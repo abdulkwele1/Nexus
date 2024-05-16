@@ -5,14 +5,8 @@ import HelloWorld from './components/HelloWorld.vue'
 
 <template>
   <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
    <div class="wrapper">
       <HelloWorld msg="Second time!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
     </div>
   </header>
 
@@ -32,10 +26,11 @@ header {
 }
 
 nav {
-  width: 100%;
-  font-size: 12px;
+  width: 1000%;
+  font-size: 18px;
   text-align: center;
   margin-top: 2rem;
+
 }
 
 nav a.router-link-exact-active {
@@ -58,13 +53,14 @@ nav a:first-of-type {
 
 @media (min-width: 1024px) {
   header {
-    display: flex;
+    display: center;
     place-items: center;
     padding-right: calc(var(--section-gap) / 2);
   }
 
   .logo {
     margin: 0 2rem 0 0;
+    display: flex;
   }
 
   header .wrapper {
@@ -73,13 +69,6 @@ nav a:first-of-type {
     flex-wrap: wrap;
   }
 
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
 
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
 }
 </style>
