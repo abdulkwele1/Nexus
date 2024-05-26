@@ -8,8 +8,7 @@ defineProps<{
 <nav class="bg-white border-gray-200 dark:bg-gray-900">
   <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
     <a href="https://flowbite.com/" class="flex items-center space-x-3 rtl:space-x-reverse">
-        <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-        <span class="self-center text-5xl font-semibold whitespace-nowrap dark:text-white">Nexus</span>
+        <img alt="Vue logo" class="logo" src="@/assets/ProjectNexus.png" width="150" height="125" />
     </a>
     <button data-collapse-toggle="navbar-default" type="button" class="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600" aria-controls="navbar-default" aria-expanded="false">
         <span class="sr-only">Open main menu</span>
