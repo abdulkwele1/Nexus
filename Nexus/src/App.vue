@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import LandingPage from './components/LandingPage.vue'
 </script>
 
 <template>
   <header>
    <div class="wrapper">
-      <HelloWorld msg="Second time!" />
+      <LandingPage msg="Second time!" />
     </div>
   </header>
 

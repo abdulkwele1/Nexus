@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import TheWelcome from '../components/TheWelcome.vue'
+import SignInPage from '../components/SignInPage.vue'
 </script>
 
 <template>
   <main>
-    <TheWelcome />
+    <SignInPage />
   </main>
 </template>
