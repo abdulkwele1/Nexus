@@ -8,17 +8,17 @@ const settings = {
   // Where the tokens will be stored
   userStore: new WebStorageStateStore({ store: window.sessionStorage }),
   // URL to the authentication server (including realm)
-  authority: 'http://localhost:5173/auth/realms/auth-example',
+  authority: "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_DvkMmb2EP",
   // The name of the client in Keycloak setup for this service
-  client_id: 'webclient-service',
+  client_id: "6pu7h0ltofehkq1f3gh7bpj31b",
   // Where to redirect the user to after successful authentication
   redirect_uri: 'http://localhost:5173/login',
   // Where to redirect the user to after logging the user out
   post_logout_redirect_uri: 'http://localhost:5173/logout',
   // Indicate the the authorization code flow should be used
-  response_type: 'code',
+  response_type: "token",
   // "openid" tells the server that this client uses oidc for authentication
-  scope: 'openid',
+  scope: "openid profile email",
   // Enable automatic (silent) renewal of the access token
   automaticSilentRenew: true
 }

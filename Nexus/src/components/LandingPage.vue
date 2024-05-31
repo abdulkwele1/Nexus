@@ -1,8 +1,4 @@
-<script setup lang="ts">
-defineProps<{
-  msg: string
-}>()
-</script>
+
 
 <template>
 <nav class="bg-white border-gray-200 dark:bg-gray-900">
@@ -40,3 +36,26 @@ defineProps<{
 </template>
 
 
+<script>
+
+export default {
+  props: ['msg'],
+  setup(props) {
+    // setup() receives props as the first argument.
+    console.log(props.msg)
+  },
+  name: 'LandingPage',
+  data () {
+   
+  },
+  mounted () {
+        
+  },
+  methods: {
+    onLogin () {
+      this.$auth.login()
+    },
+   
+  }
+}
+</script>

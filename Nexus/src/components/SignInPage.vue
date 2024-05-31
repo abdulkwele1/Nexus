@@ -1,31 +1,5 @@
 
 <template>
-  <div>
-    <h1>Welcome!</h1>
-    <router-link
-      v-if="isUserLoggedIn"
-      to="/protected"
-    >
-      Protected |
-    </router-link>
-    <router-link
-      v-if="isUserLoggedIn"
-      to="/profile"
-    >
-      Profile
-    </router-link>
-    <br>
-    <button
-      v-if="!isUserLoggedIn"
-      @click="onLogin()"
-    >
-      Login
-    </button>
-    <button
-      v-else
-      @click="onLogout()"
-    >
-      Logout
-    </button>
-  </div>
+  
 </template>
+
