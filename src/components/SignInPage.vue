@@ -12,15 +12,18 @@ import { ref } from 'vue';
 const username = ref('');
 
 // Handle the login action
-const handleLogin = () => {
+async function handleLogin () {
   // Check if the username input is not empty after trimming whitespace
   if (username.value.trim()) {
     try {
       // Construct the URL with the username
       const url = `http://localhost:8080/${username.value.trim()}`;
-      
-      // Redirect to the constructed URL
-      window.location.href = url;
+
+      let response = await fetch(url)
+
+      console.log(response)
+
+      alert(`api says ${response.url}`)
     } catch (error) {
       console.error('An error occurred during redirection:', error);
       alert('Failed to redirect.');
