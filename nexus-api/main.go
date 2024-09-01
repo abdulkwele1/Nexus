@@ -7,10 +7,11 @@ import (
 	"nexus-api/service"
 
 	"github.com/gorilla/mux"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
-	fmt.Print("api server starting")
+	fmt.Println("api server starting")
 
 	router := mux.NewRouter()
 
@@ -22,6 +23,7 @@ func main() {
 	http.Handle("/", router)
 
 	http.ListenAndServe(":8080", nil)
+
 }
 
 func HelloServer(w http.ResponseWriter, r *http.Request) {
@@ -39,11 +41,23 @@ type LoginResponse struct {
 	RedirectURL string `json:"redirect_url"`
 	Password    string `json:"password"`
 	Username    string `json:"username"`
+	Hash        string `json:"hash"`
+	Match       bool   `json:"match"`
 }
 
 var LoginInfo = map[string]string{
-	"username1": "passwordHash",
+	"abdul":     "passwordHash",
 	"username2": "passwordHash",
+}
+
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -58,15 +72,25 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("login username %s, password %s", request.Username, request.Password)
+	fmt.Printf("login username %s, password %s\n", request.Username, request.Password)
+
+	passwordHashForUser, exists := LoginInfo[request.Username]
+	if !exists {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(struct{}{})
+		return
+	}
+
+	match := CheckPasswordHash(request.Password, passwordHashForUser)
 
 	response := LoginResponse{
 		RedirectURL: "/",
 		Password:    request.Password,
 		Username:    request.Username,
+		Hash:        passwordHashForUser,
+		Match:       match,
 	}
-
-	passwordHashForUser, exists := LoginInfo[request.Username]
 
 	// username doesn't exist in our system
 	if !exists {

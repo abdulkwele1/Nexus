@@ -22,8 +22,8 @@ async function handleLogin () {
       const url = `http://localhost:8080/login`;
 
       let data = {
-        "password":  username.value.trim(),
-        "username":  password.value.trim()
+        "password":  password.value.trim(),
+        "username":  username.value.trim()
       }
 
       let response = await fetch(url, {
@@ -53,7 +53,7 @@ async function handleLogin () {
   justify-content: center; /* Center vertically */
   align-items: center; /* Center horizontally */
   height: 100vh; /* Full viewport height */
-  background-color: #f0f0f0; /* Optional: Background color */
+  background-color: ##FFFFFF; /* Optional: Background color */
 }
 
 input {
@@ -75,4 +75,5 @@ button {
 button:hover {
   background-color: #0056b3;
 }
+
 </style>
