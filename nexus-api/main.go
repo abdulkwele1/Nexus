@@ -3,14 +3,22 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"nexus-api/service"
-
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
+	"net/http"
+	"nexus-api/service"
 )
 
 func main() {
+
+	//generate a hash for password123
+	hash, err := HashPassword("password123")
+	if err != nil {
+		fmt.Println("Error generating hash:", err)
+		return
+	}
+	fmt.Println("Hash for password123:", hash)
+
 	fmt.Println("api server starting")
 
 	router := mux.NewRouter()
@@ -46,8 +54,7 @@ type LoginResponse struct {
 }
 
 var LoginInfo = map[string]string{
-	"abdul":     "passwordHash",
-	"username2": "passwordHash",
+	"abdul": "<generated-hash-for-password123>",
 }
 
 func HashPassword(password string) (string, error) {
@@ -74,6 +81,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("login username %s, password %s\n", request.Username, request.Password)
 
+	// username doesnt exist in our system
+
 	passwordHashForUser, exists := LoginInfo[request.Username]
 	if !exists {
 		w.Header().Set("Content-Type", "application/json")
@@ -92,8 +101,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Match:       match,
 	}
 
-	// username doesn't exist in our system
-	if !exists {
+	//if passwordHash doesnt match
+	if !match {
 		w.Header().Set("Content-Type", "application/json")
 		// return access denied
 		w.WriteHeader(http.StatusUnauthorized)

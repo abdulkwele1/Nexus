@@ -46,6 +46,25 @@ async function handleLogin () {
 };
 </script>
 
+<script>
+   fetch("https://jsonplaceholder.typicode.com/todos")
+   .then(response=>{
+      if (response.ok){
+
+      const mystatus = response.status;
+
+      // Display output in HTML page
+      document.getElementById("sendData").innerHTML = JSON.stringify(mystatus);
+      }else{
+         console.log("Request Fail:", mystatus);
+      }
+   })
+   // Handling error
+   .catch(err =>{
+      console.log("Error is:", err)
+   });
+</script>
+
 <style scoped>
 .flex-container {
   display: flex;
