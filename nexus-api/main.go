@@ -54,7 +54,7 @@ type LoginResponse struct {
 }
 
 var LoginInfo = map[string]string{
-	"abdul": "<generated-hash-for-password123>",
+	"abdul": "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
 }
 
 func HashPassword(password string) (string, error) {
