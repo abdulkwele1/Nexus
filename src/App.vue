@@ -68,6 +68,10 @@ nav a:first-of-type {
     place-items: flex-start;
     flex-wrap: wrap;
   }
+  
+  body {
+    background-color: #f0f0f0; /* Set the entire page background color to light grey */
+}
 
 
 }

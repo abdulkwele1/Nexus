@@ -1,6 +1,7 @@
 <template>
   <div class="flex-container">
     <input v-model="username" type="text" placeholder="Enter your username" />
+    <input v-model="password" type="text" placeholder="Enter your password" />
     <button @click="handleLogin">Login</button>
   </div>
 </template>
@@ -10,6 +11,7 @@ import { ref } from 'vue';
 
 // Create a reactive reference for the username
 const username = ref('');
+const password = ref('');
 
 // Handle the login action
 async function handleLogin () {
@@ -17,13 +19,23 @@ async function handleLogin () {
   if (username.value.trim()) {
     try {
       // Construct the URL with the username
-      const url = `http://localhost:8080/${username.value.trim()}`;
+      const url = `http://localhost:8080/login`;
 
-      let response = await fetch(url)
+      let data = {
+        "password":  password.value.trim(),
+        "username":  username.value.trim()
+      }
 
-      console.log(response)
+      let response = await fetch(url, {
+        headers: {
+                'Content-Type': 'application/json'
+            },
+        method: 'POST',
+        body: JSON.stringify(data)})
 
-      alert(`api says ${response.url}`)
+    let responseData = await response.json()
+      alert(`api says ${JSON.stringify(responseData)}`)
+
     } catch (error) {
       console.error('An error occurred during redirection:', error);
       alert('Failed to redirect.');
@@ -34,6 +46,25 @@ async function handleLogin () {
 };
 </script>
 
+<script>
+   fetch("https://jsonplaceholder.typicode.com/todos")
+   .then(response=>{
+      if (response.ok){
+
+      const mystatus = response.status;
+
+      // Display output in HTML page
+      document.getElementById("sendData").innerHTML = JSON.stringify(mystatus);
+      }else{
+         console.log("Request Fail:", mystatus);
+      }
+   })
+   // Handling error
+   .catch(err =>{
+      console.log("Error is:", err)
+   });
+</script>
+
 <style scoped>
 .flex-container {
   display: flex;
@@ -41,7 +72,7 @@ async function handleLogin () {
   justify-content: center; /* Center vertically */
   align-items: center; /* Center horizontally */
   height: 100vh; /* Full viewport height */
-  background-color: #f0f0f0; /* Optional: Background color */
+  background-color: ##FFFFFF; /* Optional: Background color */
 }
 
 input {
@@ -63,4 +94,5 @@ button {
 button:hover {
   background-color: #0056b3;
 }
+
 </style>
