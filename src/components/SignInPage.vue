@@ -8,10 +8,14 @@
 
 <script setup>
 import { ref } from 'vue';
+import { useRouter } from 'vue-router'
 
 // Create a reactive reference for the username
 const username = ref('');
 const password = ref('');
+
+
+const router = useRouter(); // Initalize router
 
 // Handle the login action
 async function handleLogin () {
@@ -36,6 +40,14 @@ async function handleLogin () {
     let responseData = await response.json()
       alert(`api says ${JSON.stringify(responseData)}`)
 
+  if (response.ok && responseData.valid) {
+    // Redirect to /home on succesful login
+    router.push({path: '/home'});
+  } else {
+    // Handle invalid login
+    alert('Invalid username or password');
+  }
+
     } catch (error) {
       console.error('An error occurred during redirection:', error);
       alert('Failed to redirect.');
@@ -44,25 +56,6 @@ async function handleLogin () {
     alert('Please enter a valid username.');
   }
 };
-</script>
-
-<script>
-   fetch("https://jsonplaceholder.typicode.com/todos")
-   .then(response=>{
-      if (response.ok){
-
-      const mystatus = response.status;
-
-      // Display output in HTML page
-      document.getElementById("sendData").innerHTML = JSON.stringify(mystatus);
-      }else{
-         console.log("Request Fail:", mystatus);
-      }
-   })
-   // Handling error
-   .catch(err =>{
-      console.log("Error is:", err)
-   });
 </script>
 
 <style scoped>
