@@ -10,8 +10,12 @@
         <div class="box-text">Sensors</div>
       </div>
       <div class="box">
-        <img src="../assets/profileIcon.jpg" alt="Profile Icon" class="box-image" />
-        <div class="box-text">Settings</div>
+        <RouterLink to="/settings" class="box-link">
+        <div class="box">
+          <img src="../assets/profileIcon.jpg" alt="Profile Icon" class="box-image" />
+          <div class="box-text">Settings</div>
+        </div>
+      </RouterLink>
       </div>
     </div>
   </div>
