@@ -54,7 +54,7 @@ type LoginResponse struct {
 }
 
 var LoginInfo = map[string]string{
-	"abdul": "<generated-hash-for-password123>",
+	"abdul": "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
 }
 
 func HashPassword(password string) (string, error) {
@@ -112,16 +112,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("password hash for user %s in our system is %s", request.Username, passwordHashForUser)
 
-	// hash the password provided by the user in the request
-	// compare the hash of the password we generated with passwordHashForUser
-	// if they are a match, return below
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
-	// otherwise if not return  error
-	// w.Header().Set("Content-Type", "application/json")
-	// 	// return access denied
-	// 	w.WriteHeader(http.StatusUnauthorized)
-	// 	json.NewEncoder(w).Encode(struct{}{})
-	// 	return
 }
