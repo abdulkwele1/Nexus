@@ -15,10 +15,11 @@ const username = ref('');
 const password = ref('');
 
 
-const router = useRouter(); // Initalize router
+const router = useRouter(); // Initialize router
 
 // Handle the login action
 async function handleLogin () {
+  // TODO refactor
   // Check if the username input is not empty after trimming whitespace
   if (username.value.trim()) {
     try {
@@ -40,8 +41,11 @@ async function handleLogin () {
     let responseData = await response.json()
       alert(`api says ${JSON.stringify(responseData)}`)
 
-  if (response.ok && responseData.valid) {
-    // Redirect to /home on succesful login
+  // TODO try out with abdul
+  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/debugger
+  // debugger
+  if (response.ok && responseData.match) {
+    // Redirect to /home on successful login
     router.push({path: '/home'});
   } else {
     // Handle invalid login

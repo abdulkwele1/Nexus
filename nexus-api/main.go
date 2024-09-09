@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-
+	// #TODO make into a unit test
 	//generate a hash for password123
 	hash, err := HashPassword("password123")
 	if err != nil {
@@ -23,13 +23,14 @@ func main() {
 
 	router := mux.NewRouter()
 
-	// attach router to default http server mux
+	// setup handler functions to run whenever an api endpoint is called
 	router.HandleFunc("/login", service.CorsMiddleware(LoginHandler))
 	router.HandleFunc("/hello", service.CorsMiddleware(HelloServer))
 
 	// attach router to default http server mux
 	http.Handle("/", router)
 
+	// run api on port 8080
 	http.ListenAndServe(":8080", nil)
 
 }
@@ -55,6 +56,7 @@ type LoginResponse struct {
 
 var LoginInfo = map[string]string{
 	"abdul": "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
+	"levi": "$2a$10$HqQx4jxUzfQm1fZYUZRLbOBaMNWHmhSmweH03rl0EykgE4BNfDciO",
 }
 
 func HashPassword(password string) (string, error) {
@@ -81,8 +83,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("login username %s, password %s\n", request.Username, request.Password)
 
-	// username doesnt exist in our system
-
+	// username doesn't exist in our system
 	passwordHashForUser, exists := LoginInfo[request.Username]
 	if !exists {
 		w.Header().Set("Content-Type", "application/json")
@@ -93,6 +94,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	match := CheckPasswordHash(request.Password, passwordHashForUser)
 
+	// #TODO remove sensitive info
 	response := LoginResponse{
 		RedirectURL: "/",
 		Password:    request.Password,
@@ -101,7 +103,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Match:       match,
 	}
 
-	//if passwordHash doesnt match
+	//if passwordHash doesn't match
 	if !match {
 		w.Header().Set("Content-Type", "application/json")
 		// return access denied
