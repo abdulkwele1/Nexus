@@ -46,8 +46,7 @@ async function handleLogin () {
         body: JSON.stringify(data)})
 
     let responseData = await response.json()
-    alert(`api says ${JSON.stringify(responseData)}`)
-
+   
   if (response.ok && responseData.match) {
     // set user cookie
      // default expire time: 1 day

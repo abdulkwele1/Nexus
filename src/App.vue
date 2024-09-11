@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import LandingPage from './components/LandingPage.vue'; // This includes your Navbar
+import navBar from './components/navBar.vue'; // This includes your Navbar
 
 // Get the current route
 const route = useRoute();
@@ -13,8 +13,8 @@ const isSettingsPage = computed(() => route.path === '/settings');
 <template>
   <header>
     <div class="wrapper">
-      <!-- Conditionally render LandingPage based on the route path -->
-      <LandingPage v-if="!isSettingsPage" msg="Second time!" />
+      <!-- Conditionally render navBar based on the route path -->
+      <navBar v-if="!isSettingsPage" msg="Second time!" />
     </div>
   </header>
 
