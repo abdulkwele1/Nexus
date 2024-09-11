@@ -9,13 +9,20 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router'
+import { onMounted } from 'vue'
 
 // Create a reactive reference for the username
 const username = ref('');
 const password = ref('');
 
-
 const router = useRouter(); // Initialize router
+
+// run every time page (component) loads
+// https://learnvue.co/articles/vue-lifecycle-hooks-guide
+onMounted(() => {
+    console.log('mounted in the composition api!')
+    // If user is on login page and document.cookie == “” is false (is not empty), redirect them to the home page
+})
 
 // Handle the login action
 async function handleLogin () {
@@ -42,6 +49,9 @@ async function handleLogin () {
     alert(`api says ${JSON.stringify(responseData)}`)
 
   if (response.ok && responseData.match) {
+    // set user cookie
+     // default expire time: 1 day
+    document.cookie = (username.value.trim() + ":" + responseData.cookie)
     // Redirect to /home on successful login
     router.push({path: '/home'});
   } else {

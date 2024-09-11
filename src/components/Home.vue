@@ -67,3 +67,14 @@
   text-align: center;
 }
 </style>
+
+<script setup>
+import { onMounted } from 'vue'
+
+// run every time page (component) loads
+// https://learnvue.co/articles/vue-lifecycle-hooks-guide
+onMounted(() => {
+    console.log('hommie')
+    // If user is on home page and document.cookie == “” is true, redirect the user to the login page
+})
+</script>

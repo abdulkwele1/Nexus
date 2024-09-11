@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"nexus-api/service"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
@@ -49,12 +51,15 @@ type LoginRequest struct {
 type LoginResponse struct {
 	RedirectURL string `json:"redirect_url"`
 	Match       bool   `json:"match"`
+	Cookie      string `json:"cookie"`
 }
 
 var LoginInfo = map[string]string{
 	"abdul": "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
 	"levi":  "$2a$10$HqQx4jxUzfQm1fZYUZRLbOBaMNWHmhSmweH03rl0EykgE4BNfDciO",
 }
+
+var UserCookies = map[string]string{}
 
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -104,6 +109,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(struct{}{})
 		return
 	}
+
+	response.Cookie = uuid.NewString()
+
+	UserCookies[request.Username] = response.Cookie
 
 	fmt.Printf("password hash for user %s in our system is %s", request.Username, passwordHashForUser)
 
