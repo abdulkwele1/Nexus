@@ -39,11 +39,8 @@ async function handleLogin () {
         body: JSON.stringify(data)})
 
     let responseData = await response.json()
-      alert(`api says ${JSON.stringify(responseData)}`)
+    alert(`api says ${JSON.stringify(responseData)}`)
 
-  // TODO try out with abdul
-  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/debugger
-  // debugger
   if (response.ok && responseData.match) {
     // Redirect to /home on successful login
     router.push({path: '/home'});

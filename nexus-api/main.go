@@ -48,15 +48,12 @@ type LoginRequest struct {
 
 type LoginResponse struct {
 	RedirectURL string `json:"redirect_url"`
-	Password    string `json:"password"`
-	Username    string `json:"username"`
-	Hash        string `json:"hash"`
 	Match       bool   `json:"match"`
 }
 
 var LoginInfo = map[string]string{
 	"abdul": "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
-	"levi": "$2a$10$HqQx4jxUzfQm1fZYUZRLbOBaMNWHmhSmweH03rl0EykgE4BNfDciO",
+	"levi":  "$2a$10$HqQx4jxUzfQm1fZYUZRLbOBaMNWHmhSmweH03rl0EykgE4BNfDciO",
 }
 
 func HashPassword(password string) (string, error) {
@@ -94,12 +91,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	match := CheckPasswordHash(request.Password, passwordHashForUser)
 
-	// #TODO remove sensitive info
 	response := LoginResponse{
 		RedirectURL: "/",
-		Password:    request.Password,
-		Username:    request.Username,
-		Hash:        passwordHashForUser,
 		Match:       match,
 	}
 
