@@ -65,6 +65,7 @@
   margin-top: 10px;
   font-size: 16px;
   text-align: center;
+  font-family: 'MyCustomFont', sans-serif; 
 }
 </style>
 
