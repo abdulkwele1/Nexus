@@ -131,3 +131,11 @@ dist
 
 
 pkg/**
+
+
+.vite
+
+.vscode
+
+# macOS filesystem metadata
+.DS_Store

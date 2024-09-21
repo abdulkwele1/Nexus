@@ -3,14 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"nexus-api/service"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
-
+	// #TODO make into a unit test
 	//generate a hash for password123
 	hash, err := HashPassword("password123")
 	if err != nil {
@@ -23,13 +25,14 @@ func main() {
 
 	router := mux.NewRouter()
 
-	// attach router to default http server mux
+	// setup handler functions to run whenever an api endpoint is called
 	router.HandleFunc("/login", service.CorsMiddleware(LoginHandler))
 	router.HandleFunc("/hello", service.CorsMiddleware(HelloServer))
 
 	// attach router to default http server mux
 	http.Handle("/", router)
 
+	// run api on port 8080
 	http.ListenAndServe(":8080", nil)
 
 }
@@ -47,15 +50,16 @@ type LoginRequest struct {
 
 type LoginResponse struct {
 	RedirectURL string `json:"redirect_url"`
-	Password    string `json:"password"`
-	Username    string `json:"username"`
-	Hash        string `json:"hash"`
 	Match       bool   `json:"match"`
+	Cookie      string `json:"cookie"`
 }
 
 var LoginInfo = map[string]string{
 	"abdul": "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
+	"levi":  "$2a$10$HqQx4jxUzfQm1fZYUZRLbOBaMNWHmhSmweH03rl0EykgE4BNfDciO",
 }
+
+var UserCookies = map[string]string{}
 
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -81,8 +85,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("login username %s, password %s\n", request.Username, request.Password)
 
-	// username doesnt exist in our system
-
+	// username doesn't exist in our system
 	passwordHashForUser, exists := LoginInfo[request.Username]
 	if !exists {
 		w.Header().Set("Content-Type", "application/json")
@@ -95,13 +98,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := LoginResponse{
 		RedirectURL: "/",
-		Password:    request.Password,
-		Username:    request.Username,
-		Hash:        passwordHashForUser,
 		Match:       match,
 	}
 
-	//if passwordHash doesnt match
+	//if passwordHash doesn't match
 	if !match {
 		w.Header().Set("Content-Type", "application/json")
 		// return access denied
@@ -109,6 +109,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(struct{}{})
 		return
 	}
+
+	response.Cookie = uuid.NewString()
+
+	UserCookies[request.Username] = response.Cookie
 
 	fmt.Printf("password hash for user %s in our system is %s", request.Username, passwordHashForUser)
 

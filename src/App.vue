@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import LandingPage from './components/LandingPage.vue'
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+import navBar from './components/navBar.vue'; // This includes your Navbar
+
+// Get the current route
+const route = useRoute();
+
+// Determine if the current route is /settings
+const isSettingsPage = computed(() => route.path === '/settings');
 </script>
 
 <template>
   <header>
-   <div class="wrapper">
-      <LandingPage msg="Second time!" />
+    <div class="wrapper">
+      <!-- Conditionally render navBar based on the route path -->
+      <navBar v-if="!isSettingsPage" msg="Second time!" />
     </div>
   </header>
 
   <RouterView />
 </template>
-
 
 <style scoped>
 header {
@@ -30,7 +37,6 @@ nav {
   font-size: 18px;
   text-align: center;
   margin-top: 2rem;
-
 }
 
 nav a.router-link-exact-active {
@@ -68,11 +74,9 @@ nav a:first-of-type {
     place-items: flex-start;
     flex-wrap: wrap;
   }
-  
+
   body {
     background-color: #f0f0f0; /* Set the entire page background color to light grey */
-}
-
-
+  }
 }
 </style>
