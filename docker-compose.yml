@@ -1,0 +1,37 @@
+---
+services:
+  # run postgres for nexus user, location, sensor data
+  nexus-db:
+    image: postgres:${POSTGRES_VERSION}
+    env_file: .env
+    ports:
+      - "${POSTGRES_HOST_PORT}:${POSTGRES_CONTAINER_PORT}"
+    expose:
+      - "${POSTGRES_CONTAINER_PORT}"
+  # run api service
+  nexus-api:
+    build:
+      context: ./nexus-api
+      dockerfile: ../api.local.Dockerfile
+    env_file: .env
+    ports:
+      - "${NEXUS_API_CONTAINER_PORT}:${NEXUS_API_HOST_PORT}"
+      - "${NEXUS_API_CONTAINER_DEBUG_PORT}:${NEXUS_API_HOST_DEBUG_PORT}"
+    cap_add:
+      - SYS_PTRACE # Allows for attaching debugger to process in this container
+  # run vuejs web app for
+  nexus-ui:
+      build:
+        context: .
+        dockerfile: ui.local.Dockerfile
+      ports:
+      - '${NEXUS_UI_HOST_PORT}:${NEXUS_UI_CONTAINER_PORT}'
+      # mount local code sources to allow hot reloading
+      volumes:
+      - .:/app
+  docker-host:
+    image: qoomon/docker-host
+    cap_add: [ 'NET_ADMIN', 'NET_RAW' ]
+    mem_limit: 8M
+    restart: on-failure
+
