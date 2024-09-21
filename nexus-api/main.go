@@ -5,10 +5,21 @@ import (
 	"fmt"
 	"net/http"
 	"nexus-api/service"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
+)
+
+type APIConfig struct {
+	APIPort string
+}
+
+var (
+	apiConfig = APIConfig{
+		APIPort: os.Getenv("API_PORT"),
+	}
 )
 
 func main() {
@@ -32,8 +43,8 @@ func main() {
 	// attach router to default http server mux
 	http.Handle("/", router)
 
-	// run api on port 8080
-	http.ListenAndServe(":8080", nil)
+	// run api service listening on the configured port
+	http.ListenAndServe(fmt.Sprintf(":%s", apiConfig.APIPort), nil)
 
 }
 

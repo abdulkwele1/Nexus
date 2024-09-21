@@ -11,6 +11,10 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router'
 import { onMounted } from 'vue'
 
+const {
+  VITE_NEXUS_API_URL,
+} = import.meta.env;
+
 // Create a reactive reference for the username
 const username = ref('');
 const password = ref('');
@@ -31,7 +35,7 @@ async function handleLogin () {
   if (username.value.trim()) {
     try {
       // Construct the URL with the username
-      const url = `http://localhost:8080/login`;
+      const url = `${VITE_NEXUS_API_URL}/login`;
 
       let data = {
         "password":  password.value.trim(),
