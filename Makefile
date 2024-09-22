@@ -1,5 +1,5 @@
 # execute these tasks when `make` with no target is invoked
-default: unit-test reset ready e2e-test logs
+default: unit-test reset e2e-test logs
 
 # import environment file for setting or overriding
 # configuration used by this Makefile
