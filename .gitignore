@@ -138,3 +138,7 @@ pkg/**
 
 # macOS filesystem metadata
 .DS_Store
+
+
+# Go language server
+bin/gopls

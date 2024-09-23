@@ -17,11 +17,13 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # copy over local sources used to build service
-COPY *.go ./
+COPY logging logging
+COPY main.go main.go
 COPY service service
+COPY clients clients
 
 # build service from latest sources
-# with all compilier optimizations off to support debugging
+# with all compiler optimizations off to support debugging
 RUN go install  -gcflags=all="-N -l"
 
 # by default when a container is started from this image

@@ -117,4 +117,4 @@ debug-nexus-api:
 # open a connection to the postgres database for debugging it's state
 # https://www.postgresql.org/docs/current/app-psql.html
 debug-database:
-	docker compose exec postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+	docker compose exec nexus-db psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}

@@ -34,4 +34,3 @@ services:
     cap_add: [ 'NET_ADMIN', 'NET_RAW' ]
     mem_limit: 8M
     restart: on-failure
-
