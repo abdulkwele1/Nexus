@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"nexus-api/clients/database"
@@ -20,6 +21,7 @@ import (
 var (
 	serviceCtx    = context.Background()
 	serviceLogger *logging.ServiceLogger
+	apiService    *APIService
 )
 
 type APIConfig struct {
@@ -27,16 +29,16 @@ type APIConfig struct {
 }
 
 type APIService struct {
-	config         APIConfig
-	server         http.Server
-	databaseClient *database.PostgresClient
+	Config         APIConfig
+	DatabaseClient *database.PostgresClient
 	*logging.ServiceLogger
 }
 
 func main() {
 	// setup logger
 	logLevel := os.Getenv("LOG_LEVEL")
-	serviceLogger, err := logging.New(os.Getenv("LOG_LEVEL"))
+	logger, err := logging.New(os.Getenv("LOG_LEVEL"))
+	serviceLogger = &logger
 
 	if err != nil {
 		panic(fmt.Errorf("error %s creating serviceLogger with level %s", err, logLevel))
@@ -51,7 +53,7 @@ func main() {
 		SSLEnabled:            os.Getenv("DATABASE_SSL_ENABLED") == "true",
 		QueryLoggingEnabled:   os.Getenv("DATABASE_QUERY_LOGGING_ENABLED") == "true",
 		RunDatabaseMigrations: os.Getenv("RUN_DATABASE_MIGRATIONS") == "true",
-		Logger:                &serviceLogger,
+		Logger:                serviceLogger,
 	}
 
 	serviceLogger.Debug().Msgf("loaded databaseClient config %+v", databaseConfig)
@@ -67,7 +69,7 @@ func main() {
 	if databaseConfig.RunDatabaseMigrations {
 		go func() {
 			for {
-				ranMigrations, err := database.Migrate(serviceCtx, databaseClient.DB, *migrations.Migrations, &serviceLogger)
+				ranMigrations, err := database.Migrate(serviceCtx, databaseClient.DB, *migrations.Migrations, serviceLogger)
 
 				if err != nil {
 					serviceLogger.Error().Msgf("error %s running migrations %+v, will retry in 3 seconds", err, migrations.Migrations)
@@ -78,6 +80,29 @@ func main() {
 				}
 
 				serviceLogger.Info().Msgf("successfully ran migrations %+v", ranMigrations)
+
+				// seed super users
+				leviLoginAuthentication := database.LoginAuthentication{
+					UserName:     "levi",
+					PasswordHash: "$2a$10$HqQx4jxUzfQm1fZYUZRLbOBaMNWHmhSmweH03rl0EykgE4BNfDciO",
+				}
+
+				err = leviLoginAuthentication.Save(serviceCtx, databaseClient.DB)
+
+				if err != nil {
+					panic(fmt.Errorf("error %s saving leviLoginAuthentication %+v to database", err, leviLoginAuthentication))
+				}
+
+				abdulLoginAuthentication := database.LoginAuthentication{
+					UserName:     "abdul",
+					PasswordHash: "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
+				}
+
+				err = abdulLoginAuthentication.Save(serviceCtx, databaseClient.DB)
+
+				if err != nil {
+					panic(fmt.Errorf("error %s saving abdulLoginAuthentication %+v to database", err, abdulLoginAuthentication))
+				}
 
 				return
 			}
@@ -92,10 +117,10 @@ func main() {
 	serviceLogger.Debug().Msgf("loaded api config %+v", apiConfig)
 
 	// create api service
-	_ = APIService{
-		config:         apiConfig,
-		ServiceLogger:  &serviceLogger,
-		databaseClient: &databaseClient,
+	apiService = &APIService{
+		Config:         apiConfig,
+		ServiceLogger:  serviceLogger,
+		DatabaseClient: &databaseClient,
 	}
 
 	// #TODO make into a unit test
@@ -139,11 +164,6 @@ type LoginResponse struct {
 	Cookie      string `json:"cookie"`
 }
 
-var LoginInfo = map[string]string{
-	"abdul": "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
-	"levi":  "$2a$10$HqQx4jxUzfQm1fZYUZRLbOBaMNWHmhSmweH03rl0EykgE4BNfDciO",
-}
-
 var UserCookies = map[string]string{}
 
 func HashPassword(password string) (string, error) {
@@ -170,16 +190,33 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	serviceLogger.Debug().Msgf("login username %s, password %s\n", request.Username, request.Password)
 
-	// username doesn't exist in our system
-	passwordHashForUser, exists := LoginInfo[request.Username]
-	if !exists {
+	// check if username doesn't exist in our system
+	loginAuthentication, err := database.GetLoginAuthenticationByUserName(serviceCtx, apiService.DatabaseClient.DB, request.Username)
+
+	if err != nil {
+		if errors.Is(err, database.ErrorNoLoginAuthenticationForUsername) {
+			apiService.Debug().Msgf("%s for %s", err, request.Username)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(struct{}{})
+			return
+		}
+
+		apiService.Error().Msgf("error %s looking up loginAuthentication for %s", err, request.Username)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(struct{}{})
+		return
+	}
+
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(struct{}{})
 		return
 	}
 
-	match := CheckPasswordHash(request.Password, passwordHashForUser)
+	match := CheckPasswordHash(request.Password, loginAuthentication.PasswordHash)
 
 	response := LoginResponse{
 		RedirectURL: "/",
@@ -199,7 +236,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	UserCookies[request.Username] = response.Cookie
 
-	serviceLogger.Debug().Msgf("password hash for user %s in our system is %s", request.Username, passwordHashForUser)
+	serviceLogger.Debug().Msgf("password hash for user %s in our system is %s", request.Username, loginAuthentication.PasswordHash)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

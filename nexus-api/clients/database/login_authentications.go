@@ -14,10 +14,10 @@ var (
 
 // LoginAuthentication represents a location based event for tracked assets
 type LoginAuthentication struct {
-	bun.BaseModel `bun:"table:login_authentication"`
+	bun.BaseModel `bun:"table:login_authentications"`
 	ID            int64  `bun:",pk,autoincrement"`
 	UserName      string `bun:"user_name"`
-	PasswordHash  string `bun:"resource_id"`
+	PasswordHash  string `bun:"password_hash"`
 }
 
 // Save saves the current activity to
@@ -42,12 +42,12 @@ func (a *LoginAuthentication) Update(ctx context.Context, db *bun.DB) error {
 	return err
 }
 
-// GetLoginAuthenticationsByUserName returns the row in the
+// GetLoginAuthenticationByUserName returns the row in the
 // login_authentications table that has the specified userName
 // or error if any of the below are true
 // an error was encountered searching the database
 // no login authentication information exists for that userName
-func GetLoginAuthenticationsByUserName(ctx context.Context, db *bun.DB, userName string) (LoginAuthentication, error) {
+func GetLoginAuthenticationByUserName(ctx context.Context, db *bun.DB, userName string) (LoginAuthentication, error) {
 	var loginAuthentications []LoginAuthentication
 	err := db.NewSelect().Model(&loginAuthentications).Where("user_name = ?", userName).Scan(ctx)
 
