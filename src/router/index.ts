@@ -17,9 +17,10 @@ const router = createRouter({
     {
       path: '/solar',
       name: 'solar',
-      component: SolarPage // Solar page
+      component: SolarPage, // Solar page
+      meta: { requiresAuth: true } // Protect this route
     },
-    
+
     {
       path: '/',
       name: 'home',
@@ -31,6 +32,7 @@ const router = createRouter({
       component: Home,
       meta: { requiresAuth: true } // Protect this route
     },
+
     {
       path: '/settings',
       name: 'userSettings',
