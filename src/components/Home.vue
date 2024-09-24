@@ -10,12 +10,12 @@
         <div class="box-text">Sensors</div>
       </div>
       <div class="box">
-        <RouterLink to="/home" class="box-link">
-        <div class="box">
-          <img src="../assets/solarIcon.jpg" alt="Profile Icon" class="box-image" />
-          <div class="box-text">Solar Panels</div>
-        </div>
-      </RouterLink>
+        <RouterLink to="/solar" class="box-link">
+          <div class="box">
+            <img src="../assets/solarIcon.jpg" alt="Solar Icon" class="box-image" />
+            <div class="box-text">Solar Panels</div>
+          </div>
+        </RouterLink>
       </div>
     </div>
   </div>
