@@ -1,10 +1,12 @@
 <template>
   <div>
     <div class="container">
+    <RouterLink to="/locations" class="box-link">
       <div class="box">
         <img src="../assets/locationIcon.jpg" alt="Location Icon" class="box-image" />
         <div class="box-text">Locations</div>
       </div>
+       </RouterLink>
       <div class="box">
         <img src="../assets/sensorIcon.jpg" alt="Sensor Icon" class="box-image" />
         <div class="box-text">Sensors</div>
