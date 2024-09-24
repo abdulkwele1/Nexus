@@ -173,7 +173,7 @@ func main() {
 	router.HandleFunc("/hello", service.CorsMiddleware(AuthMiddleware(HelloServer)))        // Protect the hello route
 	router.HandleFunc("/settings", service.CorsMiddleware(AuthMiddleware(SettingsHandler))) // Protect the settings route
 	router.HandleFunc("/home", service.CorsMiddleware(AuthMiddleware(HomeHandler)))         // Protect the home route
-
+	router.HandleFunc("/home", service.CorsMiddleware(AuthMiddleware(SolarHandler)))
 	http.Handle("/", router)
 
 	// run api service listening on the configured port
@@ -184,6 +184,11 @@ func HelloServer(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Path[1:]
 	serviceLogger.Debug().Msgf("api called with %s \n", name)
 	fmt.Fprintf(w, "Hello, %s!", name)
+}
+
+func SolarHandler(W http.ResponseWriter, r *http.Request) {
+	username := r.Context().Value("username").(string)
+	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
 }
 
 func SettingsHandler(w http.ResponseWriter, r *http.Request) {
