@@ -73,12 +73,12 @@ func HelloServer(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, %s!", name)
 }
 
-func LocationsHandler(W http.ResponseWriter, r *http.Request) {
+func LocationsHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.Context().Value("username").(string)
 	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
 }
 
-func SolarHandler(W http.ResponseWriter, r *http.Request) {
+func SolarHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.Context().Value("username").(string)
 	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
 }
