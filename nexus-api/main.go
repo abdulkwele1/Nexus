@@ -112,6 +112,38 @@ func main() {
 
 				serviceLogger.Info().Msgf("successfully ran migrations %+v", ranMigrations)
 
+				// Example of how to update password for user
+				// Step 1: check if user exists
+				// check if username doesn't exist in our system
+				userNameToUpdatePasswordFor := "levi"
+				newPassword := "newPassword"
+				loginAuthentication, err := database.GetLoginAuthenticationByUserName(serviceCtx, apiService.DatabaseClient.DB, userNameToUpdatePasswordFor)
+				if err != nil {
+					// handle case where user doesn't exist
+					if errors.Is(err, database.ErrorNoLoginAuthenticationForUsername) {
+						apiService.Debug().Msgf("%s for %s", err, userNameToUpdatePasswordFor)
+
+						return
+					}
+					// handle case where issue talkng to database
+					apiService.Error().Msgf("error %s looking up loginAuthentication for %s", err, userNameToUpdatePasswordFor)
+
+					return
+				}
+				// Step 2: compute hash for new password
+				newPasswordHash, err := HashPassword(newPassword)
+
+				if err != nil {
+					// handle error
+					apiService.Error().Msgf("error %s hashing new password %s", err, newPassword)
+				}
+				// Step 3: update password hash for user in database
+				loginAuthentication.PasswordHash = newPasswordHash
+				err = loginAuthentication.Update(serviceCtx, apiService.DatabaseClient.DB)
+				if err != nil {
+					// handle error
+					apiService.Error().Msgf("error %s updating loginAuthentication for %+v", err, loginAuthentication)
+				}
 				return
 			}
 		}()
