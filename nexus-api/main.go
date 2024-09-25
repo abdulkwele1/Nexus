@@ -10,7 +10,9 @@ import (
 	"nexus-api/clients/database/schemas/postgres/migrations"
 	"nexus-api/logging"
 	"nexus-api/service"
+
 	"os"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +34,36 @@ type APIService struct {
 	Config         APIConfig
 	DatabaseClient *database.PostgresClient
 	*logging.ServiceLogger
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// Middleware to check for valid session cookie
+func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_id")
+		if err != nil || cookie == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Check if the cookie value matches any user's cookie
+		for username, userCookie := range UserCookies {
+			if userCookie == cookie.Value {
+				// Attach username to request context for later use
+				ctx := context.WithValue(r.Context(), "username", username)
+				r = r.WithContext(ctx)
+				next(w, r)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
+	}
 }
 
 func main() {
@@ -138,9 +170,10 @@ func main() {
 
 	// setup handler functions to run whenever a specific api endpoint is called
 	router.HandleFunc("/login", service.CorsMiddleware(LoginHandler))
-	router.HandleFunc("/hello", service.CorsMiddleware(HelloServer))
+	router.HandleFunc("/hello", service.CorsMiddleware(AuthMiddleware(HelloServer)))        // Protect the hello route
+	router.HandleFunc("/settings", service.CorsMiddleware(AuthMiddleware(SettingsHandler))) // Protect the settings route
+	router.HandleFunc("/home", service.CorsMiddleware(AuthMiddleware(HomeHandler)))         // Protect the home route
 
-	// attach router to default http server mux
 	http.Handle("/", router)
 
 	// run api service listening on the configured port
@@ -151,6 +184,16 @@ func HelloServer(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Path[1:]
 	serviceLogger.Debug().Msgf("api called with %s \n", name)
 	fmt.Fprintf(w, "Hello, %s!", name)
+}
+
+func SettingsHandler(w http.ResponseWriter, r *http.Request) {
+	username := r.Context().Value("username").(string)
+	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
+}
+
+func HomeHandler(w http.ResponseWriter, r *http.Request) {
+	username := r.Context().Value("username").(string)
+	fmt.Fprintf(w, "Home page - only accessible with a valid cookie! User: %s", username)
 }
 
 type LoginRequest struct {
@@ -184,7 +227,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		serviceLogger.Debug().Msgf("error %s parsing %+v", err, request)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(struct{}{})
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request"})
 		return
 	}
 
@@ -212,7 +255,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(struct{}{})
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
 		return
 	}
 
@@ -223,20 +266,29 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Match:       match,
 	}
 
-	//if passwordHash doesn't match
 	if !match {
 		w.Header().Set("Content-Type", "application/json")
-		// return access denied
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(struct{}{})
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
 		return
 	}
 
 	response.Cookie = uuid.NewString()
-
 	UserCookies[request.Username] = response.Cookie
 
 	serviceLogger.Debug().Msgf("password hash for user %s in our system is %s", request.Username, loginAuthentication.PasswordHash)
+
+	// Set the cookie with an expiration time
+	expiration := time.Now().Add(1 * time.Hour)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_id",
+		Value:    response.Cookie,
+		Path:     "/",
+		Expires:  expiration,
+		MaxAge:   3600,  // 1 hour
+		HttpOnly: true,  // Optional: helps mitigate XSS
+		Secure:   false, // Set to true if serving over HTTPS
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

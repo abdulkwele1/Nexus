@@ -13,7 +13,7 @@ const isHomePage = computed(() => route.path === '/home');
 <nav style="background-color: #FFFFFF; border-color: #e5e7eb;">
   <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
     <a href="/" class="flex items-center space-x-3 rtl:space-x-reverse">
-        <img alt="Vue logo" class="logo" src="@/assets/ProjectNexus.png" width="150" height="125" />
+        <img alt="Vue logo" class="logo" src="@/assets/nexus.png" width="175" height="150" />
     </a>
     <button data-collapse-toggle="navbar-default" type="button" class="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600" aria-controls="navbar-default" aria-expanded="false">
         <span class="sr-only">Open main menu</span>

@@ -9,6 +9,10 @@
       <div class="option" @click="optionTwo">
         Change password
       </div>
+      <div class="divider"></div>
+      <div class="option" @click="logout">
+        Log Out
+      </div>
     </div>
   </div>
 </template>
@@ -18,17 +22,33 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
-// Methods to handle button clicks
+// Function to delete a cookie by name
+const deleteCookie = (name: string) => {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+};
+
+// Navigate to the home page
 const goHome = () => {
-  router.push('/home'); // Replace '/home' with your actual home route
+  router.push('/home'); // Adjust the path as necessary
 };
 
+// Placeholder for changing email
 const optionOne = () => {
-  // Handle option one click
+  // Implement change email functionality
 };
 
+// Placeholder for changing password
 const optionTwo = () => {
-  // Handle option two click
+  // Implement change password functionality
+};
+
+// Handle user logout
+const logout = () => {
+  // Clear the session cookie
+  deleteCookie('session_id'); // Call deleteCookie to remove the cookie
+  
+  // Redirect to the login page
+  router.push('/'); // This redirects to the login page
 };
 </script>
 
