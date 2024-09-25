@@ -9,7 +9,7 @@ Before starting development on this project, ensure you have installed the follo
 * [NPM](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) for ui development
 * [Golang](https://go.dev/doc/install) for api development
 * [Docker](https://docs.docker.com/engine/install/)
-
+* [psql](https://www.timescale.com/blog/how-to-install-psql-on-mac-ubuntu-debian-windows/)
 ## Running Nexus App Locally Using Docker
 
 To run both the ui and api service

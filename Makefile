@@ -118,3 +118,8 @@ debug-nexus-api:
 # https://www.postgresql.org/docs/current/app-psql.html
 debug-database:
 	docker compose exec nexus-db psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+
+.PHONY: seed-database
+# add seed state to database
+seed-database:
+	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_login_authentication_seed.sql

@@ -87,8 +87,7 @@ func main() {
 		RunDatabaseMigrations: os.Getenv("RUN_DATABASE_MIGRATIONS") == "true",
 		Logger:                serviceLogger,
 	}
-
-	serviceLogger.Debug().Msgf("loaded databaseClient config %+v", databaseConfig)
+	serviceLogger.Debug().Msgf("loaded databaseClient confiEg %+v", databaseConfig)
 
 	// create database client
 	databaseClient, err := database.NewPostgresClient(databaseConfig)
@@ -112,29 +111,6 @@ func main() {
 				}
 
 				serviceLogger.Info().Msgf("successfully ran migrations %+v", ranMigrations)
-
-				// seed super users
-				leviLoginAuthentication := database.LoginAuthentication{
-					UserName:     "levi",
-					PasswordHash: "$2a$10$HqQx4jxUzfQm1fZYUZRLbOBaMNWHmhSmweH03rl0EykgE4BNfDciO",
-				}
-
-				err = leviLoginAuthentication.Save(serviceCtx, databaseClient.DB)
-
-				if err != nil {
-					panic(fmt.Errorf("error %s saving leviLoginAuthentication %+v to database", err, leviLoginAuthentication))
-				}
-
-				abdulLoginAuthentication := database.LoginAuthentication{
-					UserName:     "abdul",
-					PasswordHash: "$2a$14$KXCe7VMOjZdf/BwSKIFLxu2FRHcr.DAQntjq8OfdqQI69EOQz4gHW",
-				}
-
-				err = abdulLoginAuthentication.Save(serviceCtx, databaseClient.DB)
-
-				if err != nil {
-					panic(fmt.Errorf("error %s saving abdulLoginAuthentication %+v to database", err, abdulLoginAuthentication))
-				}
 
 				return
 			}
@@ -247,7 +223,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// check if username doesn't exist in our system
 	loginAuthentication, err := database.GetLoginAuthenticationByUserName(serviceCtx, apiService.DatabaseClient.DB, request.Username)
-
 	if err != nil {
 		if errors.Is(err, database.ErrorNoLoginAuthenticationForUsername) {
 			apiService.Debug().Msgf("%s for %s", err, request.Username)
