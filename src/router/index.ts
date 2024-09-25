@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '../views/HomeView.vue';
 import Home from '../components/Home.vue';
 import userSettings from '../components/userSettings.vue';
+import SolarPage from '../components/SolarPage.vue';
+import Locations from '../components/Locations.vue';
 
 // Function to get a cookie by name
 function getCookie(name) {
@@ -13,6 +15,21 @@ function getCookie(name) {
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+
+    {
+      path: '/locations',
+      name: 'locations',
+      component: Locations,
+      meta: { requiresAuth: true }
+    },
+
+    {
+      path: '/solar',
+      name: 'solar',
+      component: SolarPage, // Solar page
+      meta: { requiresAuth: true } // Protect this route
+    },
+
     {
       path: '/',
       name: 'home',
@@ -24,6 +41,7 @@ const router = createRouter({
       component: Home,
       meta: { requiresAuth: true } // Protect this route
     },
+
     {
       path: '/settings',
       name: 'userSettings',

@@ -170,9 +170,11 @@ func main() {
 
 	// setup handler functions to run whenever a specific api endpoint is called
 	router.HandleFunc("/login", service.CorsMiddleware(LoginHandler))
-	router.HandleFunc("/hello", service.CorsMiddleware(AuthMiddleware(HelloServer)))        // Protect the hello route
-	router.HandleFunc("/settings", service.CorsMiddleware(AuthMiddleware(SettingsHandler))) // Protect the settings route
-	router.HandleFunc("/home", service.CorsMiddleware(AuthMiddleware(HomeHandler)))         // Protect the home route
+	router.HandleFunc("/hello", service.CorsMiddleware(AuthMiddleware(HelloServer)))         // Protect the hello route
+	router.HandleFunc("/settings", service.CorsMiddleware(AuthMiddleware(SettingsHandler)))  // Protect the settings route
+	router.HandleFunc("/home", service.CorsMiddleware(AuthMiddleware(HomeHandler)))          // Protect the home route
+	router.HandleFunc("/solar", service.CorsMiddleware(AuthMiddleware(SolarHandler)))        //protects solar route
+	router.HandleFunc("/loations", service.CorsMiddleware(AuthMiddleware(LocationsHandler))) //p protects location route
 
 	http.Handle("/", router)
 
@@ -184,6 +186,16 @@ func HelloServer(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Path[1:]
 	serviceLogger.Debug().Msgf("api called with %s \n", name)
 	fmt.Fprintf(w, "Hello, %s!", name)
+}
+
+func LocationsHandler(w http.ResponseWriter, r *http.Request) {
+	username := r.Context().Value("username").(string)
+	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
+}
+
+func SolarHandler(w http.ResponseWriter, r *http.Request) {
+	username := r.Context().Value("username").(string)
+	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
 }
 
 func SettingsHandler(w http.ResponseWriter, r *http.Request) {

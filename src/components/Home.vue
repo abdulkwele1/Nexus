@@ -1,21 +1,23 @@
 <template>
   <div>
     <div class="container">
+    <RouterLink to="/locations" class="box-link">
       <div class="box">
         <img src="../assets/locationIcon.jpg" alt="Location Icon" class="box-image" />
         <div class="box-text">Locations</div>
       </div>
+       </RouterLink>
       <div class="box">
         <img src="../assets/sensorIcon.jpg" alt="Sensor Icon" class="box-image" />
         <div class="box-text">Sensors</div>
       </div>
       <div class="box">
-        <RouterLink to="/home" class="box-link">
-        <div class="box">
-          <img src="../assets/solarIcon.jpg" alt="Profile Icon" class="box-image" />
-          <div class="box-text">Solar Panels</div>
-        </div>
-      </RouterLink>
+        <RouterLink to="/solar" class="box-link">
+          <div class="box">
+            <img src="../assets/solarIcon.jpg" alt="Solar Icon" class="box-image" />
+            <div class="box-text">Solar Panels</div>
+          </div>
+        </RouterLink>
       </div>
     </div>
   </div>
