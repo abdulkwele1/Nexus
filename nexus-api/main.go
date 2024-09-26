@@ -87,7 +87,7 @@ func main() {
 		RunDatabaseMigrations: os.Getenv("RUN_DATABASE_MIGRATIONS") == "true",
 		Logger:                serviceLogger,
 	}
-	serviceLogger.Debug().Msgf("loaded databaseClient confiEg %+v", databaseConfig)
+	serviceLogger.Debug().Msgf("loaded databaseClient config %+v", databaseConfig)
 
 	// create database client
 	databaseClient, err := database.NewPostgresClient(databaseConfig)
@@ -115,7 +115,7 @@ func main() {
 				// Example of how to update password for user
 				// Step 1: check if user exists
 				// check if username doesn't exist in our system
-				userNameToUpdatePasswordFor := "levi"
+				userNameToUpdatePasswordFor := "abdul"
 				newPassword := "newPassword"
 				loginAuthentication, err := database.GetLoginAuthenticationByUserName(serviceCtx, apiService.DatabaseClient.DB, userNameToUpdatePasswordFor)
 				if err != nil {
@@ -178,11 +178,12 @@ func main() {
 
 	// setup handler functions to run whenever a specific api endpoint is called
 	router.HandleFunc("/login", service.CorsMiddleware(LoginHandler))
-	router.HandleFunc("/hello", service.CorsMiddleware(AuthMiddleware(HelloServer)))         // Protect the hello route
-	router.HandleFunc("/settings", service.CorsMiddleware(AuthMiddleware(SettingsHandler)))  // Protect the settings route
-	router.HandleFunc("/home", service.CorsMiddleware(AuthMiddleware(HomeHandler)))          // Protect the home route
-	router.HandleFunc("/solar", service.CorsMiddleware(AuthMiddleware(SolarHandler)))        //protects solar route
-	router.HandleFunc("/loations", service.CorsMiddleware(AuthMiddleware(LocationsHandler))) //p protects location route
+	router.HandleFunc("/hello", service.CorsMiddleware(AuthMiddleware(HelloServer)))                     // Protect the hello route
+	router.HandleFunc("/settings", service.CorsMiddleware(AuthMiddleware(SettingsHandler)))              // Protect the settings route
+	router.HandleFunc("/home", service.CorsMiddleware(AuthMiddleware(HomeHandler)))                      // Protect the home route
+	router.HandleFunc("/solar", service.CorsMiddleware(AuthMiddleware(SolarHandler)))                    //protects solar route
+	router.HandleFunc("/loations", service.CorsMiddleware(AuthMiddleware(LocationsHandler)))             //p protects location route
+	router.HandleFunc("/change-password", service.CorsMiddleware(AuthMiddleware(ChangePasswordHandler))) // Move this line here
 
 	http.Handle("/", router)
 
@@ -215,6 +216,73 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.Context().Value("username").(string)
 	fmt.Fprintf(w, "Home page - only accessible with a valid cookie! User: %s", username)
 }
+
+// Add this function after HomeHandler
+func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&request)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	username, ok := r.Context().Value("username").(string)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	serviceLogger.Debug().Msgf("User attempting to change password: %s", username)
+
+	loginAuthentication, err := database.GetLoginAuthenticationByUserName(serviceCtx, apiService.DatabaseClient.DB, username)
+	if err != nil {
+		apiService.Error().Msgf("error retrieving login authentication for user %s: %s", username, err)
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Check if the current password is correct
+	if !CheckPasswordHash(request.CurrentPassword, loginAuthentication.PasswordHash) {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Current password is incorrect"})
+		return
+	}
+
+	// Hash the new password
+	newPasswordHash, err := HashPassword(request.NewPassword)
+	if err != nil {
+		apiService.Error().Msgf("error hashing new password for user %s: %s", username, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Internal server error"})
+		return
+	}
+
+	// Update the password hash in the database
+	loginAuthentication.PasswordHash = newPasswordHash
+	err = loginAuthentication.Update(serviceCtx, apiService.DatabaseClient.DB)
+	if err != nil {
+		apiService.Error().Msgf("error updating password for user %s: %s", username, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Internal server error"})
+		return
+	}
+
+	// Optionally, you can clear the old password hash variable if needed
+	// (not strictly necessary in this context since it's being replaced)
+	loginAuthentication.PasswordHash = ""
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(struct{}{})
+}
+
+// Inside main function, add this line to register the route
 
 type LoginRequest struct {
 	Password string `json:"password"`
@@ -253,37 +321,21 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	serviceLogger.Debug().Msgf("login username %s, password %s\n", request.Username, request.Password)
 
-	// check if username doesn't exist in our system
+	// Check if username doesn't exist in our system
 	loginAuthentication, err := database.GetLoginAuthenticationByUserName(serviceCtx, apiService.DatabaseClient.DB, request.Username)
 	if err != nil {
 		if errors.Is(err, database.ErrorNoLoginAuthenticationForUsername) {
-			apiService.Debug().Msgf("%s for %s", err, request.Username)
-			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(struct{}{})
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "User not found"})
 			return
 		}
-
-		apiService.Error().Msgf("error %s looking up loginAuthentication for %s", err, request.Username)
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(struct{}{})
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Internal server error"})
 		return
 	}
 
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
-		return
-	}
-
+	// Check the password
 	match := CheckPasswordHash(request.Password, loginAuthentication.PasswordHash)
-
-	response := LoginResponse{
-		RedirectURL: "/",
-		Match:       match,
-	}
 
 	if !match {
 		w.Header().Set("Content-Type", "application/json")
@@ -292,7 +344,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.Cookie = uuid.NewString()
+	// Generate a session cookie
+	response := LoginResponse{
+		RedirectURL: "/",
+		Match:       true,
+		Cookie:      uuid.NewString(),
+	}
 	UserCookies[request.Username] = response.Cookie
 
 	serviceLogger.Debug().Msgf("password hash for user %s in our system is %s", request.Username, loginAuthentication.PasswordHash)

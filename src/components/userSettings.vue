@@ -2,53 +2,109 @@
   <div class="settings-container">
     <button class="home-button" @click="goHome">Home</button>
     <div class="settings-content">
-      <div class="option" @click="optionOne">
-        Change email
-      </div>
+      <div class="option" @click="optionOne">Change email</div>
       <div class="divider"></div>
-      <div class="option" @click="optionTwo">
-        Change password
-      </div>
+      <div class="option" @click="showChangePasswordModal = true">Change password</div>
       <div class="divider"></div>
-      <div class="option" @click="logout">
-        Log Out
+      <div class="option" @click="logout">Log Out</div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div v-if="showChangePasswordModal" class="modal">
+      <div class="modal-content">
+        <h2>Change Password</h2>
+        <input type="password" v-model="currentPassword" placeholder="Current Password" />
+        <input type="password" v-model="newPassword" placeholder="New Password" @input="clearError" />
+        <input type="password" v-model="confirmPassword" placeholder="Confirm New Password" @input="clearError" />
+
+        <div class="button-container">
+          <button class="submit-button" @click="changePassword" :disabled="!passwordsMatch">Submit</button>
+          <button class="cancel-button" @click="showChangePasswordModal = false">Cancel</button>
+        </div>
+
+        <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
+const showChangePasswordModal = ref(false);
+const currentPassword = ref('');
+const newPassword = ref('');
+const confirmPassword = ref('');
+const errorMessage = ref('');
 
-// Function to delete a cookie by name
-const deleteCookie = (name: string) => {
-    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+// Computed property to check if passwords match
+const passwordsMatch = computed(() => newPassword.value === confirmPassword.value);
+
+// Clear the error message when input changes
+const clearError = () => {
+  if (errorMessage.value) {
+    errorMessage.value = '';
+  }
+};
+
+// Change password functionality
+const changePassword = async () => {
+  if (!passwordsMatch.value) {
+    errorMessage.value = 'Passwords do not match';
+    return;
+  }
+
+  // Check if new password is the same as current password
+  if (newPassword.value === currentPassword.value) {
+    errorMessage.value = 'New password cannot be the same as the current password.';
+    return;
+  }
+
+  // Create and log the request body
+  const requestBody = JSON.stringify({
+    current_password: currentPassword.value,
+    new_password: newPassword.value,
+  });
+  console.log('Request Body:', requestBody); // Log the request body
+
+  try {
+    const response = await fetch('/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: requestBody,
+    });
+
+    if (!response.ok) {
+      const errorResponse = await response.json();
+      console.error('Error response:', errorResponse); // Log the error for better visibility
+      errorMessage.value = errorResponse.error || 'Failed to change password';
+      return;
+    }
+
+    alert('Password changed successfully');
+    showChangePasswordModal.value = false;
+    currentPassword.value = '';
+    newPassword.value = '';
+    confirmPassword.value = '';
+  } catch (error) {
+    console.error('Error:', error);
+    alert('An error occurred while changing the password');
+  }
 };
 
 // Navigate to the home page
 const goHome = () => {
-  router.push('/home'); // Adjust the path as necessary
-};
-
-// Placeholder for changing email
-const optionOne = () => {
-  // Implement change email functionality
-};
-
-// Placeholder for changing password
-const optionTwo = () => {
-  // Implement change password functionality
+  router.push('/home');
 };
 
 // Handle user logout
 const logout = () => {
-  // Clear the session cookie
-  deleteCookie('session_id'); // Call deleteCookie to remove the cookie
-  
-  // Redirect to the login page
-  router.push('/'); // This redirects to the login page
+  document.cookie = 'session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  router.push('/');
 };
 </script>
 
@@ -113,5 +169,39 @@ const logout = () => {
   height: 1px;
   background-color: #ddd;
   margin: 10px 0;
+}
+
+/* Modal styling */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+}
+
+/* Button container styling */
+.button-container {
+  display: flex;
+  justify-content: space-between; /* Align buttons to opposite sides */
+  margin-top: 20px;
+}
+
+/* Error message styling */
+.error {
+  color: red;
+  font-size: 14px;
+  margin-top: 10px;
 }
 </style>
