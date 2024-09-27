@@ -177,6 +177,7 @@ func main() {
 	router := mux.NewRouter()
 
 	// setup handler functions to run whenever a specific api endpoint is called
+	router.HandleFunc("/healthcheck", service.CorsMiddleware(HealthcheckHandler))
 	router.HandleFunc("/login", service.CorsMiddleware(LoginHandler))
 	router.HandleFunc("/hello", service.CorsMiddleware(AuthMiddleware(HelloServer)))                     // Protect the hello route
 	router.HandleFunc("/settings", service.CorsMiddleware(AuthMiddleware(SettingsHandler)))              // Protect the settings route
@@ -215,6 +216,28 @@ func SettingsHandler(w http.ResponseWriter, r *http.Request) {
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.Context().Value("username").(string)
 	fmt.Fprintf(w, "Home page - only accessible with a valid cookie! User: %s", username)
+}
+
+func HealthcheckHandler(w http.ResponseWriter, r *http.Request) {
+	var combinedErrors error
+
+	databaseErr := apiService.DatabaseClient.HealthCheck()
+
+	if databaseErr != nil {
+		errMsg := fmt.Errorf("error %s unable to connect to database", databaseErr)
+		combinedErrors = errors.Join(combinedErrors, errMsg)
+	}
+
+	if combinedErrors != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+
+		w.Write([]byte(combinedErrors.Error()))
+
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("nexus api is healthy"))
 }
 
 // Add this function after HomeHandler
