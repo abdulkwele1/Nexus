@@ -28,9 +28,13 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
+
+const {
+  VITE_NEXUS_API_URL,
+} = import.meta.env;
 
 const router = useRouter();
 const showChangePasswordModal = ref(false);
@@ -69,9 +73,13 @@ const changePassword = async () => {
   });
   console.log('Request Body:', requestBody); // Log the request body
 
+
+
   try {
-    const response = await fetch('/change-password', {
+    // debugger;
+    const response = await fetch(`${VITE_NEXUS_API_URL}/change-password`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
