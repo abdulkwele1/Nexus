@@ -13,4 +13,4 @@ This is the front end for viewing and analyzing energy data related to the black
 
 ## Developing Nexus
 
-[DEVELOPMENT.MD](./DEVELOPMENT.MD)
+[DEVELOPMENT.md](./DEVELOPMENT.md)

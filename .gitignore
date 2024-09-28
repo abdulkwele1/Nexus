@@ -142,3 +142,5 @@ pkg/**
 
 # Go language server
 bin/gopls
+# go test coverage files
+cover.out

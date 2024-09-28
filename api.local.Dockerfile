@@ -19,6 +19,8 @@ RUN go mod download
 # copy over local sources used to build service
 COPY logging logging
 COPY main.go main.go
+COPY password password
+COPY api api
 COPY service service
 COPY clients clients
 

@@ -1,5 +1,5 @@
 # execute these tasks when `make` with no target is invoked
-default: unit-test reset e2e-test logs
+default: unit-test reset ready e2e-test logs
 
 # import environment file for setting or overriding
 # configuration used by this Makefile
@@ -85,7 +85,7 @@ restart:
 
 .PHONY: reset
 # wipe state and restart the service and all it's dependencies
-reset:
+reset: lint
 	docker compose up -d --build --remove-orphans --renew-anon-volumes --force-recreate
 
 .PHONY: refresh
@@ -100,12 +100,12 @@ refresh: lint
 # or one
 # make logs S=nexus-api
 logs:
-	docker compose logs ${S} -f
+	docker compose logs -f ${S}
 
-# poll service health check endpoint until it doesn't error
+# poll api health check endpoint until it doesn't error
 .PHONY: ready
 ready:
-	./scripts/wait-for-service-healthy.sh
+	./bin/wait_for_api_ready.sh
 
 .PHONY: debug-nexus-api
 # attach the dlv debugger to the running service and connect to the dlv debugger
