@@ -100,7 +100,7 @@ refresh: lint
 # or one
 # make logs S=nexus-api
 logs:
-	docker compose logs ${S} -f
+	docker compose logs -f ${S}
 
 # poll api health check endpoint until it doesn't error
 .PHONY: ready

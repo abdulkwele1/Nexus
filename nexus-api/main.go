@@ -2,75 +2,33 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
+	"nexus-api/api"
 	"nexus-api/clients/database"
-	"nexus-api/clients/database/schemas/postgres/migrations"
 	"nexus-api/logging"
+	"nexus-api/password"
 	"nexus-api/service"
 
 	"os"
-
-	"time"
-
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	serviceCtx    = context.Background()
-	serviceLogger *logging.ServiceLogger
-	apiService    *APIService
+	serviceCtx = context.Background()
 )
 
-type APIConfig struct {
-	APIPort string
-}
-
-type APIService struct {
-	Config         APIConfig
-	DatabaseClient *database.PostgresClient
-	*logging.ServiceLogger
-}
-
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
-// Middleware to check for valid session cookie
-func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("session_id")
-		if err != nil || cookie == nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
-			return
-		}
-
-		// Check if the cookie value matches any user's cookie
-		for username, userCookie := range UserCookies {
-			if userCookie == cookie.Value {
-				// Attach username to request context for later use
-				ctx := context.WithValue(r.Context(), "username", username)
-				r = r.WithContext(ctx)
-				next(w, r)
-				return
-			}
-		}
-
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
-	}
-}
-
 func main() {
+	// #TODO make into a unit test
+	//generate a hash for password123
+	hash, err := password.HashPassword("password123")
+	if err != nil {
+		fmt.Println("Error generating hash:", err)
+		return
+	}
+	fmt.Printf("Hash for password123: %s\n", hash)
+
 	// setup logger
 	logLevel := os.Getenv("LOG_LEVEL")
-	logger, err := logging.New(os.Getenv("LOG_LEVEL"))
-	serviceLogger = &logger
+	serviceLogger, err := logging.New(os.Getenv("LOG_LEVEL"))
 
 	if err != nil {
 		panic(fmt.Errorf("error %s creating serviceLogger with level %s", err, logLevel))
@@ -85,279 +43,32 @@ func main() {
 		SSLEnabled:            os.Getenv("DATABASE_SSL_ENABLED") == "true",
 		QueryLoggingEnabled:   os.Getenv("DATABASE_QUERY_LOGGING_ENABLED") == "true",
 		RunDatabaseMigrations: os.Getenv("RUN_DATABASE_MIGRATIONS") == "true",
-		Logger:                serviceLogger,
-	}
-	serviceLogger.Debug().Msgf("loaded databaseClient config %+v", databaseConfig)
-
-	// create database client
-	databaseClient, err := database.NewPostgresClient(databaseConfig)
-
-	if err != nil {
-		panic(fmt.Errorf("error %s creating database client with %+v", err, databaseConfig))
+		Logger:                &serviceLogger,
 	}
 
-	// run migrations based on configuration
-	if databaseConfig.RunDatabaseMigrations {
-		go func() {
-			for {
-				ranMigrations, err := database.Migrate(serviceCtx, databaseClient.DB, *migrations.Migrations, serviceLogger)
-
-				if err != nil {
-					serviceLogger.Error().Msgf("error %s running migrations %+v, will retry in 3 seconds", err, migrations.Migrations)
-
-					time.Sleep(3 * time.Second)
-
-					continue
-				}
-
-				serviceLogger.Info().Msgf("successfully ran migrations %+v", ranMigrations)
-
-				return
-			}
-		}()
-	}
+	serviceLogger.Trace().Msgf("loaded databaseClient config %+v", databaseConfig)
 
 	// parse api config from the environment
-	apiConfig := APIConfig{
-		APIPort: os.Getenv("API_PORT"),
+	apiConfig := service.APIConfig{
+		APIPort:        os.Getenv("API_PORT"),
+		DatabaseConfig: databaseConfig,
+		ServiceLogger:  &serviceLogger,
+		UserCookies:    api.UserCookies{},
 	}
 
-	serviceLogger.Debug().Msgf("loaded api config %+v", apiConfig)
+	serviceLogger.Debug().Msgf("loaded api config %+v",
+		apiConfig)
 
-	// create api service
-	apiService = &APIService{
-		Config:         apiConfig,
-		ServiceLogger:  serviceLogger,
-		DatabaseClient: &databaseClient,
-	}
+	apiService, err := service.NewAPIService(serviceCtx, apiConfig)
 
-	// #TODO make into a unit test
-	//generate a hash for password123
-	hash, err := HashPassword("password123")
 	if err != nil {
-		fmt.Println("Error generating hash:", err)
-		return
+		panic(err)
 	}
-	serviceLogger.Debug().Msgf("Hash for password123: %s", hash)
+
 	serviceLogger.Debug().Msg("api server starting")
-
-	// setup api request router
-	router := mux.NewRouter()
-
-	// setup handler functions to run whenever a specific api endpoint is called
-	router.HandleFunc("/healthcheck", service.CorsMiddleware(HealthcheckHandler))
-	router.HandleFunc("/login", service.CorsMiddleware(LoginHandler))
-	router.HandleFunc("/hello", service.CorsMiddleware(AuthMiddleware(HelloServer)))                     // Protect the hello route
-	router.HandleFunc("/settings", service.CorsMiddleware(AuthMiddleware(SettingsHandler)))              // Protect the settings route
-	router.HandleFunc("/home", service.CorsMiddleware(AuthMiddleware(HomeHandler)))                      // Protect the home route
-	router.HandleFunc("/solar", service.CorsMiddleware(AuthMiddleware(SolarHandler)))                    //protects solar route
-	router.HandleFunc("/locations", service.CorsMiddleware(AuthMiddleware(LocationsHandler)))            //p protects location route
-	router.HandleFunc("/change-password", service.CorsMiddleware(AuthMiddleware(ChangePasswordHandler))) // Move this line here
-
-	http.Handle("/", router)
-
-	// run api service listening on the configured port
-	http.ListenAndServe(fmt.Sprintf(":%s", apiConfig.APIPort), nil)
-}
-
-func HelloServer(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Path[1:]
-	serviceLogger.Debug().Msgf("api called with %s \n", name)
-	fmt.Fprintf(w, "Hello, %s!", name)
-}
-
-func LocationsHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value("username").(string)
-	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
-}
-
-func SolarHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value("username").(string)
-	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
-}
-
-func SettingsHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value("username").(string)
-	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
-}
-
-func HomeHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value("username").(string)
-	fmt.Fprintf(w, "Home page - only accessible with a valid cookie! User: %s", username)
-}
-
-func HealthcheckHandler(w http.ResponseWriter, r *http.Request) {
-	var combinedErrors error
-
-	databaseErr := apiService.DatabaseClient.HealthCheck()
-
-	if databaseErr != nil {
-		errMsg := fmt.Errorf("error %s unable to connect to database", databaseErr)
-		combinedErrors = errors.Join(combinedErrors, errMsg)
-	}
-
-	if combinedErrors != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-
-		w.Write([]byte(combinedErrors.Error()))
-
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("nexus api is healthy"))
-}
-
-// Add this function after HomeHandler
-func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
-	var request struct {
-		CurrentPassword string `json:"current_password"`
-		NewPassword     string `json:"new_password"`
-	}
-	err := json.NewDecoder(r.Body).Decode(&request)
+	err = apiService.Run()
 
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request"})
-		return
+		serviceLogger.Error().Msgf("service exited with error %s", err)
 	}
-
-	username, ok := r.Context().Value("username").(string)
-	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
-		return
-	}
-
-	serviceLogger.Debug().Msgf("User attempting to change password: %s", username)
-
-	loginAuthentication, err := database.GetLoginAuthenticationByUserName(serviceCtx, apiService.DatabaseClient.DB, username)
-	if err != nil {
-		apiService.Error().Msgf("error retrieving login authentication for user %s: %s", username, err)
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
-		return
-	}
-
-	// Check if the current password is correct
-	if !CheckPasswordHash(request.CurrentPassword, loginAuthentication.PasswordHash) {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Current password is incorrect"})
-		return
-	}
-
-	// Hash the new password
-	newPasswordHash, err := HashPassword(request.NewPassword)
-	if err != nil {
-		apiService.Error().Msgf("error hashing new password for user %s: %s", username, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Internal server error"})
-		return
-	}
-
-	// Update the password hash in the database
-	loginAuthentication.PasswordHash = newPasswordHash
-	err = loginAuthentication.Update(serviceCtx, apiService.DatabaseClient.DB)
-	if err != nil {
-		apiService.Error().Msgf("error updating password for user %s: %s", username, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Internal server error"})
-		return
-	}
-
-	// Optionally, you can clear the old password hash variable if needed
-	// (not strictly necessary in this context since it's being replaced)
-	loginAuthentication.PasswordHash = ""
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(struct{}{})
-}
-
-// Inside main function, add this line to register the route
-
-type LoginRequest struct {
-	Password string `json:"password"`
-	Username string `json:"username"`
-}
-
-type LoginResponse struct {
-	RedirectURL string `json:"redirect_url"`
-	Match       bool   `json:"match"`
-	Cookie      string `json:"cookie"`
-}
-
-var UserCookies = map[string]string{}
-
-func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(bytes), err
-}
-
-func CheckPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
-}
-
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	var request LoginRequest
-	err := json.NewDecoder(r.Body).Decode(&request)
-
-	if err != nil {
-		serviceLogger.Debug().Msgf("error %s parsing %+v", err, request)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request"})
-		return
-	}
-
-	serviceLogger.Debug().Msgf("login username %s, password %s\n", request.Username, request.Password)
-
-	// Check if username doesn't exist in our system
-	loginAuthentication, err := database.GetLoginAuthenticationByUserName(serviceCtx, apiService.DatabaseClient.DB, request.Username)
-	if err != nil {
-		if errors.Is(err, database.ErrorNoLoginAuthenticationForUsername) {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "User not found"})
-			return
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Internal server error"})
-		return
-	}
-
-	// Check the password
-	match := CheckPasswordHash(request.Password, loginAuthentication.PasswordHash)
-
-	if !match {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Unauthorized"})
-		return
-	}
-
-	// Generate a session cookie
-	response := LoginResponse{
-		RedirectURL: "/",
-		Match:       true,
-		Cookie:      uuid.NewString(),
-	}
-	UserCookies[request.Username] = response.Cookie
-
-	serviceLogger.Debug().Msgf("password hash for user %s in our system is %s", request.Username, loginAuthentication.PasswordHash)
-
-	// Set the cookie with an expiration time
-	expiration := time.Now().Add(1 * time.Hour)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_id",
-		Value:    response.Cookie,
-		Path:     "/",
-		Expires:  expiration,
-		MaxAge:   3600,  // 1 hour
-		HttpOnly: true,  // Optional: helps mitigate XSS
-		Secure:   false, // Set to true if serving over HTTPS
-	})
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
 }
