@@ -6,7 +6,6 @@ import (
 	"nexus-api/api"
 	"nexus-api/clients/database"
 	"nexus-api/logging"
-	"nexus-api/password"
 	"nexus-api/service"
 
 	"os"
@@ -17,15 +16,6 @@ var (
 )
 
 func main() {
-	// #TODO make into a unit test
-	//generate a hash for password123
-	hash, err := password.HashPassword("password123")
-	if err != nil {
-		fmt.Println("Error generating hash:", err)
-		return
-	}
-	fmt.Printf("Hash for password123: %s\n", hash)
-
 	// setup logger
 	logLevel := os.Getenv("LOG_LEVEL")
 	serviceLogger, err := logging.New(os.Getenv("LOG_LEVEL"))
