@@ -1,214 +1,288 @@
-    <template>
-    <div class="container">
-        <button class="home-button" @click="goHome">Home</button>
-        <div ref="chartContainer" class="chart-container">
-        <button class="current-date-button" @click="openCalendar">
-            Current Date &#9662; <!-- Down arrow icon -->
-        </button>
-        <button class="export-button" @click="exportData">
-            📄 Export
-        </button>
-        </div> <!-- Chart container -->
-
-        <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
-        <div class="modal" @click.stop>
-            <h2>Select Dates</h2>
-            <div class="calendar-container">
-            <div class="calendar">
-                <h3>Calendar 1</h3>
-                <input type="date" v-model="selectedDate1" />
-            </div>
-            <div class="calendar">
-                <h3>Calendar 2</h3>
-                <input type="date" v-model="selectedDate2" />
-            </div>
-            </div>
-            <button @click="closeCalendar">Close</button>
-        </div>
-        </div>
+<template>
+  <div class="container">
+    <button class="home-button" @click="goHome">Home</button>
+    <div ref="chartContainer" class="chart-container">
+      <button class="current-date-button" @click="openCalendar">
+        Select Date Range &#9662;
+      </button>
+      <button class="export-button" @click="exportData">
+        📄 Export
+      </button>
     </div>
-    </template>
 
+    <!-- Calendar modal -->
+    <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
+      <div class="modal" @click.stop>
+        <h2>Select Date Range</h2>
+        <div class="calendar-container">
+          <div class="calendar">
+            <h3>Start Point</h3>
+            <input type="date" v-model="startDate" />
+          </div>
+          <div class="calendar">
+            <h3>End Point</h3>
+            <input type="date" v-model="endDate" />
+          </div>
+        </div>
+        <!-- Error message if end date is before start date -->
+        <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+        <button @click="closeCalendar">Close</button>
+      </div>
+    </div>
+  </div>
+</template>
 
-    <script setup lang="ts">
-    import { useRouter } from 'vue-router';
-    import * as d3 from 'd3'; // Import D3.js
-    import { onMounted, ref } from 'vue';
+<script setup lang="ts">
+import { ref, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import * as d3 from 'd3';
 
-    const router = useRouter(); // Create router instance
-    const chartContainer = ref(null); // Reference for the chart container
+const router = useRouter();
+const chartContainer = ref(null);
+const showCalendar = ref(false);
+const startDate = ref(null);
+const endDate = ref(null);
+const solarData = ref([]); // Store solar data
+const errorMessage = ref(""); // Store error message
 
-    const showCalendar = ref(false); // State to control modal visibility
-    const selectedDate1 = ref(null); // State for the first calendar date
-    const selectedDate2 = ref(null); // State for the second calendar date
+const goHome = () => {
+  router.push('/home');
+};
 
-    const goHome = () => {
-    router.push('/home'); // Adjust the path as necessary
-    };
+const openCalendar = () => {
+  showCalendar.value = true;
+};
 
-    const openCalendar = () => {
-    showCalendar.value = true; // Show the calendar modal
-    };
+const closeCalendar = () => {
+  showCalendar.value = false;
+};
 
-    const closeCalendar = () => {
-    showCalendar.value = false; // Hide the calendar modal
-    };
+// Function to generate random solar production data for the given date range
+const generateSolarData = (start, end) => {
+  const data = [];
+  const currentDate = new Date(start);
+  const endDate = new Date(end);
 
-    const onCurrentDateClick = () => {
-    console.log('Current Date button clicked');
-    };
+  while (currentDate <= endDate) {
+    const month = currentDate.getMonth();
+    let production;
+    if (month === 5 || month === 6 || month === 7) {
+      production = Math.floor(Math.random() * 100) + 150; // Random value between 150 and 250 for summer months
+    } else {
+      production = Math.floor(Math.random() * 50) + 50; // Random value between 50 and 100 for other months
+    }
 
-    const exportData = () => {
-    console.log('Export Data button clicked');
-    // Implement data export logic here
-    };
-
-    const createChart = () => {
-    const width = 960;
-    const height = 500;
-    const marginTop = 30;
-    const marginRight = 20;
-    const marginBottom = 30;
-    const marginLeft = 150;
-
-    const x = d3.scaleUtc()
-        .domain([new Date("2023-01-01"), new Date("2024-01-01")])
-        .range([marginLeft, width - marginRight]);
-
-    const y = d3.scaleLinear()
-        .domain([0, 100])
-        .range([height - marginBottom, marginTop]);
-
-    const svg = d3.create("svg")
-        .attr("width", width)
-        .attr("height", height);
-
-    svg.append("g")
-        .attr("transform", `translate(0,${height - marginBottom})`)
-        .call(d3.axisBottom(x));
-
-    svg.append("g")
-        .attr("transform", `translate(${marginLeft},0)`)
-        .call(d3.axisLeft(y));
-
-    svg.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -height / 2)
-        .attr("y", marginLeft / 2)
-        .attr("dy", "-1em")
-        .attr("fill", "currentColor")
-        .attr("text-anchor", "middle")
-        .text("(kWh)");
-
-    chartContainer.value.appendChild(svg.node());
-    };
-
-    onMounted(() => {
-    createChart(); // Create the chart when the component mounts
+    data.push({
+      date: new Date(currentDate),
+      production
     });
-    </script>
 
+    // Increment the date by 1 day
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
 
+  return data;
+};
 
-    <style scoped>
-    .container {
-    position: relative; /* Positioning context for absolute elements */
-    height: 100vh; /* Full viewport height */
-    display: flex;
-    justify-content: center; /* Center the chart */
-    align-items: center; /* Center the chart */
+// Function to handle date validation
+const validateDates = () => {
+  errorMessage.value = ""; // Clear any previous error message
+  if (startDate.value && endDate.value) {
+    const start = new Date(startDate.value);
+    const end = new Date(endDate.value);
+
+    // Check if the end date is before the start date
+    if (end < start) {
+      errorMessage.value = "End point cannot be before starting point.";
+    } else {
+      solarData.value = generateSolarData(start, end);
+      createChart(); // Update the chart with new data
     }
+  }
+};
 
-    .chart-container {
-    position: relative; /* Positioning context for the button */
-    }
+// Watch for changes in the start and end dates and regenerate the chart automatically
+watch([startDate, endDate], validateDates);
 
-    /* Modal Styles */
-    .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    }
+// Create the bar chart with daily data points
+const createChart = () => {
+  d3.select(chartContainer.value).select("svg").remove();
 
-    .modal {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    width: 400px;
-    text-align: center;
-    }
+  const width = 960;
+  const height = 500;
+  const margin = { top: 30, right: 20, bottom: 50, left: 150 };
 
-    .calendar-container {
-    display: flex;
-    justify-content: space-between;
-    margin: 20px 0;
-    }
+  const x = d3.scaleBand()
+    .domain(solarData.value.map(d => d3.timeFormat("%Y-%m-%d")(d.date)))
+    .range([margin.left, width - margin.right])
+    .padding(0.1);
 
-    .calendar {
-    width: 45%;
-    }
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(solarData.value, d => d.production)]).nice()
+    .range([height - margin.bottom, margin.top]);
 
-    /* Style for the home button */
-    .home-button {
-    position: absolute; /* Keep button in top left */
-    top: 20px;
-    left: 20px;
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    }
+  const svg = d3.select(chartContainer.value)
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
 
-    .home-button:hover {
-    background-color: #0056b3;
-    }
+  svg.append("g")
+    .attr("transform", `translate(0,${height - margin.bottom})`)
+    .call(d3.axisBottom(x).tickValues(x.domain().filter((d, i) => !(i % Math.floor(solarData.value.length / 10)))))
+    .selectAll("text")
+    .attr("transform", "rotate(-45)")
+    .style("text-anchor", "end");
 
-    /* Style for the current date button */
-    .current-date-button {
-    position: absolute; /* Position relative to the chart */
-    top: -25px; /* Adjust this value to position it above the graph */
-    left: 125px; /* Adjust this value to align with the y-axis */
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #f8f9fa;
-    color: #343a40;
-    border: 1px solid #ced4da;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    }
+  svg.append("g")
+    .attr("transform", `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y));
 
-    .current-date-button:hover {
-    background-color: #e2e6ea;
-    }
+  svg.selectAll(".bar")
+    .data(solarData.value)
+    .enter()
+    .append("rect")
+    .attr("class", "bar")
+    .attr("x", d => x(d3.timeFormat("%Y-%m-%d")(d.date)))
+    .attr("y", d => y(d.production))
+    .attr("width", x.bandwidth())
+    .attr("height", d => y(0) - y(d.production))
+    .attr("fill", "#69b3a2");
 
-    /* Style for the export button */
-    .export-button {
-    position: absolute; /* Position relative to the chart */
-    bottom: -40px; /* Adjust this value to position it above the x-axis */
-    right: 0; /* Adjust this value to position it on the right */
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #28a745;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    }
+  svg.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("x", -height / 2)
+    .attr("y", margin.left / 2)
+    .attr("dy", "-1em")
+    .attr("fill", "currentColor")
+    .attr("text-anchor", "middle")
+    .text("(kWh)");
+};
 
-    .export-button:hover {
-    background-color: #218838;
-    }
-    </style>
+// Function to export data to CSV
+const exportData = () => {
+  // Define the header for the CSV
+  const header = "sensor_reading_date, daily_kw_generated\n";
+  
+  // Generate the CSV content
+  const csvContent = "data:text/csv;charset=utf-8," 
+    + header // Add the header
+    + solarData.value.map(d => `${d3.timeFormat("%Y-%m-%d")(d.date)},${d.production}`).join("\n");
 
+  // Create the link element and trigger download
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "solar_data.csv");
+  document.body.appendChild(link); // Required for Firefox
+  link.click();
+  document.body.removeChild(link); // Clean up the link after download
+};
+
+onMounted(() => {
+  solarData.value = generateSolarData(new Date("2023-01-01"), new Date("2023-01-31"));
+  createChart();
+});
+</script>
+
+<style scoped>
+.container {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chart-container {
+  position: relative;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 400px;
+  text-align: center;
+}
+
+.calendar-container {
+  display: flex;
+  justify-content: space-between;
+  margin: 20px 0;
+}
+
+.calendar {
+  width: 45%;
+}
+
+.error-message {
+  color: red;
+  font-size: 14px;
+}
+
+.home-button {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.home-button:hover {
+  background-color: #0056b3;
+}
+
+.current-date-button {
+  position: absolute;
+  top: -25px;
+  left: 125px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #f8f9fa;
+  color: #343a40;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.current-date-button:hover {
+  background-color: #e2e6ea;
+}
+
+.export-button {
+  position: absolute;
+  bottom: -40px;
+  right: 0;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.export-button:hover {
+  background-color: #218838;
+}
+</style>
