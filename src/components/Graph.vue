@@ -13,6 +13,13 @@ const props = defineProps<{
 
 const chartContainer = ref(null);
 
+// Create the tooltip once (outside of createChart to avoid recreating multiple tooltips)
+const tooltip = d3.select("body").append("div")
+  .attr("class", "tooltip")
+  .style("opacity", 0)
+  .style("z-index", 1000)  // Ensures the tooltip is above everything
+  .style("position", "absolute");
+
 // Create the chart
 const createChart = () => {
   d3.select(chartContainer.value).select("svg").remove(); // Clear previous SVG
@@ -48,18 +55,40 @@ const createChart = () => {
     .attr("transform", `translate(${margin.left},0)`)
     .call(d3.axisLeft(y));
 
-  // Draw either bars or a line based on the checkbox state
   if (props.isLineChart) {
     const line = d3.line()
       .x(d => x(d3.timeFormat("%Y-%m-%d")(d.date)) + x.bandwidth() / 2)
       .y(d => y(d.production));
 
+    // Draw the line
     svg.append("path")
       .datum(props.solarData)
       .attr("fill", "none")
       .attr("stroke", "#69b3a2")
       .attr("stroke-width", 2)
       .attr("d", line);
+
+    // Create hover circles
+    svg.selectAll(".hover-circle")
+      .data(props.solarData)
+      .enter()
+      .append("circle")
+      .attr("class", "hover-circle")
+      .attr("cx", d => x(d3.timeFormat("%Y-%m-%d")(d.date)) + x.bandwidth() / 2)
+      .attr("cy", d => y(d.production))
+      .attr("r", 8)  // Easier hover target
+      .attr("fill", "transparent")
+      .on("mouseover", (event, d) => {
+        tooltip.transition().duration(200).style("opacity", 1);
+      })
+      .on("mousemove", (event, d) => {
+        tooltip.html(`Date: ${d3.timeFormat("%Y-%m-%d")(d.date)}<br>kWh: ${d.production}`)
+          .style("left", (event.clientX + window.scrollX + 10) + "px")
+          .style("top", (event.clientY + window.scrollY - 15) + "px");
+      })
+      .on("mouseout", () => {
+        tooltip.transition().duration(200).style("opacity", 0);
+      });
   } else {
     svg.selectAll(".bar")
       .data(props.solarData)
@@ -70,9 +99,21 @@ const createChart = () => {
       .attr("y", d => y(d.production))
       .attr("width", x.bandwidth())
       .attr("height", d => y(0) - y(d.production))
-      .attr("fill", "#69b3a2");
+      .attr("fill", "#69b3a2")
+      .on("mouseover", (event, d) => {
+        tooltip.transition().duration(200).style("opacity", 1);
+      })
+      .on("mousemove", (event, d) => {
+        tooltip.html(`Date: ${d3.timeFormat("%Y-%m-%d")(d.date)}<br>kWh: ${d.production}`)
+          .style("left", (event.clientX + window.scrollX + 10) + "px")
+          .style("top", (event.clientY + window.scrollY - 15) + "px");
+      })
+      .on("mouseout", () => {
+        tooltip.transition().duration(200).style("opacity", 0);
+      });
   }
 
+  // Add y-axis label
   svg.append("text")
     .attr("transform", "rotate(-90)")
     .attr("x", -height / 2)
@@ -83,29 +124,9 @@ const createChart = () => {
     .text("(kWh)");
 };
 
-// Watch for changes in the solar data and chart type
 watch(() => [props.solarData, props.isLineChart], createChart);
 
 onMounted(() => {
   createChart(); // Create the initial chart
 });
-
-// Example functions to calculate X and Y positions for the chart
-const calculateX = (date) => {
-  return d3.scaleBand().domain(props.solarData.map(d => d3.timeFormat("%Y-%m-%d")(d.date))).range([150, 960 - 20])(d3.timeFormat("%Y-%m-%d")(date)) + 150 / 2; // Add margin.left to center the circle
-};
-
-const calculateY = (production) => {
-  return d3.scaleLinear()
-    .domain([0, d3.max(props.solarData, d => d.production)]).nice()
-    .range([500 - 50, 30])(production); // Add margin.bottom and margin.top
-};
 </script>
-
-<style scoped>
-.chart-container {
-  width: 100%;
-  height: 500px;
-}
-
-</style>
