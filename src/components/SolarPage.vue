@@ -1,214 +1,321 @@
-    <template>
-    <div class="container">
-        <button class="home-button" @click="goHome">Home</button>
-        <div ref="chartContainer" class="chart-container">
-        <button class="current-date-button" @click="openCalendar">
-            Current Date &#9662; <!-- Down arrow icon -->
+<template>
+  <div class="container">
+    <button class="home-button" @click="goHome">Home</button>
+    <div class="chart-container">
+      <button class="current-date-button" @click="openCalendar">
+        Select Date Range &#9662;
+      </button>
+      <div class="solar-panel-container">
+        <button class="solar-panels-button" @click="toggleDropdown">
+          Solar Panels
         </button>
-        <button class="export-button" @click="exportData">
-            📄 Export
-        </button>
-        </div> <!-- Chart container -->
-
-        <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
-        <div class="modal" @click.stop>
-            <h2>Select Dates</h2>
-            <div class="calendar-container">
-            <div class="calendar">
-                <h3>Calendar 1</h3>
-                <input type="date" v-model="selectedDate1" />
-            </div>
-            <div class="calendar">
-                <h3>Calendar 2</h3>
-                <input type="date" v-model="selectedDate2" />
-            </div>
-            </div>
-            <button @click="closeCalendar">Close</button>
+        <div v-if="showDropdown" class="dropdown">
+          <ul>
+            <li @click="selectSolarPanel('Panel 1')">Panel 1</li>
+            <li @click="selectSolarPanel('Panel 2')">Panel 2</li>
+            <li @click="selectSolarPanel('Panel 3')">Panel 3</li>
+          </ul>
         </div>
-        </div>
+      </div>
+      <label class="line-chart-label">
+        <input type="checkbox" v-model="isLineChart" />
+        Switch to Line Chart
+      </label>
+      <button class="export-button" @click="exportData">
+        📄 Export
+      </button>
+      <Graph :solarData="solarData" :isLineChart="isLineChart" />
     </div>
-    </template>
 
+    <!-- Calendar modal -->
+    <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
+      <div class="modal" @click.stop>
+        <h2>Select Date Range</h2>
+        <div class="calendar-container">
+          <div class="calendar">
+            <h3>Start Point</h3>
+            <input type="date" v-model="startDate" />
+          </div>
+          <div class="calendar">
+            <h3>End Point</h3>
+            <input type="date" v-model="endDate" />
+          </div>
+        </div>
+        <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+        <button @click="closeCalendar">Close</button>
+      </div>
+    </div>
+  </div>
+</template>
 
-    <script setup lang="ts">
-    import { useRouter } from 'vue-router';
-    import * as d3 from 'd3'; // Import D3.js
-    import { onMounted, ref } from 'vue';
+<script setup lang="ts">
+import { ref, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import Graph from './Graph.vue'; // Import the Graph component
 
-    const router = useRouter(); // Create router instance
-    const chartContainer = ref(null); // Reference for the chart container
+const router = useRouter();
+const showCalendar = ref(false);
+const showDropdown = ref(false); // Controls the visibility of the dropdown
+const startDate = ref(null);
+const endDate = ref(null);
+const solarData = ref([]); // Stores solar data
+const errorMessage = ref(""); // Stores error message
+const isLineChart = ref(false); // State for line chart toggle
+const selectedPanel = ref("Panel 1"); // Store the selected solar panel, defaults to 'Panel 1'
 
-    const showCalendar = ref(false); // State to control modal visibility
-    const selectedDate1 = ref(null); // State for the first calendar date
-    const selectedDate2 = ref(null); // State for the second calendar date
+const goHome = () => {
+  router.push('/home');
+};
 
-    const goHome = () => {
-    router.push('/home'); // Adjust the path as necessary
-    };
+const openCalendar = () => {
+  showCalendar.value = true;
+};
 
-    const openCalendar = () => {
-    showCalendar.value = true; // Show the calendar modal
-    };
+const closeCalendar = () => {
+  showCalendar.value = false;
+};
 
-    const closeCalendar = () => {
-    showCalendar.value = false; // Hide the calendar modal
-    };
+const toggleDropdown = () => {
+  showDropdown.value = !showDropdown.value; // Toggle dropdown visibility
+};
 
-    const onCurrentDateClick = () => {
-    console.log('Current Date button clicked');
-    };
+const selectSolarPanel = (panel) => {
+  selectedPanel.value = panel;
+  console.log("Selected Solar Panel:", selectedPanel.value);
+  showDropdown.value = false; // Close dropdown after selection
+};
 
-    const exportData = () => {
-    console.log('Export Data button clicked');
-    // Implement data export logic here
-    };
+// Function to generate random solar production data for the given date range
+const generateSolarData = (start, end) => {
+  const data = [];
+  const currentDate = new Date(start);
+  const endDate = new Date(end);
 
-    const createChart = () => {
-    const width = 960;
-    const height = 500;
-    const marginTop = 30;
-    const marginRight = 20;
-    const marginBottom = 30;
-    const marginLeft = 150;
+  while (currentDate <= endDate) {
+    const month = currentDate.getMonth();
+    let production;
+    if (month === 5 || month === 6 || month === 7) {
+      production = Math.floor(Math.random() * 100) + 150; // Summer months
+    } else {
+      production = Math.floor(Math.random() * 50) + 50; // Other months
+    }
 
-    const x = d3.scaleUtc()
-        .domain([new Date("2023-01-01"), new Date("2024-01-01")])
-        .range([marginLeft, width - marginRight]);
-
-    const y = d3.scaleLinear()
-        .domain([0, 100])
-        .range([height - marginBottom, marginTop]);
-
-    const svg = d3.create("svg")
-        .attr("width", width)
-        .attr("height", height);
-
-    svg.append("g")
-        .attr("transform", `translate(0,${height - marginBottom})`)
-        .call(d3.axisBottom(x));
-
-    svg.append("g")
-        .attr("transform", `translate(${marginLeft},0)`)
-        .call(d3.axisLeft(y));
-
-    svg.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -height / 2)
-        .attr("y", marginLeft / 2)
-        .attr("dy", "-1em")
-        .attr("fill", "currentColor")
-        .attr("text-anchor", "middle")
-        .text("(kWh)");
-
-    chartContainer.value.appendChild(svg.node());
-    };
-
-    onMounted(() => {
-    createChart(); // Create the chart when the component mounts
+    data.push({
+      date: new Date(currentDate),
+      production,
     });
-    </script>
 
+    currentDate.setDate(currentDate.getDate() + 1); // Increment the date by 1 day
+  }
 
+  return data;
+};
 
-    <style scoped>
-    .container {
-    position: relative; /* Positioning context for absolute elements */
-    height: 100vh; /* Full viewport height */
-    display: flex;
-    justify-content: center; /* Center the chart */
-    align-items: center; /* Center the chart */
+// Watch for changes in start and end dates
+watch([startDate, endDate], () => {
+  if (startDate.value && endDate.value) {
+    const start = new Date(startDate.value);
+    const end = new Date(endDate.value);
+    
+    if (end < start) {
+      errorMessage.value = "End point cannot be before starting point.";
+    } else {
+      solarData.value = generateSolarData(start, end);
     }
+  }
+});
 
-    .chart-container {
-    position: relative; /* Positioning context for the button */
-    }
+// Function to export data to CSV
+const exportData = () => {
+  const header = "sensor_reading_date,daily_kw_generated\n";
+  const csvContent = "data:text/csv;charset=utf-8," 
+    + header 
+    + solarData.value.map(d => `${d.date.toISOString().split('T')[0]},${d.production}`).join("\n");
 
-    /* Modal Styles */
-    .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    }
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "solar_data.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
-    .modal {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    width: 400px;
-    text-align: center;
-    }
+onMounted(() => {
+  solarData.value = generateSolarData(new Date("2023-01-01"), new Date("2023-01-31"));
+});
+</script>
 
-    .calendar-container {
-    display: flex;
-    justify-content: space-between;
-    margin: 20px 0;
-    }
 
-    .calendar {
-    width: 45%;
-    }
+<style scoped>
+/* Container for the overall layout */
+.container {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
-    /* Style for the home button */
-    .home-button {
-    position: absolute; /* Keep button in top left */
-    top: 20px;
-    left: 20px;
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    }
+.chart-container {
+  position: relative;
+  width: 1000px;
+  height: 500px;
+}
 
-    .home-button:hover {
-    background-color: #0056b3;
-    }
+/* Home button style */
+.home-button {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
 
-    /* Style for the current date button */
-    .current-date-button {
-    position: absolute; /* Position relative to the chart */
-    top: -25px; /* Adjust this value to position it above the graph */
-    left: 125px; /* Adjust this value to align with the y-axis */
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #f8f9fa;
-    color: #343a40;
-    border: 1px solid #ced4da;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    }
+.home-button:hover {
+  background-color: #0056b3;
+}
 
-    .current-date-button:hover {
-    background-color: #e2e6ea;
-    }
+/* Date selection button */
+.current-date-button {
+  position: absolute;
+  top: -25px;
+  left: 125px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #f8f9fa;
+  color: #343a40;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
 
-    /* Style for the export button */
-    .export-button {
-    position: absolute; /* Position relative to the chart */
-    bottom: -40px; /* Adjust this value to position it above the x-axis */
-    right: 0; /* Adjust this value to position it on the right */
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #28a745;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    }
+.current-date-button:hover {
+  background-color: #e2e6ea;
+}
 
-    .export-button:hover {
-    background-color: #218838;
-    }
-    </style>
+/* Export button */
+.export-button {
+  position: absolute;
+  bottom: -40px;
+  right: 0;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
 
+.export-button:hover {
+  background-color: #218838;
+}
+
+/* Modal for calendar overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 400px;
+  text-align: center;
+}
+
+/* Calendar container inside the modal */
+.calendar-container {
+  display: flex;
+  justify-content: space-between;
+  margin: 20px 0;
+}
+
+.calendar {
+  width: 45%;
+}
+
+/* Error message styling */
+.error-message {
+  color: red;
+  font-size: 14px;
+}
+
+/* Button for switching between panels */
+.solar-panels-button {
+  position: absolute;
+  top: -25px; /* Adjust this value to align with other buttons */
+  left: 500px; /* Adjust this value to space from Select Date Range button */
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #f8f9fa;
+  color: #343a40;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.solar-panels-button:hover {
+  background-color: #e2e6ea;
+}
+
+/* Style for the line chart checkbox */
+.line-chart-label {
+  position: absolute;
+  top: -30px; /* Adjust as necessary to align with other elements */
+  left: 650px; /* Adjust this value to space from the Solar Panels button */
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+.line-chart-label input {
+  margin-right: 5px;
+}
+
+/* Dropdown styling */
+.dropdown {
+  position: absolute;
+  top: 30px; /* Adjust this value to position below the button */
+  left: 0;
+  background-color: white;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.1);
+  z-index: 1;
+}
+
+.dropdown ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dropdown li {
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.dropdown li:hover {
+  background-color: #e2e6ea;
+}
+</style>
