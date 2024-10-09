@@ -142,7 +142,7 @@ const exportData = () => {
 };
 
 // Mount the chart on component load
-onMounted(() => {
+onMounted(() => {   
   renderChart();
 });
 </script>
