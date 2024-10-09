@@ -1,27 +1,33 @@
 <template>
   <div>
     <div class="container">
-    <RouterLink to="/locations" class="box-link">
-      <div class="box">
-        <img src="../assets/locationIcon.jpg" alt="Location Icon" class="box-image" />
-        <div class="box-text">Locations</div>
-      </div>
-       </RouterLink>
+      <RouterLink to="/locations" class="box-link">
+        <div class="box">
+          <img src="../assets/locationIcon.jpg" alt="Location Icon" class="box-image" />
+          <div class="box-text">Locations</div>
+        </div>
+      </RouterLink>
       <div class="box">
         <img src="../assets/sensorIcon.jpg" alt="Sensor Icon" class="box-image" />
         <div class="box-text">Sensors</div>
       </div>
-      <div class="box">
-        <RouterLink to="/solar" class="box-link">
-          <div class="box">
-            <img src="../assets/solarIcon.jpg" alt="Solar Icon" class="box-image" />
-            <div class="box-text">Solar Panels</div>
-          </div>
-        </RouterLink>
-      </div>
+      <RouterLink to="/solar" class="box-link">
+        <div class="box">
+          <img src="../assets/solarIcon.jpg" alt="Solar Icon" class="box-image" />
+          <div class="box-text">Solar Panels</div>
+        </div>
+      </RouterLink>
+      <!-- New Drone Box -->
+      <RouterLink to="/drone" class="box-link">
+        <div class="box">
+          <img src="../assets/droneIcon.png" alt="Drone Icon" class="box-image" />
+          <div class="box-text">Drone</div>
+        </div>
+      </RouterLink>
     </div>
   </div>
 </template>
+
 
 <style scoped>
 /* Container style to center the boxes */

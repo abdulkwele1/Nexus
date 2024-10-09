@@ -16,6 +16,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "chart.js": "^4.4.4",
     "d3": "^7.9.0",
     "flowbite": "^2.3.0",
     "pinia": "^2.1.7",
