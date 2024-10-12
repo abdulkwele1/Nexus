@@ -1,14 +1,28 @@
 <template>
   <div class="container">
-    <button class="home-button" @click="goHome">Home</button>
-    <div class="chart-container">
-      <button class="current-date-button" @click="openCalendar">
-        Select Date Range &#9662;
-      </button>
+    <!-- Navigation bar -->
+    <nav class="navbar">
+      <button class="nav-button" @click="goTo('/home')">Home</button>
+      <button class="nav-button" @click="switchGraph('yield')">Solar Yield</button>
+      <button class="nav-button" @click="switchGraph('consumption')">Solar Consumption</button>
+    </nav>
+
+    <!-- Conditional rendering of graphs and controls for Solar Yield -->
+    <div class="chart-container" v-if="currentGraph === 'yield'">
+      <Graph :solarData="solarData" :isLineChart="isLineChart" />
+      
+      <!-- Line chart switch button -->
+      <label class="line-chart-label">
+        <input type="checkbox" v-model="isLineChart" />
+        Switch to Line Chart
+      </label>
+
+      <!-- Export button -->
+      <button class="export-button" @click="exportData">📄 Export</button>
+
+      <!-- Show panels button -->
       <div class="solar-panel-container">
-        <button class="solar-panels-button" @click="toggleDropdown">
-          Solar Panels
-        </button>
+        <button class="solar-panels-button" @click="toggleDropdown">Solar Panels</button>
         <div v-if="showDropdown" class="dropdown">
           <ul>
             <li @click="selectSolarPanel('Panel 1')">Panel 1</li>
@@ -17,54 +31,66 @@
           </ul>
         </div>
       </div>
-      <label class="line-chart-label">
-        <input type="checkbox" v-model="isLineChart" />
-        Switch to Line Chart
-      </label>
-      <button class="export-button" @click="exportData">
-        📄 Export
+
+      <!-- Calendar -->
+      <button class="current-date-button" @click="openCalendar">
+        Select Date Range &#9662;
       </button>
-      <Graph :solarData="solarData" :isLineChart="isLineChart" />
+
+      <!-- Calendar modal -->
+      <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
+        <div class="modal" @click.stop>
+          <h2>Select Date Range</h2>
+          <div class="calendar-container">
+            <div class="calendar">
+              <h3>Start Point</h3>
+              <input type="date" v-model="startDate" />
+            </div>
+            <div class="calendar">
+              <h3>End Point</h3>
+              <input type="date" v-model="endDate" />
+            </div>
+          </div>
+          <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+          <button @click="closeCalendar">Close</button>
+        </div>
+      </div>
     </div>
 
-    <!-- Calendar modal -->
-    <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
-      <div class="modal" @click.stop>
-        <h2>Select Date Range</h2>
-        <div class="calendar-container">
-          <div class="calendar">
-            <h3>Start Point</h3>
-            <input type="date" v-model="startDate" />
-          </div>
-          <div class="calendar">
-            <h3>End Point</h3>
-            <input type="date" v-model="endDate" />
-          </div>
-        </div>
-        <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-        <button @click="closeCalendar">Close</button>
-      </div>
+    <!-- Solar Consumption graph -->
+    <div class="chart-container" v-if="currentGraph === 'consumption'">
+      <BarGraph />
     </div>
   </div>
 </template>
 
+
+
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import Graph from './Graph.vue'; // Import the Graph component
+import Graph from './Graph.vue'; // Import the Solar Yield Graph component
+import BarGraph from './yieldGraph.vue';  // Bar graph for Solar Consumption
 
 const router = useRouter();
+const currentGraph = ref('yield');  // Default is Solar Yield graph
 const showCalendar = ref(false);
-const showDropdown = ref(false); // Controls the visibility of the dropdown
+const showDropdown = ref(false);
 const startDate = ref(null);
 const endDate = ref(null);
-const solarData = ref([]); // Stores solar data
-const errorMessage = ref(""); // Stores error message
-const isLineChart = ref(false); // State for line chart toggle
-const selectedPanel = ref("Panel 1"); // Store the selected solar panel, defaults to 'Panel 1'
+const solarData = ref([]);
+const errorMessage = ref("");
+const isLineChart = ref(false);
+const selectedPanel = ref("Panel 1");
 
-const goHome = () => {
-  router.push('/home');
+const switchGraph = (graphType) => {
+  if (currentGraph.value !== graphType) {
+    currentGraph.value = graphType;  // Switch graph if different from current
+  }
+};
+
+const goTo = (path) => {
+  router.push(path);
 };
 
 const openCalendar = () => {
@@ -76,16 +102,14 @@ const closeCalendar = () => {
 };
 
 const toggleDropdown = () => {
-  showDropdown.value = !showDropdown.value; // Toggle dropdown visibility
+  showDropdown.value = !showDropdown.value;
 };
 
 const selectSolarPanel = (panel) => {
   selectedPanel.value = panel;
-  console.log("Selected Solar Panel:", selectedPanel.value);
-  showDropdown.value = false; // Close dropdown after selection
+  showDropdown.value = false;
 };
 
-// Function to generate random solar production data for the given date range
 const generateSolarData = (start, end) => {
   const data = [];
   const currentDate = new Date(start);
@@ -95,9 +119,9 @@ const generateSolarData = (start, end) => {
     const month = currentDate.getMonth();
     let production;
     if (month === 5 || month === 6 || month === 7) {
-      production = Math.floor(Math.random() * 100) + 150; // Summer months
+      production = Math.floor(Math.random() * 100) + 150;
     } else {
-      production = Math.floor(Math.random() * 50) + 50; // Other months
+      production = Math.floor(Math.random() * 50) + 50;
     }
 
     data.push({
@@ -105,13 +129,12 @@ const generateSolarData = (start, end) => {
       production,
     });
 
-    currentDate.setDate(currentDate.getDate() + 1); // Increment the date by 1 day
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
   return data;
 };
 
-// Watch for changes in start and end dates
 watch([startDate, endDate], () => {
   if (startDate.value && endDate.value) {
     const start = new Date(startDate.value);
@@ -125,7 +148,6 @@ watch([startDate, endDate], () => {
   }
 });
 
-// Function to export data to CSV
 const exportData = () => {
   const header = "sensor_reading_date,daily_kw_generated\n";
   const csvContent = "data:text/csv;charset=utf-8," 
@@ -146,11 +168,39 @@ onMounted(() => {
 });
 </script>
 
-
 <style scoped>
+/* Navbar styling */
+.navbar {
+  position: fixed;
+  left: 50px;
+  top: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  background-color: #fff;
+  padding: 10px;
+  z-index: 1000; /* Ensures navbar stays on top of other content */
+  border-bottom: 2px solid #ccc; /* Add a bottom border */
+}
+
+.nav-button {
+  background-color: #fff;
+  border: none;
+  padding: 10px 20px;
+  color: #333;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.nav-button:hover {
+  background-color: #ddd;
+}
+
 /* Container for the overall layout */
 .container {
   position: relative;
+  top: 60px; /* Adds space below the fixed navbar */
   height: 100vh;
   display: flex;
   justify-content: center;
@@ -261,8 +311,8 @@ onMounted(() => {
 /* Button for switching between panels */
 .solar-panels-button {
   position: absolute;
-  top: -25px; /* Adjust this value to align with other buttons */
-  left: 500px; /* Adjust this value to space from Select Date Range button */
+  top: -25px;
+  left: 500px;
   padding: 10px 20px;
   font-size: 16px;
   background-color: #f8f9fa;
@@ -280,8 +330,8 @@ onMounted(() => {
 /* Style for the line chart checkbox */
 .line-chart-label {
   position: absolute;
-  top: -30px; /* Adjust as necessary to align with other elements */
-  left: 650px; /* Adjust this value to space from the Solar Panels button */
+  top: -30px;
+  left: 650px;
   display: flex;
   align-items: center;
   font-size: 16px;
@@ -294,7 +344,7 @@ onMounted(() => {
 /* Dropdown styling */
 .dropdown {
   position: absolute;
-  top: 30px; /* Adjust this value to position below the button */
+  top: 30px;
   left: 0;
   background-color: white;
   border: 1px solid #ced4da;
