@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"nexus-api/api"
 	"nexus-api/clients/database"
 	"nexus-api/logging"
 	"nexus-api/service"
@@ -43,7 +42,6 @@ func main() {
 		APIPort:        os.Getenv("API_PORT"),
 		DatabaseConfig: databaseConfig,
 		ServiceLogger:  &serviceLogger,
-		UserCookies:    api.UserCookies{},
 	}
 
 	serviceLogger.Debug().Msgf("loaded api config %+v",
@@ -56,7 +54,7 @@ func main() {
 	}
 
 	serviceLogger.Debug().Msg("api server starting")
-	err = apiService.Run()
+	err = apiService.Run(serviceCtx)
 
 	if err != nil {
 		serviceLogger.Error().Msgf("service exited with error %s", err)

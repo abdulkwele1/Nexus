@@ -37,9 +37,6 @@ func NewPostgresClient(config PostgresDatabaseConfig) (PostgresClient, error) {
 	// configure postgres database connection options
 	var pgOptions *pgdriver.Connector
 
-	// TODO: figure out if the library supports controlling
-	// TLS outside of the "WithInsecure" method which can't
-	// be undone or applied after connector creation
 	if config.SSLEnabled {
 		pgOptions =
 			pgdriver.NewConnector(
