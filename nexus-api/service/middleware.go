@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"nexus-api/api"
+	"nexus-api/clients/database"
 )
 
 func CorsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -24,7 +25,7 @@ func CorsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // Middleware to check for valid session cookie
-func AuthMiddleware(next http.HandlerFunc, userCookies api.UserCookies) http.HandlerFunc {
+func AuthMiddleware(next http.HandlerFunc, apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session_id")
 		if err != nil || cookie == nil {
@@ -34,17 +35,21 @@ func AuthMiddleware(next http.HandlerFunc, userCookies api.UserCookies) http.Han
 		}
 
 		// Check if the cookie value matches any user's cookie
-		for username, userCookie := range userCookies {
-			if userCookie == cookie.Value {
-				// Attach username to request context for later use
-				ctx := context.WithValue(r.Context(), "username", username)
-				r = r.WithContext(ctx)
-				next(w, r)
-				return
-			}
+		loginCookie, err := database.GetLoginCookie(r.Context(), apiService.DatabaseClient.DB, cookie.Value)
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
 		}
 
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+		// TODO: handle case if cookie is expired
+
+		// Attach username to request context for later use
+		ctx := context.WithValue(r.Context(), "username", loginCookie.UserName)
+		r = r.WithContext(ctx)
+		// call next handler
+		next(w, r)
+		return
 	}
 }

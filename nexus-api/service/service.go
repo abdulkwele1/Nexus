@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"nexus-api/api"
 	"nexus-api/clients/database"
 	"nexus-api/clients/database/schemas/postgres/migrations"
 	"nexus-api/logging"
@@ -17,8 +16,6 @@ type APIConfig struct {
 	ServiceLogger  *logging.ServiceLogger
 	DatabaseConfig database.PostgresDatabaseConfig
 	APIPort        string
-	// #TODO refactor to storing cookies in database
-	UserCookies api.UserCookies
 }
 
 type APIService struct {
@@ -27,11 +24,13 @@ type APIService struct {
 	Config         APIConfig
 	DatabaseClient *database.PostgresClient
 	*logging.ServiceLogger
-	// #TODO refactor to storing cookies in database
-	UserCookies api.UserCookies
 }
 
-func (as *APIService) Run() error {
+func (as *APIService) Run(ctx context.Context) error {
+	// run background routine to delete any expired cookies
+	go func() {
+		as.ExpireCookies(ctx)
+	}()
 	// run api service listening on the configured port
 	return as.server.ListenAndServe()
 }
@@ -73,12 +72,12 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	// setup handler functions to run whenever a specific api endpoint is called
 	router.HandleFunc("/healthcheck", CorsMiddleware(CreateHealthCheckHandler(&databaseClient)))
 	router.HandleFunc("/login", CorsMiddleware(CreateLoginHandler(&nexusAPI)))
-	router.HandleFunc("/change-password", CorsMiddleware(AuthMiddleware(CreateChangePasswordHandler(&nexusAPI), config.UserCookies)))
+	router.HandleFunc("/change-password", CorsMiddleware(AuthMiddleware(CreateChangePasswordHandler(&nexusAPI), &nexusAPI)))
 
-	router.HandleFunc("/settings", CorsMiddleware(AuthMiddleware(SettingsHandler, config.UserCookies)))   // Protect the settings route
-	router.HandleFunc("/home", CorsMiddleware(AuthMiddleware(HomeHandler, config.UserCookies)))           // Protect the home route
-	router.HandleFunc("/solar", CorsMiddleware(AuthMiddleware(SolarHandler, config.UserCookies)))         //protects solar route
-	router.HandleFunc("/locations", CorsMiddleware(AuthMiddleware(LocationsHandler, config.UserCookies))) //p protects location route
+	router.HandleFunc("/settings", CorsMiddleware(AuthMiddleware(SettingsHandler, &nexusAPI)))   // Protect the settings route
+	router.HandleFunc("/home", CorsMiddleware(AuthMiddleware(HomeHandler, &nexusAPI)))           // Protect the home route
+	router.HandleFunc("/solar", CorsMiddleware(AuthMiddleware(SolarHandler, &nexusAPI)))         //protects solar route
+	router.HandleFunc("/locations", CorsMiddleware(AuthMiddleware(LocationsHandler, &nexusAPI))) //p protects location route
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),
@@ -91,10 +90,27 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 		Config:         config,
 		DatabaseClient: &databaseClient,
 		ServiceLogger:  config.ServiceLogger,
-		UserCookies:    config.UserCookies,
 	}
 
 	nexusAPI.Trace().Msg(fmt.Sprintf("created nexus api  %+v", nexusAPI))
 
 	return nexusAPI, nil
+}
+
+func (as *APIService) ExpireCookies(ctx context.Context) {
+	ticker := time.NewTicker(24 * time.Hour)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case t := <-ticker.C:
+			as.Trace().Msgf("ExpireCookies routine running %+v", t)
+			err := database.DeleteExpiredCookies(ctx, time.Now(), as.DatabaseClient.DB)
+
+			if err != nil {
+				as.Error().Msgf("error %s deleting expired cookies", err)
+			}
+		}
+	}
 }
