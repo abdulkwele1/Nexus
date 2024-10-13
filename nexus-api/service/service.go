@@ -98,7 +98,7 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 }
 
 func (as *APIService) ExpireCookies(ctx context.Context) {
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(1 * time.Minute)
 
 	for {
 		select {
