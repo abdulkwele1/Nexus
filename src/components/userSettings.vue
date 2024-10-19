@@ -32,6 +32,10 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useNexusStore } from '@/stores/nexus'
+
+const store = useNexusStore()
+
 const {
   VITE_NEXUS_API_URL,
 } = import.meta.env;
@@ -73,10 +77,7 @@ const changePassword = async () => {
   });
   console.log('Request Body:', requestBody); // Log the request body
 
-
-
   try {
-    // debugger;
     const response = await fetch(`${VITE_NEXUS_API_URL}/change-password`, {
       method: 'POST',
       credentials: 'include',
@@ -110,8 +111,10 @@ const goHome = () => {
 };
 
 // Handle user logout
-const logout = () => {
+const logout = async () => {
+  await store.user.logout()
   document.cookie = 'session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+
   router.push('/');
 };
 </script>

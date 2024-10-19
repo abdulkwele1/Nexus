@@ -15,7 +15,7 @@ var (
 // LoginCookie represents a location based event for tracked assets
 type LoginCookie struct {
 	bun.BaseModel `bun:"table:login_cookies"`
-	Cookie        string    `bun:",pk,cookie"`
+	Cookie        string    `bun:"cookie,pk"`
 	UserName      string    `bun:"user_name"`
 	Expiration    time.Time `bun:"expires_at"`
 }
@@ -80,6 +80,12 @@ func GetLoginCookie(ctx context.Context, db *bun.DB, cookie string) (LoginCookie
 
 func DeleteExpiredCookies(ctx context.Context, now time.Time, db *bun.DB) error {
 	_, err := db.NewDelete().Model(&LoginCookie{}).Where("expires_at <= ?", now).Exec(ctx)
+
+	return err
+}
+
+func DeleteCookieForUserName(ctx context.Context, userName string, db *bun.DB) error {
+	_, err := db.NewDelete().Model(&LoginCookie{}).Where("user_name = ?", userName).Exec(ctx)
 
 	return err
 }

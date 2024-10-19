@@ -119,6 +119,32 @@ func CreateLoginHandler(apiService *APIService) http.HandlerFunc {
 	}
 }
 
+func CreateLogoutHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rawUsername := r.Context().Value(UsernameContextKey)
+
+		userName, ok := rawUsername.(string)
+
+		if !ok {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: http.StatusText(http.StatusInternalServerError)})
+			return
+		}
+
+		err := database.DeleteCookieForUserName(r.Context(), userName, apiService.DatabaseClient.DB)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: http.StatusText(http.StatusInternalServerError)})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNoContent)
+		json.NewEncoder(w).Encode(struct{}{})
+	}
+}
+
 func CreateChangePasswordHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := api.ChangePasswordRequest{}

@@ -72,6 +72,7 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	// setup handler functions to run whenever a specific api endpoint is called
 	router.HandleFunc("/healthcheck", CorsMiddleware(CreateHealthCheckHandler(&databaseClient)))
 	router.HandleFunc("/login", CorsMiddleware(CreateLoginHandler(&nexusAPI)))
+	router.HandleFunc("/logout", CorsMiddleware(AuthMiddleware(CreateLogoutHandler(&nexusAPI), &nexusAPI)))
 	router.HandleFunc("/change-password", CorsMiddleware(AuthMiddleware(CreateChangePasswordHandler(&nexusAPI), &nexusAPI)))
 
 	router.HandleFunc("/settings", CorsMiddleware(AuthMiddleware(SettingsHandler, &nexusAPI)))   // Protect the settings route
