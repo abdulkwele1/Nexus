@@ -6,6 +6,11 @@ import (
 	"net/http"
 	"nexus-api/api"
 	"nexus-api/clients/database"
+	"time"
+)
+
+const (
+	UsernameContextKey = "username"
 )
 
 func CorsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -29,6 +34,7 @@ func AuthMiddleware(next http.HandlerFunc, apiService *APIService) http.HandlerF
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session_id")
 		if err != nil || cookie == nil {
+			apiService.Trace().Msgf("no cookie found for request %+v", r)
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
 			return
@@ -38,15 +44,22 @@ func AuthMiddleware(next http.HandlerFunc, apiService *APIService) http.HandlerF
 		loginCookie, err := database.GetLoginCookie(r.Context(), apiService.DatabaseClient.DB, cookie.Value)
 
 		if err != nil {
+			apiService.Trace().Msgf("no matching cookie %s for request %+v", cookie.Value, r)
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
 			return
 		}
 
-		// TODO: handle case if cookie is expired
+		// handle case if cookie is expired
+		if loginCookie.Expiration.Before(time.Now()) {
+			apiService.Trace().Msgf("expired cookie %s for request %+v", cookie.Value, r)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Cookie expired"})
+			return
+		}
 
 		// Attach username to request context for later use
-		ctx := context.WithValue(r.Context(), "username", loginCookie.UserName)
+		ctx := context.WithValue(r.Context(), UsernameContextKey, loginCookie.UserName)
 		r = r.WithContext(ctx)
 		// call next handler
 		next(w, r)
