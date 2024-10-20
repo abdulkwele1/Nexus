@@ -102,6 +102,11 @@ func TestE2ETestLoginWithValidCredentialsReturnsCookie(t *testing.T) {
 	assert.True(t, response.Match)
 	// test a non-empty cookie was sent back
 	assert.NotEqual(t, "", response.Cookie)
+
+	// test cookie is saved to database
+	cookie, err := database.GetLoginCookie(testCtx, databaseClient.DB, response.Cookie)
+	assert.NoError(t, err)
+	assert.Equal(t, cookie.Cookie, response.Cookie)
 }
 
 func TestE2ETestChangePasswordAndLoginWithChangedPasswordSucceeds(t *testing.T) {
