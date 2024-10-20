@@ -157,3 +157,45 @@ func TestE2ETestChangePasswordAndLoginWithChangedPasswordSucceeds(t *testing.T) 
 	// assert
 	assert.NoError(t, err)
 }
+
+func TestE2ETestLogoutDeletesCookieFromDatabase(t *testing.T) {
+	// prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	response, err := testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+
+	assert.NoError(t, err)
+
+	cookie, err := database.GetLoginCookie(testCtx, databaseClient.DB, response.Cookie)
+	assert.NoError(t, err)
+	assert.Equal(t, cookie.Cookie, response.Cookie)
+
+	// execute test
+	err = testClient.Logout(testCtx)
+
+	// assert
+	assert.NoError(t, err)
+	// test cookie is deleted from database
+	_, err = database.GetLoginCookie(testCtx, databaseClient.DB, response.Cookie)
+	assert.Error(t, err, "expected cookie to be deleted from database")
+}

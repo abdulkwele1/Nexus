@@ -17,6 +17,7 @@ const (
 	HealthCheckPath    = "/healthcheck"
 	LoginPath          = "/login"
 	ChangePasswordPath = "/change-password"
+	LogoutPath         = "/logout"
 )
 
 // SDKConfig wraps values for configuring
@@ -120,7 +121,6 @@ func (nc *NexusClient) ChangePassword(ctx context.Context, params api.ChangePass
 		return err
 	}
 
-	nc.Trace()
 	err = SetAuthHeaders(request, nc.Cookie)
 
 	if err != nil {
@@ -128,6 +128,38 @@ func (nc *NexusClient) ChangePassword(ctx context.Context, params api.ChangePass
 	}
 
 	nc.Trace().Msgf("sending request with params %+v\n headers %+v", params, request.Header)
+	response, err := nc.http.Do(request)
+
+	if err != nil {
+		return err
+	}
+
+	nc.Trace().Msgf("response %+v", response)
+
+	defer response.Body.Close()
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200 level status code %d", response.StatusCode)
+	}
+
+	return nil
+}
+
+// Logout attempts to log the user out of the app
+// returning error (if any)
+func (nc *NexusClient) Logout(ctx context.Context) error {
+	request, err := http.NewRequest("GET", nc.Config.NexusAPIEndpoint+LogoutPath, nil)
+
+	if err != nil {
+		return err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+
+	if err != nil {
+		return err
+	}
+
+	nc.Trace().Msgf("sending request %+v\n headers %+v", request, request.Header)
 	response, err := nc.http.Do(request)
 
 	if err != nil {
