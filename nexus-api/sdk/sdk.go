@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	HealthCheckPath = "/healthcheck"
-	LoginPath       = "/login"
+	HealthCheckPath    = "/healthcheck"
+	LoginPath          = "/login"
+	ChangePasswordPath = "/change-password"
 )
 
 // SDKConfig wraps values for configuring
@@ -62,8 +63,8 @@ func (nc *NexusClient) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// SubmitCancelDischargeEvents attempts to submit a batch of 1 to 100
-// cancel discharge events for processing, returning error (if any)
+// Login attempts to login to nexus app using username and password
+// returning error (if any)
 func (nc *NexusClient) Login(ctx context.Context, params api.LoginRequest) (api.LoginResponse, error) {
 	body, err := json.Marshal(&params)
 
@@ -97,8 +98,50 @@ func (nc *NexusClient) Login(ctx context.Context, params api.LoginRequest) (api.
 	if err != nil {
 		return api.LoginResponse{}, err
 	}
+	// save cookie for client
+	nc.Cookie.Value = result.Cookie
+	nc.Cookie.Name = "session_id"
 
 	return result, nil
+}
+
+// ChangePassword attempts to change the users password
+// returning error (if any)
+func (nc *NexusClient) ChangePassword(ctx context.Context, params api.ChangePasswordRequest) error {
+	body, err := json.Marshal(&params)
+
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest("POST", nc.Config.NexusAPIEndpoint+ChangePasswordPath, bytes.NewBuffer(body))
+
+	if err != nil {
+		return err
+	}
+
+	nc.Trace()
+	err = SetAuthHeaders(request, nc.Cookie)
+
+	if err != nil {
+		return err
+	}
+
+	nc.Trace().Msgf("sending request with params %+v\n headers %+v", params, request.Header)
+	response, err := nc.http.Do(request)
+
+	if err != nil {
+		return err
+	}
+
+	nc.Trace().Msgf("response %+v", response)
+
+	defer response.Body.Close()
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200 level status code %d", response.StatusCode)
+	}
+
+	return nil
 }
 
 // SetAuthHeaders sets the headers needed to authenticate requests
@@ -115,6 +158,7 @@ func NewClient(config SDKConfig) (*NexusClient, error) {
 		http:          http.Client{},
 		Config:        config,
 		ServiceLogger: config.Logger,
+		Cookie:        &http.Cookie{},
 	}
 
 	return &client, nil

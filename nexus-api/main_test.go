@@ -103,3 +103,52 @@ func TestE2ETestLoginWithValidCredentialsReturnsCookie(t *testing.T) {
 	// test a non-empty cookie was sent back
 	assert.NotEqual(t, "", response.Cookie)
 }
+
+func TestE2ETestChangePasswordAndLoginWithChangedPasswordSucceeds(t *testing.T) {
+	// prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+
+	assert.NoError(t, err)
+
+	newPassword := uuid.New().String()
+	changePasswordParams := api.ChangePasswordRequest{
+		CurrentPassword: testPassword,
+		NewPassword:     newPassword,
+	}
+
+	// execute test
+	// change password
+	err = testClient.ChangePassword(testCtx, changePasswordParams)
+	assert.NoError(t, err)
+
+	// login with new password
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: newPassword,
+	})
+
+	// assert
+	assert.NoError(t, err)
+}
