@@ -4,7 +4,7 @@ import Home from '../components/Home.vue';
 import userSettings from '../components/userSettings.vue';
 import SolarPage from '../components/SolarPage.vue';
 import Locations from '../components/Locations.vue';
-
+import drone from '../components/drone.vue'
 // Function to get a cookie by name
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -15,6 +15,13 @@ function getCookie(name) {
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    
+  {
+      path: '/drone',
+      name: 'drone',
+      component: drone,
+      meta: { requiresAuth: true }
+    },
 
     {
       path: '/locations',
