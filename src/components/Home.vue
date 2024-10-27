@@ -1,16 +1,12 @@
 <template>
   <div>
     <div class="container">
-      <RouterLink to="/locations" class="box-link">
+      <RouterLink to="/sensors" class="box-link">
         <div class="box">
-          <img src="../assets/locationIcon.jpg" alt="Location Icon" class="box-image" />
-          <div class="box-text">Locations</div>
+          <img src="../assets/sensorIcon.jpg" alt="Sensor Icon" class="box-image" />
+          <div class="box-text">Sensors</div>
         </div>
       </RouterLink>
-      <div class="box">
-        <img src="../assets/sensorIcon.jpg" alt="Sensor Icon" class="box-image" />
-        <div class="box-text">Sensors</div>
-      </div>
       <RouterLink to="/solar" class="box-link">
         <div class="box">
           <img src="../assets/solarIcon.jpg" alt="Solar Icon" class="box-image" />
