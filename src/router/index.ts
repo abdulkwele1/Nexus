@@ -3,10 +3,10 @@ import HomeView from '../views/HomeView.vue';
 import Home from '../components/Home.vue';
 import userSettings from '../components/userSettings.vue';
 import SolarPage from '../components/SolarPage.vue';
-import Locations from '../components/Locations.vue';
-import drone from '../components/drone.vue'
-import { useNexusStore } from '@/stores/nexus'
+import Sensors from '../components/sensors.vue';
+import Drone from '../components/drone.vue'
 
+import { useNexusStore } from '@/stores/nexus'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -15,14 +15,14 @@ const router = createRouter({
   {
       path: '/drone',
       name: 'drone',
-      component: drone,
+      component: Drone,
       meta: { requiresAuth: true }
     },
 
     {
-      path: '/locations',
-      name: 'locations',
-      component: Locations,
+      path: '/sensors',
+      name: 'sensors',
+      component: Sensors,
       meta: { requiresAuth: true }
     },
 
