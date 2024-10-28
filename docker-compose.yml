@@ -8,6 +8,11 @@ services:
       - "${POSTGRES_HOST_PORT}:${POSTGRES_CONTAINER_PORT}"
     expose:
       - "${POSTGRES_CONTAINER_PORT}"
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"   # number of files or file count
+        max-size: "10m" # file size
   # run api service
   nexus-api:
     build:
@@ -19,6 +24,11 @@ services:
       - "${NEXUS_API_CONTAINER_DEBUG_PORT}:${NEXUS_API_HOST_DEBUG_PORT}"
     cap_add:
       - SYS_PTRACE # Allows for attaching debugger to process in this container
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"   # number of files or file count
+        max-size: "10m" # file size
   # run vuejs web app for
   nexus-ui:
       build:
@@ -29,8 +39,18 @@ services:
       # mount local code sources to allow hot reloading
       volumes:
       - .:/app
+      logging:
+        driver: "json-file"
+        options:
+          max-file: "5"   # number of files or file count
+          max-size: "10m" # file size
   docker-host:
     image: qoomon/docker-host
     cap_add: [ 'NET_ADMIN', 'NET_RAW' ]
     mem_limit: 8M
     restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"   # number of files or file count
+        max-size: "10m" # file size

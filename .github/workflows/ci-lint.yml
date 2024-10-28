@@ -1,0 +1,16 @@
+name: Lint Checks
+on:
+  workflow_call:
+# run per commit lint checks against this commit
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo from current commit
+        uses: actions/checkout@v3
+      - name: set up Go
+        uses: actions/setup-go@v5
+        with:
+            go-version-file: 'nexus-api/go.mod'
+      - name: golangci-lint
+        run: make lint

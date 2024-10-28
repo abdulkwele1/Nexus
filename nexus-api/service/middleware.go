@@ -5,6 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"nexus-api/api"
+	"nexus-api/clients/database"
+	"time"
+)
+
+const (
+	UsernameContextKey = "username"
 )
 
 func CorsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -24,27 +30,39 @@ func CorsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // Middleware to check for valid session cookie
-func AuthMiddleware(next http.HandlerFunc, userCookies api.UserCookies) http.HandlerFunc {
+func AuthMiddleware(next http.HandlerFunc, apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session_id")
 		if err != nil || cookie == nil {
+			apiService.Trace().Msgf("no cookie found for request %+v", r)
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
 			return
 		}
 
 		// Check if the cookie value matches any user's cookie
-		for username, userCookie := range userCookies {
-			if userCookie == cookie.Value {
-				// Attach username to request context for later use
-				ctx := context.WithValue(r.Context(), "username", username)
-				r = r.WithContext(ctx)
-				next(w, r)
-				return
-			}
+		loginCookie, err := database.GetLoginCookie(r.Context(), apiService.DatabaseClient.DB, cookie.Value)
+
+		if err != nil {
+			apiService.Trace().Msgf("no matching cookie %s for request %+v", cookie.Value, r)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
 		}
 
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+		// handle case if cookie is expired
+		if loginCookie.Expiration.Before(time.Now()) {
+			apiService.Trace().Msgf("expired cookie %s for request %+v", cookie.Value, r)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Cookie expired"})
+			return
+		}
+
+		// Attach username to request context for later use
+		ctx := context.WithValue(r.Context(), UsernameContextKey, loginCookie.UserName)
+		r = r.WithContext(ctx)
+		// call next handler
+		next(w, r)
+		return
 	}
 }
