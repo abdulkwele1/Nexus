@@ -6,11 +6,11 @@ const route = useRoute();
 
 const isHomePage = computed(() => route.path === '/home');
 const isSolarPage = computed(() => route.path === '/solar');
-const isLocations = computed(() => route.path === '/locations');
+const issensors = computed(() => route.path === '/sensors');
 </script>
 
 <template>
-  <nav v-if="!isSolarPage && !isLocations" style="background-color: #FFFFFF; border-color: #e5e7eb;">
+  <nav v-if="!isSolarPage && !issensors" style="background-color: #FFFFFF; border-color: #e5e7eb;">
     <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
       <a href="/" class="flex items-center space-x-3 rtl:space-x-reverse">
         <img alt="Vue logo" class="logo" src="@/assets/nexus.png" width="175" height="150" />
