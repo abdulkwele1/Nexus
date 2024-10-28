@@ -4,7 +4,7 @@
     <canvas ref="yieldGraph"></canvas>
 
     <!-- Export Button -->
-    <button class="export-button" @click="exportData">📄 Export Data</button>
+    <button class="export-button" @click="exportData">📄 Export</button>
 
     <!-- Dropdown Calendar Button -->
     <button class="calendar-button" @click="toggleCalendar">Select Date Range &#9662;</button>
@@ -157,9 +157,12 @@ onMounted(() => {
 
 /* Export Button Styling */
 .export-button {
-  margin-top: 20px;
+  position: fixed;
+  top: 90px;
+  right: 30px;
+  z-index: 1001;
   padding: 10px 20px;
-  background-color: #28a745;
+  background-color: #007bff;
   color: white;
   border: none;
   border-radius: 5px;

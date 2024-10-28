@@ -12,17 +12,16 @@
       <Graph :solarData="solarData" :isLineChart="isLineChart" />
       
       <!-- Line chart switch button -->
-      <label class="line-chart-label">
-        <input type="checkbox" v-model="isLineChart" />
-        Switch to Line Chart
-      </label>
-
+      <button class="line-chart-toggle-button" @click="isLineChart = !isLineChart">
+  {{ isLineChart ? "Bar chart" : "Line chart" }}
+      </button>
       <!-- Export button -->
       <button class="export-button" @click="exportData">📄 Export</button>
 
       <!-- Show panels button -->
       <div class="solar-panel-container">
-        <button class="solar-panels-button" @click="toggleDropdown">Solar Panels</button>
+        <button class="solar-panels-button" @click="showPanelModal = true">Solar Panels</button>
+
         <div v-if="showDropdown" class="dropdown">
           <ul>
             <li @click="selectSolarPanel('Panel 1')">Panel 1</li>
@@ -56,6 +55,25 @@
         </div>
       </div>
     </div>
+    <!-- Solar Panel Selection Modal -->
+      <div v-if="showPanelModal" class="modal-overlay" @click="showPanelModal = false">
+        <div class="modal" @click.stop>
+          <h2>Select Solar Panel</h2>
+          <div class="solar-panel-options">
+            <div class="solar-panel-card" @click="selectSolarPanel('Panel 1'); showPanelModal = false">
+              <h3>Panel 1</h3>          
+            </div>
+            <div class="solar-panel-card" @click="selectSolarPanel('Panel 2'); showPanelModal = false">
+              <h3>Panel 2</h3>
+            </div>
+            <div class="solar-panel-card" @click="selectSolarPanel('Panel 3'); showPanelModal = false">
+              <h3>Panel 3</h3>
+            </div>
+          </div>
+          <button @click="showPanelModal = false">Close</button>
+        </div>
+      </div>
+
 
     <!-- Solar Consumption graph -->
     <div class="chart-container" v-if="currentGraph === 'consumption'">
@@ -82,6 +100,8 @@ const solarData = ref([]);
 const errorMessage = ref("");
 const isLineChart = ref(false);
 const selectedPanel = ref("Panel 1");
+const showPanelModal = ref(false);
+
 
 const switchGraph = (graphType) => {
   if (currentGraph.value !== graphType) {
@@ -172,29 +192,48 @@ onMounted(() => {
 /* Navbar styling */
 .navbar {
   position: fixed;
-  left: 50px;
+  left: 0;
   top: 0;
   width: 100%;
   display: flex;
   justify-content: space-around;
-  background-color: #fff;
-  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.9); /* Slight transparency */
+  backdrop-filter: blur(10px); /* Blur for smooth background */
+  padding: 10px 20px;
   z-index: 1000; /* Ensures navbar stays on top of other content */
-  border-bottom: 2px solid #ccc; /* Add a bottom border */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Add subtle shadow */
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.navbar:hover {
+  background-color: #fafafa; /* Slight color change on hover */
 }
 
 .nav-button {
-  background-color: #fff;
+  background-color: transparent;
   border: none;
   padding: 10px 20px;
   color: #333;
-  cursor: pointer;
   font-size: 16px;
-  transition: background-color 0.3s;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s, transform 0.3s ease; /* Smooth transition for hover and active states */
 }
 
 .nav-button:hover {
-  background-color: #ddd;
+  background-color: #f0f0f0; /* Slight background change */
+  color: #0056b3; /* Hover color */
+  transform: translateY(-2px); /* Subtle lift on hover */
+}
+
+.nav-button:active {
+  transform: translateY(1px); /* Lower it when pressed */
+  transition: transform 0.1s; /* Faster response on active */
+}
+
+/* Navbar adjustments on scroll for a smoother feel */
+.navbar.scrolled {
+  background-color: rgba(255, 255, 255, 1); /* Fully opaque when scrolled */
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* More shadow when scrolled */
 }
 
 /* Container for the overall layout */
@@ -235,12 +274,12 @@ onMounted(() => {
 /* Date selection button */
 .current-date-button {
   position: absolute;
-  top: -25px;
+  top: -55px;
   left: 125px;
   padding: 10px 20px;
   font-size: 16px;
-  background-color: #f8f9fa;
-  color: #343a40;
+  background-color: #007bff;
+  color: white;
   border: 1px solid #ced4da;
   border-radius: 5px;
   cursor: pointer;
@@ -248,22 +287,23 @@ onMounted(() => {
 }
 
 .current-date-button:hover {
-  background-color: #e2e6ea;
+  background-color: #0056b3;
 }
 
 /* Export button */
 .export-button {
-  position: absolute;
-  bottom: -40px;
-  right: 0;
+  position: fixed;
+  top: 70px;
+  right: 30px;
   padding: 10px 20px;
   font-size: 16px;
-  background-color: #28a745;
+  background-color: #007bff;
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s;
+  z-index: 1001;
 }
 
 .export-button:hover {
@@ -311,12 +351,12 @@ onMounted(() => {
 /* Button for switching between panels */
 .solar-panels-button {
   position: absolute;
-  top: -25px;
+  top: -55px;
   left: 500px;
   padding: 10px 20px;
   font-size: 16px;
-  background-color: #f8f9fa;
-  color: #343a40;
+  background-color: #007bff;
+  color: white;
   border: 1px solid #ced4da;
   border-radius: 5px;
   cursor: pointer;
@@ -324,21 +364,30 @@ onMounted(() => {
 }
 
 .solar-panels-button:hover {
-  background-color: #e2e6ea;
+  background-color: #0056b3;
 }
 
 /* Style for the line chart checkbox */
-.line-chart-label {
+.line-chart-toggle-button {
   position: absolute;
-  top: -30px;
+  top: -55px;
   left: 650px;
-  display: flex;
-  align-items: center;
+  padding: 10px 20px;
   font-size: 16px;
+  background-color: #007bff; /* Light gray background */
+  color: white;
+  border: 1px solid #ced4da; /* Subtle border */
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s ease;
 }
 
-.line-chart-label input {
-  margin-right: 5px;
+.line-chart-toggle-button:hover {
+  background-color: #0056b3; /* Darker background on hover */
+}
+
+.line-chart-toggle-button:active {
+  transform: translateY(1px); /* Slight push effect when clicked */
 }
 
 /* Dropdown styling */
@@ -368,4 +417,43 @@ onMounted(() => {
 .dropdown li:hover {
   background-color: #e2e6ea;
 }
+
+/* Solar Panel Selection Modal */
+.solar-panel-options {
+  display: flex;
+  flex-direction: column; /* Align options in a column */
+  gap: 15px; /* Space between options */
+  margin-top: 20px; /* Space above options */
+}
+
+.solar-panel-card {
+  background: #f8f9fa; /* Light background color */
+  border: 1px solid #ced4da; /* Border for definition */
+  border-radius: 8px; /* Rounded corners */
+  padding: 15px; /* Padding for content */
+  transition: transform 0.1s ease, box-shadow 0.1s ease; /* Smooth transition for hover effects */
+  cursor: pointer; /* Pointer cursor to indicate it's clickable */
+}
+
+.solar-panel-card:hover {
+  transform: translateY(-5px); /* Lift effect on hover */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Shadow effect on hover */
+}
+
+button {
+  margin-top: 20px; /* Space above the button */
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s; /* Smooth transition */
+}
+
+button:hover {
+  background-color: #0056b3; /* Darker on hover */
+  transform: scale(1.05); /* Slightly larger on hover */
+}
+
 </style>
