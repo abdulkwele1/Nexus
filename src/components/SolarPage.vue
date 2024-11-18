@@ -7,185 +7,324 @@
       <button class="nav-button" @click="switchGraph('consumption')">Solar Consumption</button>
     </nav>
 
-    <!-- Conditional rendering of graphs and controls for Solar Yield -->
+    <!-- Solar Yield Section -->
     <div class="chart-container" v-if="currentGraph === 'yield'">
-      <Graph :solarData="solarData" :isLineChart="isLineChart" />
-      
+      <!-- Graph Component -->
+      <Graph :solarData="panels[activePanel].data" :isLineChart="isLineChart" />
+
       <!-- Line chart switch button -->
       <button class="line-chart-toggle-button" @click="isLineChart = !isLineChart">
-  {{ isLineChart ? "Bar chart" : "Line chart" }}
+        {{ isLineChart ? "Bar chart" : "Line chart" }}
       </button>
+
       <!-- Export button -->
       <button class="export-button" @click="exportData">📄 Export</button>
 
-      <!-- Show panels button -->
+      <!-- Solar Panels Button and Modal -->
       <div class="solar-panel-container">
-        <button class="solar-panels-button" @click="showPanelModal = true">Solar Panels</button>
-
-        <div v-if="showDropdown" class="dropdown">
-          <ul>
-            <li @click="selectSolarPanel('Panel 1')">Panel 1</li>
-            <li @click="selectSolarPanel('Panel 2')">Panel 2</li>
-            <li @click="selectSolarPanel('Panel 3')">Panel 3</li>
-          </ul>
-        </div>
+        <button class="solar-panels-button" @click="togglePanelModal">Solar Panels</button>
+        <p>Active Panel: {{ panels[activePanel].name }}</p>
       </div>
 
-      <!-- Calendar -->
+      <div v-if="showPanelModal" class="panel-modal">
+        <p>Select a solar panel option:</p>
+        <button v-for="(panel, index) in panels" :key="index" @click="selectPanel(index)">
+          {{ panel.name }}
+        </button>
+        <button @click="togglePanelModal">Close</button>
+      </div>
+
+      <!-- Date Range Selection and Calendar Modal -->
       <button class="current-date-button" @click="openCalendar">
         Select Date Range &#9662;
       </button>
 
-      <!-- Calendar modal -->
       <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
         <div class="modal" @click.stop>
           <h2>Select Date Range</h2>
+          <p>
+            Allowed range: 
+            <strong>{{ panels[activePanel].data[0]?.date.toISOString().split('T')[0] }}</strong>
+            to
+            <strong>{{ panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0] }}</strong>
+          </p>
           <div class="calendar-container">
             <div class="calendar">
               <h3>Start Point</h3>
-              <input type="date" v-model="startDate" />
+              <input
+                type="date"
+                v-model="startDate"
+                :min="panels[activePanel].data[0]?.date.toISOString().split('T')[0]"
+                :max="panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0]"
+              />
             </div>
             <div class="calendar">
               <h3>End Point</h3>
-              <input type="date" v-model="endDate" />
+              <input
+                type="date"
+                v-model="endDate"
+                :min="panels[activePanel].data[0]?.date.toISOString().split('T')[0]"
+                :max="panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0]"
+              />
             </div>
           </div>
           <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
           <button @click="closeCalendar">Close</button>
         </div>
+        </div>
+
+      <!-- Data Entry Form -->
+      <div class="data-entry-form">
+        <h3>Add Data Point to {{ panels[activePanel].name }}</h3>
+        <input
+          type="text"
+          v-model="newDate"
+          placeholder="YYYY/MM/DD"
+          @input="formatDateInput"
+        />
+        <input
+          type="text"
+          v-model="newProduction"
+          placeholder="kWh Production"
+          @keypress="allowOnlyNumbers"
+        />
+        <button @click="addData">Add Data</button>
+        <button @click="clearData">Clear Data for {{ panels[activePanel].name }}</button>
+      </div>
+
+      <!-- List of Data Points with Remove Option -->
+      <div class="data-list">
+        <h3>Data Points for {{ panels[activePanel].name }}</h3>
+        <ul>
+          <li v-for="(point, index) in panels[activePanel].data" :key="index">
+            {{ point.date.toISOString().split('T')[0] }} - {{ point.production }} kWh
+            <button @click="removeData(index)">Remove</button>
+          </li>
+        </ul>
       </div>
     </div>
-    <!-- Solar Panel Selection Modal -->
-      <div v-if="showPanelModal" class="modal-overlay" @click="showPanelModal = false">
-        <div class="modal" @click.stop>
-          <h2>Select Solar Panel</h2>
-          <div class="solar-panel-options">
-            <div class="solar-panel-card" @click="selectSolarPanel('Panel 1'); showPanelModal = false">
-              <h3>Panel 1</h3>          
-            </div>
-            <div class="solar-panel-card" @click="selectSolarPanel('Panel 2'); showPanelModal = false">
-              <h3>Panel 2</h3>
-            </div>
-            <div class="solar-panel-card" @click="selectSolarPanel('Panel 3'); showPanelModal = false">
-              <h3>Panel 3</h3>
-            </div>
-          </div>
-          <button @click="showPanelModal = false">Close</button>
-        </div>
-      </div>
 
-
-    <!-- Solar Consumption graph -->
+    <!-- Solar Consumption Graph -->
     <div class="chart-container" v-if="currentGraph === 'consumption'">
       <BarGraph />
     </div>
   </div>
 </template>
 
-
-
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import Graph from './Graph.vue'; // Import the Solar Yield Graph component
-import BarGraph from './yieldGraph.vue';  // Bar graph for Solar Consumption
+import Graph from './Graph.vue';
+import BarGraph from './yieldGraph.vue';
 
 const router = useRouter();
-const currentGraph = ref('yield');  // Default is Solar Yield graph
+const currentGraph = ref('yield');
 const showCalendar = ref(false);
-const showDropdown = ref(false);
+const showPanelModal = ref(false);
+const isLineChart = ref(false);
+const activePanel = ref(0); // Index of the currently active panel
+const newDate = ref("");
+const newProduction = ref("");
 const startDate = ref(null);
 const endDate = ref(null);
-const solarData = ref([]);
 const errorMessage = ref("");
-const isLineChart = ref(false);
-const selectedPanel = ref("Panel 1");
-const showPanelModal = ref(false);
 
+// Panels data
+const panels = ref([
+  { name: "Panel 1", data: [] },
+  { name: "Panel 2", data: [] },
+  { name: "Panel 3", data: [] }
+]);
 
-const switchGraph = (graphType) => {
-  if (currentGraph.value !== graphType) {
-    currentGraph.value = graphType;  // Switch graph if different from current
+// Load panel data from local storage
+onMounted(() => {
+  const savedPanels = JSON.parse(localStorage.getItem('panels') || '[]');
+  if (savedPanels.length) {
+    panels.value = savedPanels.map(panel => ({
+      name: panel.name,
+      data: panel.data.map(data => ({
+        date: new Date(data.date),
+        production: data.production
+      }))
+    }));
   }
+});
+
+// Watch for changes in panels and sync with local storage
+watch(
+  panels,
+  (newPanels) => {
+    localStorage.setItem('panels', JSON.stringify(newPanels));
+  },
+  { deep: true }
+);
+
+const graphKey = ref(0);
+
+const refreshGraph = () => {
+  graphKey.value += 1; // Changes the key to force a re-render
 };
 
-const goTo = (path) => {
-  router.push(path);
+// Panel switching
+const togglePanelModal = () => {
+  showPanelModal.value = !showPanelModal.value;
+};
+const selectPanel = (index) => {
+  activePanel.value = index;
+  showPanelModal.value = false;
 };
 
+// query data
+const queriedData = panels.value[activePanel.value].data.filter(point => {
+  const pointDate = point.date;
+  return pointDate >= new Date(startDate.value) && pointDate <= new Date(endDate.value);
+});
+
+// Calendar modal
 const openCalendar = () => {
+  const activePanelData = panels.value[activePanel.value].data;
+
+  if (activePanelData.length === 0) {
+    alert("No data available for this panel to query.");
+    return;
+  }
+
+  // Determine the minimum and maximum dates from the active panel data
+  const dates = activePanelData.map((point) => point.date);
+  const minDate = new Date(Math.min(...dates));
+  const maxDate = new Date(Math.max(...dates));
+
+  // Set default start and end dates
+  startDate.value = minDate.toISOString().split('T')[0];
+  endDate.value = maxDate.toISOString().split('T')[0];
+
   showCalendar.value = true;
 };
 
-const closeCalendar = () => {
-  showCalendar.value = false;
-};
+Calendar = () => {
+  // Get the data for the active panel
+  const activePanelData = panels.value[activePanel.value]?.data || [];
 
-const toggleDropdown = () => {
-  showDropdown.value = !showDropdown.value;
-};
-
-const selectSolarPanel = (panel) => {
-  selectedPanel.value = panel;
-  showDropdown.value = false;
-};
-
-const generateSolarData = (start, end) => {
-  const data = [];
-  const currentDate = new Date(start);
-  const endDate = new Date(end);
-
-  while (currentDate <= endDate) {
-    const month = currentDate.getMonth();
-    let production;
-    if (month === 5 || month === 6 || month === 7) {
-      production = Math.floor(Math.random() * 100) + 150;
-    } else {
-      production = Math.floor(Math.random() * 50) + 50;
-    }
-
-    data.push({
-      date: new Date(currentDate),
-      production,
-    });
-
-    currentDate.setDate(currentDate.getDate() + 1);
+  if (activePanelData.length === 0) {
+    errorMessage.value = "No data available for this panel.";
+    return;
   }
 
-  return data;
+  // Get the minimum and maximum dates from the active panel data
+  const dates = activePanelData.map((point) => new Date(point.date));
+
+  // Parse selected dates
+  const selectedStartDate = new Date(startDate.value).getTime();
+  const selectedEndDate = new Date(endDate.value).getTime();
+  const minDate = new Date(panels.value[activePanel.value].data[0].date).getTime();
+  const maxDate = new Date(panels.value[activePanel.value].data[panels.value[activePanel.value].data.length - 1].date).getTime();
+
+  if (selectedStartDate < minDate || selectedEndDate > maxDate) {
+    errorMessage.value = `Dates must be between ${minDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`;
+  } else {
+    errorMessage.value = "";
+    showCalendar.value = false;
+  }
+
+  console.log("Min Date:", minDate);
+  console.log("Max Date:", maxDate);
+  console.log("Selected Start Date:", selectedStartDate);
+  console.log("Selected End Date:", selectedEndDate);
+
+  // Ensure both start and end dates are selected
+  if (!selectedStartDate || !selectedEndDate) {
+    errorMessage.value = "Please select both start and end dates.";
+    return;
+  }
+
+  // Validate selected dates are within range
+  if (selectedStartDate >= minDate && selectedEndDate <= maxDate) {
+    // Valid dates
+    errorMessage.value = "";
+    console.log("Valid date range selected");
+    showCalendar.value = false;
+  } else {
+    // Invalid date range
+    errorMessage.value = `Dates must be between ${minDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`;
+  }
 };
 
-watch([startDate, endDate], () => {
-  if (startDate.value && endDate.value) {
-    const start = new Date(startDate.value);
-    const end = new Date(endDate.value);
-    
-    if (end < start) {
-      errorMessage.value = "End point cannot be before starting point.";
-    } else {
-      solarData.value = generateSolarData(start, end);
+// Add data to the active panel
+const addData = () => {
+  const [year, month, day] = newDate.value.split('/').map(Number);
+  if (newDate.value && newProduction.value > 0 && year <= 2025) {
+    const formattedDate = new Date(year, month - 1, day);
+    const newDataPoint = {
+      date: formattedDate,
+      production: parseFloat(newProduction.value)
+    };
+
+    const panelData = [...panels.value[activePanel.value].data, newDataPoint];
+    panelData.sort((a, b) => a.date - b.date);
+
+    panels.value[activePanel.value].data = panelData; // Trigger reactivity
+    newDate.value = "";
+    newProduction.value = "";
+  } else {
+    alert("Please enter a valid date and production value.");
+  }
+};
+
+// Format the date input as YYYY/MM/DD
+const formatDateInput = () => {
+  let date = newDate.value.replace(/\D/g, "");
+  if (date.length >= 5 && parseInt(date.substring(0, 4), 10) > 2025) {
+    alert("Year cannot exceed 2025.");
+    newDate.value = "";
+    return;
+  }
+  if (date.length > 4) date = date.slice(0, 4) + '/' + date.slice(4);
+  if (date.length > 7) {
+    const month = parseInt(date.slice(5, 7), 10);
+    if (month > 12) {
+      alert("Month cannot exceed 12.");
+      newDate.value = date.slice(0, 5);
+      return;
+    }
+    date = date.slice(0, 7) + '/' + date.slice(7);
+  }
+  if (date.length === 10) {
+    const day = parseInt(date.slice(8, 10), 10);
+    if (day > 31) {
+      alert("Day cannot exceed 31.");
+      newDate.value = date.slice(0, 8);
+      return;
     }
   }
-});
-
-const exportData = () => {
-  const header = "sensor_reading_date,daily_kw_generated\n";
-  const csvContent = "data:text/csv;charset=utf-8," 
-    + header 
-    + solarData.value.map(d => `${d.date.toISOString().split('T')[0]},${d.production}`).join("\n");
-
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "solar_data.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  newDate.value = date.slice(0, 10);
 };
 
-onMounted(() => {
-  solarData.value = generateSolarData(new Date("2023-01-01"), new Date("2023-01-31"));
-});
+// Remove data from the active panel
+const removeData = (index) => {
+  const panelData = panels.value[activePanel.value].data.filter(
+    (_, i) => i !== index
+  );
+  panels.value[activePanel.value].data = panelData; // Trigger reactivity
+};
+
+// Clear data for the active panel
+const clearData = () => {
+  panels.value[activePanel.value].data = [];
+};
+
+// Other existing methods
+const switchGraph = (graphType) => {
+  currentGraph.value = graphType;
+};
+const goTo = (path) => {
+  router.push(path);
+};
+const allowOnlyNumbers = (event) => {
+  const char = String.fromCharCode(event.which);
+  if (!/[0-9.]/.test(char) || (char === '.' && newProduction.value.includes('.'))) {
+    event.preventDefault();
+  }
+};
 </script>
 
 <style scoped>
@@ -204,7 +343,7 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Add subtle shadow */
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
-
+const close
 .navbar:hover {
   background-color: #fafafa; /* Slight color change on hover */
 }
@@ -419,25 +558,59 @@ onMounted(() => {
 }
 
 /* Solar Panel Selection Modal */
-.solar-panel-options {
-  display: flex;
-  flex-direction: column; /* Align options in a column */
-  gap: 15px; /* Space between options */
-  margin-top: 20px; /* Space above options */
+.solar-panel-container {
+  margin-top: 20px;
 }
 
-.solar-panel-card {
-  background: #f8f9fa; /* Light background color */
-  border: 1px solid #ced4da; /* Border for definition */
-  border-radius: 8px; /* Rounded corners */
-  padding: 15px; /* Padding for content */
-  transition: transform 0.1s ease, box-shadow 0.1s ease; /* Smooth transition for hover effects */
-  cursor: pointer; /* Pointer cursor to indicate it's clickable */
+.solar-panels-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: #5e60ce;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
 }
 
-.solar-panel-card:hover {
-  transform: translateY(-5px); /* Lift effect on hover */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Shadow effect on hover */
+.solar-panels-button:hover {
+  background-color: #4b4fb3;
+}
+
+.panel-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 20px;
+  background-color: #ffffff;
+  border: 1px solid #d3d3d3;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+  z-index: 1000; /* Ensure it’s above other elements */
+}
+
+.panel-modal h3 {
+  margin-bottom: 15px;
+}
+
+.panel-modal button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+  background-color: #5e60ce;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.panel-modal button:hover {
+  background-color: #4b4fb3;
 }
 
 button {
