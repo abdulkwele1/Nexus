@@ -81,12 +81,11 @@ func CreateLoginHandler(apiService *APIService) http.HandlerFunc {
 			Match:       true,
 			Cookie:      uuid.NewString(),
 		}
-		apiService.UserCookies[request.Username] = response.Cookie
 
-		apiService.Debug().Msgf("password hash for user %s in our system is %s", request.Username, loginAuthentication.PasswordHash)
+		apiService.Trace().Msgf("password hash for user %s in our system is %s", request.Username, loginAuthentication.PasswordHash)
 
 		// Set the cookie with an expiration time
-		expiration := time.Now().Add(1 * time.Hour)
+		expiration := time.Now().Add(3 * 24 * time.Hour)
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_id",
 			Value:    response.Cookie,
@@ -97,9 +96,52 @@ func CreateLoginHandler(apiService *APIService) http.HandlerFunc {
 			Secure:   false, // Set to true if serving over HTTPS
 		})
 
+		// upsert cookie to database
+		loginCookie := database.LoginCookie{
+			UserName:   request.Username,
+			Cookie:     response.Cookie,
+			Expiration: expiration,
+		}
+
+		err = loginCookie.Save(r.Context(), apiService.DatabaseClient.DB)
+
+		if err != nil {
+			apiService.Error().Msgf("error %s saving login cookie %+v to database", err, loginCookie)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(struct{}{})
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func CreateLogoutHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rawUsername := r.Context().Value(UsernameContextKey)
+
+		userName, ok := rawUsername.(string)
+
+		if !ok {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: http.StatusText(http.StatusInternalServerError)})
+			return
+		}
+
+		err := database.DeleteCookieForUserName(r.Context(), userName, apiService.DatabaseClient.DB)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: http.StatusText(http.StatusInternalServerError)})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNoContent)
+		json.NewEncoder(w).Encode(struct{}{})
 	}
 }
 

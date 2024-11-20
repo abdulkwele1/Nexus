@@ -12,7 +12,7 @@ var (
 	ErrorNoLoginAuthenticationForUsername = errors.New("no login authentication info found for user_name")
 )
 
-// LoginAuthentication represents a location based event for tracked assets
+
 type LoginAuthentication struct {
 	bun.BaseModel `bun:"table:login_authentications"`
 	ID            int64  `bun:",pk,autoincrement"`
@@ -20,22 +20,19 @@ type LoginAuthentication struct {
 	PasswordHash  string `bun:"password_hash"`
 }
 
-// Save saves the current activity to
-// the database, returning error (if any)
+
 func (a *LoginAuthentication) Save(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewInsert().Model(a).Exec(ctx)
 
 	return err
 }
 
-// Load returns the row in the activities table
-// returning error (if any)
+
 func (a *LoginAuthentication) Load(ctx context.Context, db *bun.DB) error {
 	return db.NewSelect().Model(a).WherePK().Scan(ctx)
 }
 
-// Update updates a row in the activities table
-// returning error (if any)
+
 func (a *LoginAuthentication) Update(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewUpdate().Model(a).WherePK().Exec(ctx)
 

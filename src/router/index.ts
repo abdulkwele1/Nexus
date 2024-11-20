@@ -5,12 +5,7 @@ import userSettings from '../components/userSettings.vue';
 import SolarPage from '../components/SolarPage.vue';
 import Sensors from '../components/sensors.vue';
 import Drone from '../components/drone.vue'
-// Function to get a cookie by name
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-}
+import { useNexusStore } from '@/stores/nexus'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -65,7 +60,9 @@ const router = createRouter({
 
 // Navigation guard
 router.beforeEach((to, from, next) => {
-  const loggedInUser = getCookie('session_id'); // Check for session_id cookie
+  const store = useNexusStore()
+
+  const loggedInUser = store.user.getCookie(); // Check for session_id cookie
   if (to.matched.some(record => record.meta.requiresAuth) && !loggedInUser) {
     next('/'); // Redirect to login if not logged in
   } else {

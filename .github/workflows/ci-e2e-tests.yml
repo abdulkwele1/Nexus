@@ -1,0 +1,24 @@
+name: Continuous Integration (E2E Testing Checks)
+
+on:
+  workflow_call:
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo from current commit
+        uses: actions/checkout@v3
+      - name: set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'nexus-api/go.mod'
+      - name: build and start nexus api and it's dependencies
+        run: sudo docker compose up -d --build
+      - name: wait for api and dependencies to be online
+        run: make ready
+      - name: run e2e tests
+        run: make e2e-test
+      - name: print api service logs
+        run: sudo docker compose logs nexus-api
+        # because we especially want the logs if the test(s) fail 😅
+        if: always()

@@ -9,10 +9,9 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useNexusStore } from '@/stores/nexus';
 
-const {
-  VITE_NEXUS_API_URL,
-} = import.meta.env;
+const store = useNexusStore();
 
 // Create a reactive reference for the username
 const username = ref('');
@@ -20,44 +19,26 @@ const password = ref('');
 const router = useRouter();
 
 onMounted(() => {
-  const loggedInUser = getCookie('session_id'); // Check session_id cookie
+  const loggedInUser = store.user.getCookie(); // Check session_id cookie
   if (loggedInUser) {
     router.push({ path: '/home' });
   }
 });
 
-// Function to get cookie by name
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-}
-
 // Handle the login action
 async function handleLogin() {
   if (username.value.trim() && password.value.trim()) {
     try {
-      // Construct the URL with the username
-      const url = `${VITE_NEXUS_API_URL}/login`;
-
-      const data = {
-        username: username.value.trim(),
-        password: password.value.trim(),
-      };
-
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      const response = await store.user.login(username.value.trim(),password.value.trim() )
 
       const responseData = await response.json();
 
       if (response.ok && responseData.match) {
         // Set session cookie
         document.cookie = `session_id=${responseData.cookie}; path=/; samesite=strict`; // Use session_id
+        // update app state for current user
+        store.user.userName = username
+        store.user.loggedIn = true
         router.push({ path: '/home' });
       } else {
         alert('Invalid username or password');
