@@ -8,101 +8,108 @@
     </nav>
 
     <!-- Solar Yield Section -->
-    <div class="chart-container" v-if="currentGraph === 'yield'">
-      <!-- Graph Component -->
-      <Graph :solarData="panels[activePanel].data" :isLineChart="isLineChart" />
+    <!-- Solar Yield Section -->
+<div class="chart-container" v-if="currentGraph === 'yield'">
+  <!-- Graph Component -->
+  <Graph :solarData="queriedData.length ? queriedData : panels[activePanel].data" :isLineChart="isLineChart" />
 
-      <!-- Line chart switch button -->
-      <button class="line-chart-toggle-button" @click="isLineChart = !isLineChart">
-        {{ isLineChart ? "Bar chart" : "Line chart" }}
-      </button>
+  <!-- Line chart switch button -->
+  <button class="line-chart-toggle-button" @click="isLineChart = !isLineChart">
+    {{ isLineChart ? "Bar chart" : "Line chart" }}
+  </button>
 
-      <!-- Export button -->
-      <button class="export-button" @click="exportData">📄 Export</button>
+  <!-- Export button -->
+  <button class="export-button" @click="exportData">📄 Export</button>
 
-      <!-- Solar Panels Button and Modal -->
-      <div class="solar-panel-container">
-        <button class="solar-panels-button" @click="togglePanelModal">Solar Panels</button>
-        <p>Active Panel: {{ panels[activePanel].name }}</p>
-      </div>
+  <!-- Solar Panels Button and Modal -->
+  <div class="solar-panel-container">
+    <button class="solar-panels-button" @click="togglePanelModal">Solar Panels</button>
+    <p>Active Panel: {{ panels[activePanel].name }}</p>
+  </div>
 
-      <div v-if="showPanelModal" class="panel-modal">
-        <p>Select a solar panel option:</p>
-        <button v-for="(panel, index) in panels" :key="index" @click="selectPanel(index)">
-          {{ panel.name }}
-        </button>
-        <button @click="togglePanelModal">Close</button>
-      </div>
+  <div v-if="showPanelModal" class="panel-modal">
+    <p>Select a solar panel option:</p>
+    <button v-for="(panel, index) in panels" :key="index" @click="selectPanel(index)">
+      {{ panel.name }}
+    </button>
+    <button @click="togglePanelModal">Close</button>
+  </div>
 
-      <!-- Date Range Selection and Calendar Modal -->
-      <button class="current-date-button" @click="openCalendar">
-        Select Date Range &#9662;
-      </button>
+  <!-- Date Range Selection and Calendar Modal -->
+  <button class="current-date-button" @click="openCalendar">
+    Select Date Range &#9662;
+  </button>
 
-      <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
-        <div class="modal" @click.stop>
-          <h2>Select Date Range</h2>
-          <p>
-            Allowed range: 
-            <strong>{{ panels[activePanel].data[0]?.date.toISOString().split('T')[0] }}</strong>
-            to
-            <strong>{{ panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0] }}</strong>
-          </p>
-          <div class="calendar-container">
-            <div class="calendar">
-              <h3>Start Point</h3>
-              <input
-                type="date"
-                v-model="startDate"
-                :min="panels[activePanel].data[0]?.date.toISOString().split('T')[0]"
-                :max="panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0]"
-              />
-            </div>
-            <div class="calendar">
-              <h3>End Point</h3>
-              <input
-                type="date"
-                v-model="endDate"
-                :min="panels[activePanel].data[0]?.date.toISOString().split('T')[0]"
-                :max="panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0]"
-              />
-            </div>
-          </div>
-          <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-          <button @click="closeCalendar">Close</button>
+  <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
+    <div class="modal" @click.stop>
+      <h2>Select Date Range</h2>
+      <p>
+        Allowed range: 
+        <strong>{{ panels[activePanel].data[0]?.date.toISOString().split('T')[0] }}</strong>
+        to
+        <strong>{{ panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0] }}</strong>
+      </p>
+      <div class="calendar-container">
+        <div class="calendar">
+          <h3>Start Point</h3>
+          <input
+            type="date"
+            v-model="startDate"
+            :min="panels[activePanel].data[0]?.date.toISOString().split('T')[0]"
+            :max="panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0]"
+          />
         </div>
+        <div class="calendar">
+          <h3>End Point</h3>
+          <input
+            type="date"
+            v-model="endDate"
+            :min="panels[activePanel].data[0]?.date.toISOString().split('T')[0]"
+            :max="panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0]"
+          />
         </div>
-
-      <!-- Data Entry Form -->
-      <div class="data-entry-form">
-        <h3>Add Data Point to {{ panels[activePanel].name }}</h3>
-        <input
-          type="text"
-          v-model="newDate"
-          placeholder="YYYY/MM/DD"
-          @input="formatDateInput"
-        />
-        <input
-          type="text"
-          v-model="newProduction"
-          placeholder="kWh Production"
-          @keypress="allowOnlyNumbers"
-        />
-        <button @click="addData">Add Data</button>
-        <button @click="clearData">Clear Data for {{ panels[activePanel].name }}</button>
       </div>
-
-      <!-- List of Data Points with Remove Option -->
-      <div class="data-list">
-        <h3>Data Points for {{ panels[activePanel].name }}</h3>
-        <ul>
-          <li v-for="(point, index) in panels[activePanel].data" :key="index">
-            {{ point.date.toISOString().split('T')[0] }} - {{ point.production }} kWh
-            <button @click="removeData(index)">Remove</button>
-          </li>
-        </ul>
-      </div>
+      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+      <button @click="closeCalendar">Close</button>
     </div>
+  </div>
+
+  <!-- Data Entry Form -->
+  <div class="data-entry-form">
+    <h3>Add Data Point to {{ panels[activePanel].name }}</h3>
+    <input
+      type="text"
+      v-model="newDate"
+      placeholder="YYYY/MM/DD"
+      @input="formatDateInput"
+    />
+    <input
+      type="text"
+      v-model="newProduction"
+      placeholder="kWh Production"
+      @keypress="allowOnlyNumbers"
+    />
+    <button @click="addData">Add Data</button>
+    <button @click="clearData">Clear Data for {{ panels[activePanel].name }}</button>
+  </div>
+
+  <!-- List of Data Points with Remove Option -->
+  <div class="data-list">
+    <h3>Data Points for {{ panels[activePanel].name }} (Queried)</h3>
+    <button @click="revertToAllData" class="toggle-data-button">
+    Show All Data
+    </button>
+
+    <ul v-if="queriedData.length">
+      <li v-for="(point, index) in queriedData" :key="index">
+        {{ point.date.toISOString().split('T')[0] }} - {{ point.production }} kWh
+        <button @click="removeData(index)">Remove</button>
+      </li>
+    </ul>
+
+    <p v-if="!queriedData.length">No data points match the selected range.</p>
+  </div>
+</div>
 
     <!-- Solar Consumption Graph -->
     <div class="chart-container" v-if="currentGraph === 'consumption'">
@@ -129,12 +136,49 @@ const startDate = ref(null);
 const endDate = ref(null);
 const errorMessage = ref("");
 
+const exportData = () => {
+  const activeData = panels.value[activePanel.value].data;
+
+  if (!activeData.length) {
+    alert("No data to export for this panel.");
+    return;
+  }
+
+  const csvContent = [
+    "Date,Production (kWh)", // CSV header
+    ...activeData.map(
+      (point) => `${point.date.toISOString().split('T')[0]},${point.production}`
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute(
+    "download",
+    `${panels.value[activePanel.value].name}_data.csv`
+  );
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 // Panels data
 const panels = ref([
   { name: "Panel 1", data: [] },
   { name: "Panel 2", data: [] },
   { name: "Panel 3", data: [] }
 ]);
+
+watch(
+  panels,
+  (newPanels) => {
+    localStorage.setItem("panels", JSON.stringify(newPanels));
+  },
+  { deep: true }
+);
 
 // Load panel data from local storage
 onMounted(() => {
@@ -171,14 +215,46 @@ const togglePanelModal = () => {
 };
 const selectPanel = (index) => {
   activePanel.value = index;
+
+  // Reset the date range and queriedData when switching panels
+  startDate.value = null;
+  endDate.value = null;
+  queriedData.value = panels.value[index].data; // Show all data for the new panel initially
   showPanelModal.value = false;
 };
 
 // query data
-const queriedData = panels.value[activePanel.value].data.filter(point => {
-  const pointDate = point.date;
-  return pointDate >= new Date(startDate.value) && pointDate <= new Date(endDate.value);
-});
+const queriedData = ref([]); // Store the filtered data
+
+watch(
+  [startDate, endDate],
+  ([newStartDate, newEndDate]) => {
+    if (newStartDate && newEndDate) {
+      const start = new Date(newStartDate).getTime();
+      const end = new Date(newEndDate).getTime();
+
+      // Debug: Log the start, end, and data points for verification
+      console.log("Start Date:", newStartDate);
+      console.log("End Date:", newEndDate);
+      console.log("Original Data Points:", panels.value[activePanel.value].data);
+
+      if (start > end) {
+        errorMessage.value = "Start date must be earlier than end date.";
+        queriedData.value = [];
+      } else {
+        errorMessage.value = "";
+        queriedData.value = panels.value[activePanel.value].data.filter((point) => {
+          const pointDate = new Date(point.date).getTime();
+          return pointDate >= start && pointDate <= end;
+        });
+
+        // Debug: Log the filtered data points
+        console.log("Filtered Data Points:", queriedData.value);
+      }
+    }
+  },
+  { immediate: true } // Ensure it runs initially on mount
+);
 
 // Calendar modal
 const openCalendar = () => {
@@ -201,73 +277,26 @@ const openCalendar = () => {
   showCalendar.value = true;
 };
 
-Calendar = () => {
-  // Get the data for the active panel
-  const activePanelData = panels.value[activePanel.value]?.data || [];
+const closeCalendar = () => {
+  // If both dates are selected, validate them
+  if (startDate.value && endDate.value) {
+    const selectedStartDate = new Date(startDate.value).getTime();
+    const selectedEndDate = new Date(endDate.value).getTime();
+    const minDate = new Date(panels.value[activePanel.value].data[0].date).getTime();
+    const maxDate = new Date(panels.value[activePanel.value].data[panels.value[activePanel.value].data.length - 1].date).getTime();
 
-  if (activePanelData.length === 0) {
-    errorMessage.value = "No data available for this panel.";
-    return;
-  }
+    if (selectedStartDate < minDate || selectedEndDate > maxDate) {
+      errorMessage.value = `Dates must be between ${new Date(minDate).toISOString().split('T')[0]} and ${new Date(maxDate).toISOString().split('T')[0]}.`;
+      return;
+    }
 
-  // Get the minimum and maximum dates from the active panel data
-  const dates = activePanelData.map((point) => new Date(point.date));
-
-  // Parse selected dates
-  const selectedStartDate = new Date(startDate.value).getTime();
-  const selectedEndDate = new Date(endDate.value).getTime();
-  const minDate = new Date(panels.value[activePanel.value].data[0].date).getTime();
-  const maxDate = new Date(panels.value[activePanel.value].data[panels.value[activePanel.value].data.length - 1].date).getTime();
-
-  if (selectedStartDate < minDate || selectedEndDate > maxDate) {
-    errorMessage.value = `Dates must be between ${minDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`;
+    errorMessage.value = ""; // Clear the error if dates are valid
   } else {
+    // If either startDate or endDate is missing, just reset the error and close the modal
     errorMessage.value = "";
-    showCalendar.value = false;
   }
 
-  console.log("Min Date:", minDate);
-  console.log("Max Date:", maxDate);
-  console.log("Selected Start Date:", selectedStartDate);
-  console.log("Selected End Date:", selectedEndDate);
-
-  // Ensure both start and end dates are selected
-  if (!selectedStartDate || !selectedEndDate) {
-    errorMessage.value = "Please select both start and end dates.";
-    return;
-  }
-
-  // Validate selected dates are within range
-  if (selectedStartDate >= minDate && selectedEndDate <= maxDate) {
-    // Valid dates
-    errorMessage.value = "";
-    console.log("Valid date range selected");
-    showCalendar.value = false;
-  } else {
-    // Invalid date range
-    errorMessage.value = `Dates must be between ${minDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`;
-  }
-};
-
-// Add data to the active panel
-const addData = () => {
-  const [year, month, day] = newDate.value.split('/').map(Number);
-  if (newDate.value && newProduction.value > 0 && year <= 2025) {
-    const formattedDate = new Date(year, month - 1, day);
-    const newDataPoint = {
-      date: formattedDate,
-      production: parseFloat(newProduction.value)
-    };
-
-    const panelData = [...panels.value[activePanel.value].data, newDataPoint];
-    panelData.sort((a, b) => a.date - b.date);
-
-    panels.value[activePanel.value].data = panelData; // Trigger reactivity
-    newDate.value = "";
-    newProduction.value = "";
-  } else {
-    alert("Please enter a valid date and production value.");
-  }
+  showCalendar.value = false; // Close the modal
 };
 
 // Format the date input as YYYY/MM/DD
@@ -299,12 +328,33 @@ const formatDateInput = () => {
   newDate.value = date.slice(0, 10);
 };
 
+const revertToAllData = () => {
+  queriedData.value = panels.value[activePanel.value].data;
+};
+
+const showAllData = ref(true); // State to toggle between all data and queried data
+const toggleDataView = () => {
+  showAllData.value = !showAllData.value;
+};
+
 // Remove data from the active panel
-const removeData = (index) => {
-  const panelData = panels.value[activePanel.value].data.filter(
-    (_, i) => i !== index
-  );
-  panels.value[activePanel.value].data = panelData; // Trigger reactivity
+const removeData = async (dataID) => {
+  try {
+    const response = await fetch(`/api/panels/data/${dataID}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Failed to remove data:", error);
+      return;
+    }
+
+    alert("Data removed successfully!");
+    fetchPanelData(); // Refresh the data on the graph
+  } catch (err) {
+    console.error("Error removing data:", err);
+  }
 };
 
 // Clear data for the active panel
@@ -325,9 +375,76 @@ const allowOnlyNumbers = (event) => {
     event.preventDefault();
   }
 };
+
+const addData = async () => {
+  if (!newDate.value || !newProduction.value) {
+    alert("Please provide both date and production values.");
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/panels/${activePanel.value}/data`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: newDate.value,
+        production: parseFloat(newProduction.value),
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Failed to add data:", error);
+      return;
+    }
+
+    alert("Data added successfully!");
+    fetchPanelData(); // Refresh the data on the graph
+  } catch (err) {
+    console.error("Error adding data:", err);
+  }
+};
+
+const fetchPanelData = async () => {
+  try {
+    const response = await fetch(`/api/panels/${activePanel.value}/data`);
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Failed to fetch data:", error);
+      return;
+    }
+
+    const data = await response.json();
+    panels[activePanel.value].data = data.map((d) => ({
+      id: d.id,
+      date: new Date(d.date),
+      production: d.production,
+    }));
+    refreshGraph(); // Update the graph with the new data
+  } catch (err) {
+    console.error("Error fetching data:", err);
+  }
+};
+
 </script>
 
 <style scoped>
+.toggle-data-button {
+  margin-top: 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
+}
+
+.toggle-data-button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
 /* Navbar styling */
 .navbar {
   position: fixed;
@@ -343,7 +460,7 @@ const allowOnlyNumbers = (event) => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Add subtle shadow */
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
-const close
+
 .navbar:hover {
   background-color: #fafafa; /* Slight color change on hover */
 }

@@ -1,7 +1,11 @@
 <template>
   <div class="chart-container">
     <h3>Solar Panel 2 Data</h3>
-    <Graph :solarData="solarData" :isLineChart="isLineChart"></Graph>
+    <Graph
+    :key="graphKey"
+    :"solarData"
+    :isLineChart="isLineChart">
+    </Graph>
 
     <!-- Line chart switch button -->
     <button class="line-chart-toggle-button" @click="isLineChart = !isLineChart">
@@ -19,6 +23,51 @@ import Graph from './Graph.vue';
 
 const isLineChart = ref(false);
 const solarData = ref([]);
+
+const graphKey = ref(0);
+
+const refreshGraph = () => {
+  graphKey.value += 1;
+}
+
+
+const addData = () => {
+  // Validate the inputs
+  if (!newDate.value.trim() || !newProduction.value.trim()) {
+    alert("Please enter both a valid date and production value.");
+    return;
+  }
+
+  // Parse the date
+  const parsedDate = new Date(newDate.value);
+  if (isNaN(parsedDate.getTime())) {
+    alert("Invalid date format. Please use YYYY/MM/DD.");
+    return;
+  }
+
+  // Parse the production value
+  const productionValue = parseFloat(newProduction.value);
+  if (isNaN(productionValue) || productionValue <= 0) {
+    alert("Production value must be a positive number.");
+    return;
+  }
+
+  // Add the data point to the current panel
+  panels.value[activePanel.value].data.push({
+    date: parsedDate,
+    production: productionValue,
+  });
+
+  // Clear input fields
+  newDate.value = "";
+  newProduction.value = "";
+
+  // Debugging log
+  console.log("New Data Added:", panels.value[activePanel.value].data);
+
+  // Refresh the graph
+  refreshGraph();
+};
 
 onMounted(() => {
   // Load data specific to Solar Panel 2 from local storage
