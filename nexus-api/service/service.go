@@ -80,6 +80,10 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/solar", CorsMiddleware(AuthMiddleware(SolarHandler, &nexusAPI)))         //protects solar route
 	router.HandleFunc("/locations", CorsMiddleware(AuthMiddleware(LocationsHandler, &nexusAPI))) //p protects location route
 
+	//new routes for Kwh logging + retrieval
+	router.HandleFunc("/panels/{panel_id}/readings", CorsMiddleware(AuthMiddleware(CreateGetReadingsHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet)
+	router.HandleFunc("/panels/{panel_id}/readings", CorsMiddleware(AuthMiddleware(CreateLogReadingHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
+
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),
 		Handler: router,

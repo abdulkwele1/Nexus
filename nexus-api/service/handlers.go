@@ -227,3 +227,48 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.Context().Value("username").(string)
 	fmt.Fprintf(w, "Home page - only accessible with a valid cookie! User: %s", username)
 }
+
+func CreateGetReadingsHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		panelID := vars["panel_id"]
+
+		// Replace this with database logic
+		readings := []map[string]interface{}{
+			{"timestamp": time.Now(), "kwh": 5.0},
+			{"timestamp": time.Now().Add(-time.Hour), "kwh": 4.8},
+		}
+
+		apiService.Trace().Msgf("Fetched readings for panel_id: %s", panelID)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(readings)
+	}
+}
+
+func CreateLogReadingHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		panelID := vars["panel_id"]
+
+		var logData struct {
+			Timestamp time.Time `json:"timestamp"`
+			KWh       float64   `json:"kwh"`
+		}
+
+		err := json.NewDecoder(r.Body).Decode(&logData)
+		if err != nil {
+			apiService.Error().Msgf("Invalid request payload for panel_id: %s, error: %s", panelID, err)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request payload"})
+			return
+		}
+
+		apiService.Trace().Msgf("Logged kWh data for panel_id: %s, Data: %+v", panelID, logData)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Reading logged successfully"})
+	}
+}
