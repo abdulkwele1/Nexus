@@ -137,3 +137,90 @@ components:
         error:
           type: string
           example: "Invalid request"
+
+  /panels/{panel_id}:
+      get:
+        summary: Get details of a specific panel
+        parameters:
+          - in: path
+            name: panel_id
+            required: true
+            schema:
+              type: integer
+            description: The unique ID of the panel
+        responses:
+          '200':
+            description: Panel details retrieved successfully
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Panel'
+          '404':
+            description: Panel not found
+      patch:
+        summary: Update details of a specific panel
+        parameters:
+          - in: path
+            name: panel_id
+            required: true
+            schema:
+              type: integer
+            description: The unique ID of the panel
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatePanelRequest'
+        responses:
+          '200':
+            description: Panel updated successfully
+          '400':
+            description: Invalid input data
+          '404':
+            description: Panel not found
+      delete:
+        summary: Delete a specific panel
+        parameters:
+          - in: path
+            name: panel_id
+            required: true
+            schema:
+              type: integer
+            description: The unique ID of the panel
+        responses:
+          '200':
+            description: Panel deleted successfully
+          '404':
+            description: Panel not found
+
+  components:
+    schemas:
+      Panel:
+        type: object
+        properties:
+          panel_id:
+            type: integer
+          name:
+            type: string
+          location:
+            type: string
+          installation_date:
+            type: string
+            format: date
+          capacity_kW:
+            type: number
+            format: float
+      UpdatePanelRequest:
+        type: object
+        properties:
+          name:
+            type: string
+          location:
+            type: string
+          installation_date:
+            type: string
+            format: date
+          capacity_kW:
+            type: number
+            format: float
