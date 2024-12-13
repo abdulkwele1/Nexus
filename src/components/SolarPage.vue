@@ -176,8 +176,8 @@ const exportData = () => {
 
 // Panels data
 const panels = ref([
-  { name: "Panel 1", data: [], id: 1}
-  { name: "Panel 2", data: [], id: 2}
+  { name: "Panel 1", data: [], id: 1},
+  { name: "Panel 2", data: [], id: 2},
   { name: "Panel 3", data: [], id: 3}
 ]);
 
@@ -190,13 +190,15 @@ watch(
 );
 
 // Load panel data from local storage
-onMounted(() => {
+ onMounted(async () => {
   
   const defaultPanelId = 1
+  const startDate = '5/11/2024'
+  const endDate = '5/12/2024'
 
-  const defaultSolarData = await store.user.getPanelData(panelId: defaultPanelId)
-
-  solarData.value = response
+  const response = await store.user.getPanelYieldData(defaultPanelId, startDate, endDate)
+  const yieldData = response.yield_data
+  solarData.value = yieldData
 
   const savedPanels = JSON.parse(localStorage.getItem('panels') || '[]');
   if (savedPanels.length) {
@@ -391,7 +393,7 @@ const allowOnlyNumbers = (event) => {
     event.preventDefault();
   }
 };
-x
+
 const addData = async () => {
   if (!newDate.value || !newProduction.value) {
     alert("Please provide both date and production values.");
