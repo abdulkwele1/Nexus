@@ -2,10 +2,6 @@ package api
 
 type UserCookies = map[string]string
 
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
 type LoginRequest struct {
 	Password string `json:"password"`
 	Username string `json:"username"`

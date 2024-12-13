@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 func CreateHealthCheckHandler(databaseClient *database.PostgresClient) http.HandlerFunc {
