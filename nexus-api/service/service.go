@@ -81,7 +81,7 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/locations", CorsMiddleware(AuthMiddleware(LocationsHandler, &nexusAPI))) //p protects location route
 
 	//new routes for Kwh logging + retrieval
-	router.HandleFunc("/panels/{panel_id}/yield_data", CorsMiddleware(AuthMiddleware(CreateGetReadingsHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet)
+	router.HandleFunc("/panels/{panel_id}/yield_data", CorsMiddleware(AuthMiddleware(CreateGetReadingsHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc("/panels/{panel_id}/yield_data", CorsMiddleware(AuthMiddleware(CreateLogReadingHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
 
 	server := &http.Server{

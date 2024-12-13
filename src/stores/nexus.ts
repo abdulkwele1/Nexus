@@ -62,16 +62,16 @@ class User {
 
           return true
     }
-    
+
     async getPanelYieldData(panelId: number, startDate: string, endDate: string,): Promise<any> {
       const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/yield_data`
-      
 
-        const response = await fetch(url, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          method: 'GET',
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'GET',
         });
 
         return response

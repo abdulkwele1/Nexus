@@ -44,7 +44,7 @@
     <div class="modal" @click.stop>
       <h2>Select Date Range</h2>
       <p>
-        Allowed range: 
+        Allowed range:
         <strong>{{ panels[activePanel].data[0]?.date.toISOString().split('T')[0] }}</strong>
         to
         <strong>{{ panels[activePanel].data[panels[activePanel].data.length - 1]?.date.toISOString().split('T')[0] }}</strong>
@@ -191,25 +191,14 @@ watch(
 
 // Load panel data from local storage
  onMounted(async () => {
-  
+
   const defaultPanelId = 1
   const startDate = '5/11/2024'
   const endDate = '5/12/2024'
 
   const response = await store.user.getPanelYieldData(defaultPanelId, startDate, endDate)
   const yieldData = response.yield_data
-  solarData.value = yieldData
-
-  const savedPanels = JSON.parse(localStorage.getItem('panels') || '[]');
-  if (savedPanels.length) {
-    panels.value = savedPanels.map(panel => ({
-      name: panel.name,
-      data: panel.data.map(data => ({
-        date: new Date(data.date),
-        production: data.production
-      }))
-    }));
-  }
+  panels.value[0].data = yieldData
 });
 
 // Watch for changes in panels and sync with local storage
