@@ -124,6 +124,15 @@ import { useRouter } from 'vue-router';
 import Graph from './Graph.vue';
 import BarGraph from './yieldGraph.vue';
 
+
+import { useNexusStore } from '@/stores/nexus'
+
+const store = useNexusStore()
+
+const {
+  VITE_NEXUS_API_URL,
+} = import.meta.env;
+
 const router = useRouter();
 const currentGraph = ref('yield');
 const showCalendar = ref(false);
@@ -167,9 +176,9 @@ const exportData = () => {
 
 // Panels data
 const panels = ref([
-  { name: "Panel 1", data: [] },
-  { name: "Panel 2", data: [] },
-  { name: "Panel 3", data: [] }
+  { name: "Panel 1", data: [], id: 1}
+  { name: "Panel 2", data: [], id: 2}
+  { name: "Panel 3", data: [], id: 3}
 ]);
 
 watch(
@@ -182,6 +191,13 @@ watch(
 
 // Load panel data from local storage
 onMounted(() => {
+  
+  const defaultPanelId = 1
+
+  const defaultSolarData = await store.user.getPanelData(panelId: defaultPanelId)
+
+  solarData.value = response
+
   const savedPanels = JSON.parse(localStorage.getItem('panels') || '[]');
   if (savedPanels.length) {
     panels.value = savedPanels.map(panel => ({
@@ -375,7 +391,7 @@ const allowOnlyNumbers = (event) => {
     event.preventDefault();
   }
 };
-
+x
 const addData = async () => {
   if (!newDate.value || !newProduction.value) {
     alert("Please provide both date and production values.");
@@ -407,7 +423,7 @@ const addData = async () => {
 
 const fetchPanelData = async () => {
   try {
-    const response = await fetch(`/api/panels/${activePanel.value}/data`);
+    const response = await store.user.getPanelData(activePanel.value)
     if (!response.ok) {
       const error = await response.text();
       console.error("Failed to fetch data:", error);

@@ -112,7 +112,7 @@
                 content:
                   application/json:
                     schema:
-                      $ref: '#/components/schemas/Panel'
+                      $ref: '#/components/schemas/PanelYieldData'
               '404':
                 description: Panel not found
           patch:
@@ -151,6 +151,58 @@
                 description: Panel deleted successfully
               '404':
                 description: Panel not found
+      
+      /panels/{panel_id}/yield_data:
+          get:
+            summary: Gets solar yield data for a single solar panel between specified dates
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+              - in: query
+                name: start_date
+                schema:
+                  type: string
+                description: Gets data starting from this date
+              - in: query
+                name: end_date
+                schema:
+                  type: string
+                description: Gets data up to this date      
+            responses:
+              '200':
+                description: Panel details retrieved successfully
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/PanelYieldData'
+              '404':
+                description: Panel not found
+          patch:
+            summary: Update details of a specific panel
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+            requestBody:
+              required: true
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/UpdatePanelRequest'
+            responses:
+              '200':
+                description: Panel updated successfully
+              '400':
+                description: Invalid input data
+              '404':
+                description: Panel not found
     components:
       schemas:
         Panel:
@@ -168,6 +220,20 @@
               capacity_kW:
                 type: number
                 format: float
+        PanelYieldData:
+        # {data: [ {id: 0}, {id: 1}]}
+         # {data: [ {date: '5/11/2024', kwh_yield: 1}, {date: '5/12/2024', kwh_yield: 2}]}
+          type: object
+          properties:
+            yield_data:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  kwh_yield:
+                    type: integer
         UpdatePanelRequest:
             type: object
             properties:

@@ -62,6 +62,38 @@ class User {
 
           return true
     }
+    
+    async getPanelData(panelId: number): Promise<any> {
+      const url = `${VITE_NEXUS_API_URL}/panels/${panelId}`
+      
+
+        const response = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'GET',
+        });
+
+        return response
+  }
+   async logPanelData(userName: any, password: any): Promise<any> {
+    const loginAPIUrl = `${VITE_NEXUS_API_URL}/login`
+    const data = {
+        username: userName,
+        password: password,
+      };
+
+      const response = await fetch(loginAPIUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      return response
+}
+
 
     // Function to get a cookie by name
     getCookie(): any {
