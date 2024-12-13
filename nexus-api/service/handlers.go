@@ -235,9 +235,8 @@ func CreateGetReadingsHandler(apiService *APIService) http.HandlerFunc {
 		panelID := vars["panel_id"]
 
 		// Replace this with database logic
-		readings := []map[string]interface{}{
-			{"timestamp": time.Now(), "kwh": 5.0},
-			{"timestamp": time.Now().Add(-time.Hour), "kwh": 4.8},
+		readings := api.GetYieldDataResponse{
+			YieldData: []api.YieldData{{Date: "5/12/2024", KwhYield: 0}, {Date: "5/11/2024", KwhYield: 9}},
 		}
 
 		apiService.Trace().Msgf("Fetched readings for panel_id: %s", panelID)

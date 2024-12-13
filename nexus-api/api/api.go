@@ -43,3 +43,12 @@ type ErrorResponse struct {
 type SuccessResponse struct {
 	Message string `json:"message"` // Success message
 }
+
+type YieldData struct {
+	Date     string  `json:"date"`
+	KwhYield float64 `json:"kwh_yield"`
+}
+
+type GetYieldDataResponse struct {
+	YieldData []YieldData `json:"yield_data"`
+}
