@@ -62,10 +62,23 @@ Lastly share the user_name and default password `password123` with the new user.
 
 ### Viewing Solar Data
 
-- add details about how to navigate to solar data view
-- add details that explain what the metrics of solar yield and solar consumption are, e.g. what do they measure
-- add details about how to select time range
-- add details about how to export data
+- You can switch between solar view by using the navbar at the top for switching between solar consumption and solar yeild
+
+- In the Solar Yeild graph you can switch between different solar panels to store the data using the solar panels button
+
+- you can delete data points and add new ones at the bottom of the graph, if you have data queried you can select the "show all data" button which will allow you to see all the data points that have been graphed.
+
+- you can quickly delete all data points at once by using the the "clear data" button
+
+- Pressing the line chart button you can switch between a bar graph view and a line chart view
+
+- Solar yeild, is used to see how much solar is produced on any given day through the solar panels.(in kw/h)
+
+- Solar Consumption is used to show how much of the solar energy on the site is being used and how much is being sent back to the panels.  (in kw/h)
+
+- To select the time range, pick a start point and end point and the graph will show you all the days of energy produced between those two points
+
+- to export data you press the export button. This exports the data as a table into a .csv file that you can import into excel
 
 ## Developing Nexus
 
