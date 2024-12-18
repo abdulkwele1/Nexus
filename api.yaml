@@ -7,7 +7,6 @@
     servers:
       - url: http://localhost:8080
         description: Local server
-
     paths:
       /healthcheck:
         get:
@@ -18,7 +17,6 @@
               description: API is healthy
             '500':
               description: Internal server error
-
       /login:
         post:
           summary: User login
@@ -49,7 +47,6 @@
                 application/json:
                   schema:
                     $ref: '#/components/schemas/ErrorResponse'
-
       /logout:
         post:
           summary: User logout
@@ -63,7 +60,6 @@
                 application/json:
                   schema:
                     $ref: '#/components/schemas/ErrorResponse'
-
       /change-password:
         post:
           summary: Change user password
@@ -203,6 +199,36 @@
                 description: Invalid input data
               '404':
                 description: Panel not found
+      
+      /panels/{panel_id}/consumption_data:
+          get:
+            summary: Gets solar consumption data for a single solar panel between specified dates
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+              - in: query
+                name: start_date
+                schema:
+                  type: string
+                description: Gets data starting from this date
+              - in: query
+                name: end_date
+                schema:
+                  type: string
+                description: Gets data up to this date
+            responses:
+              '200':
+                description: Panel details retrieved successfully
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/ConsumptionData'
+              '404':
+                description: Panel not found   
     components:
       schemas:
         Panel:
@@ -220,6 +246,9 @@
               capacity_kW:
                 type: number
                 format: float
+              consumed_kW:
+                type: number
+                format: float
         PanelYieldData:
         # {data: [ {id: 0}, {id: 1}]}
          # {data: [ {date: '5/11/2024', kwh_yield: 1}, {date: '5/12/2024', kwh_yield: 2}]}
@@ -234,6 +263,20 @@
                     type: string
                   kwh_yield:
                     type: integer
+        ConsumptionData:
+          type: object
+          properties:
+            consumption_data:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  kwh_consumed:
+                    type: integer
+        
         UpdatePanelRequest:
             type: object
             properties:
@@ -256,7 +299,6 @@
             password:
               type: string
               example: "password123"
-
         LoginResponse:
           type: object
           properties:
@@ -269,7 +311,6 @@
             cookie:
               type: string
               example: "session_id_value"
-
         ChangePasswordRequest:
           type: object
           properties:
@@ -279,7 +320,6 @@
             new_password:
               type: string
               example: "newPassword456"
-
         ErrorResponse:
           type: object
           properties:

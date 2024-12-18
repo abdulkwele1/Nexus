@@ -236,7 +236,7 @@ func CreateGetReadingsHandler(apiService *APIService) http.HandlerFunc {
 
 		// Replace this with database logic
 		readings := api.GetYieldDataResponse{
-			YieldData: []api.YieldData{{Date: "5/12/2024", KwhYield: 0}, {Date: "5/11/2024", KwhYield: 9}},
+			YieldData: []api.YieldData{{Date: "5/11/2024", KwhYield: 80}, {Date: "5/24/2024", KwhYield: 150}},
 		}
 
 		apiService.Trace().Msgf("Fetched readings for panel_id: %s", panelID)

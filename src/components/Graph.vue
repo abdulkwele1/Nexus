@@ -7,8 +7,15 @@ import { onMounted, watch, defineProps, ref } from 'vue';
 import * as d3 from 'd3';
 
 const props = defineProps({
-  solarData: Array,
-  isLineChart: Boolean,
+  solarData: {
+    type: Array,
+    required: true,
+  },
+
+  isLineChart:{
+    type: Boolean,
+    required: true,
+  },
 });
 
 const chartContainer = ref(null);
