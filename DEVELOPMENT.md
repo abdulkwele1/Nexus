@@ -71,3 +71,10 @@ make debug-nexus-api
 ```bash
 make debug-database
 ```
+### Git flow
+
+git stash- saving local changes
+
+git pull - pulling local changes
+
+git stash apply - re-adding local changes I had pushed away

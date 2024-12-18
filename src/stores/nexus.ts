@@ -63,6 +63,38 @@ class User {
           return true
     }
 
+    async getPanelYieldData(panelId: number, startDate: string, endDate: string,): Promise<any> {
+      const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/yield_data`
+
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'GET',
+        });
+
+        return response
+  }
+   async logPanelData(userName: any, password: any): Promise<any> {
+    const loginAPIUrl = `${VITE_NEXUS_API_URL}/login`
+    const data = {
+        username: userName,
+        password: password,
+      };
+
+      const response = await fetch(loginAPIUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      return response
+}
+
+
     // Function to get a cookie by name
     getCookie(): any {
         const value = `; ${document.cookie}`;
