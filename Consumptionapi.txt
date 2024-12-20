@@ -1,0 +1,57 @@
+/panels/{panel_id}/consumption_data:
+    get:
+      summary: Gets solar yield data for a single solar panel between specified dates
+      parameters:
+        - in: path
+          name: panel_id
+          required: true
+          schema:
+            type: integer
+          description: The unique ID of the panel
+        - in: query
+          name: start_date
+          schema:
+            type: string
+          description: Gets data starting from this date
+        - in: query
+          name: end_date
+            schema:
+              type: string
+            description: Gets data up to this date
+        responses:
+          '200':
+            description: Panel details retrieved successfully
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/PanelYieldData'
+          '404':
+            description: Panel not found     
+    components:
+       schemas:
+         Panel:
+            type: object
+            properties:
+              panel_id:
+              type: integer
+            name:
+              type: string
+            location:
+              type: string
+            consumed_kW:
+              type: number
+              format: float
+      ConsumptionData:
+        type: object
+        properties:
+          consumption_data:
+            type: array
+            items:
+              type: object
+              properties:
+                  date:
+                    type: string
+                    format: date
+                  kwh_consumed:
+                    type: integer
+              

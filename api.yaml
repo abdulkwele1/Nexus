@@ -1,139 +1,328 @@
 ---
-openapi: 3.0.0
-info:
-  title: Nexus API
-  version: 1.0.0
-  description: API documentation for the Nexus application
-servers:
-  - url: http://localhost:8080
-    description: Local server
-
-paths:
-  /healthcheck:
-    get:
-      summary: Check service health
-      operationId: checkHealth
-      responses:
-        '200':
-          description: API is healthy
-        '500':
-          description: Internal server error
-
-  /login:
-    post:
-      summary: User login
-      operationId: loginUser
-      requestBody:
-        description: Login credentials
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LoginRequest'
-      responses:
-        '200':
-          description: Successful login
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoginResponse'
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized - invalid credentials
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /logout:
-    post:
-      summary: User logout
-      operationId: logoutUser
-      responses:
-        '204':
-          description: Successful logout
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /change-password:
-    post:
-      summary: Change user password
-      operationId: changePassword
-      requestBody:
-        description: Password change request
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChangePasswordRequest'
-      responses:
-        '200':
-          description: Password changed successfully
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized - invalid current password
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-components:
-  schemas:
-    LoginRequest:
-      type: object
-      properties:
-        username:
-          type: string
-          example: "user1"
-        password:
-          type: string
-          example: "password123"
-
-    LoginResponse:
-      type: object
-      properties:
-        redirect_url:
-          type: string
-          example: "/"
-        match:
-          type: boolean
-          example: true
-        cookie:
-          type: string
-          example: "session_id_value"
-
-    ChangePasswordRequest:
-      type: object
-      properties:
-        current_password:
-          type: string
-          example: "currentPassword123"
-        new_password:
-          type: string
-          example: "newPassword456"
-
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          example: "Invalid request"
+    openapi: 3.0.0
+    info:
+      title: Nexus API
+      version: 1.0.0
+      description: API documentation for the Nexus application
+    servers:
+      - url: http://localhost:8080
+        description: Local server
+    paths:
+      /healthcheck:
+        get:
+          summary: Check service health
+          operationId: checkHealth
+          responses:
+            '200':
+              description: API is healthy
+            '500':
+              description: Internal server error
+      /login:
+        post:
+          summary: User login
+          operationId: loginUser
+          requestBody:
+            description: Login credentials
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/LoginRequest'
+          responses:
+            '200':
+              description: Successful login
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/LoginResponse'
+            '400':
+              description: Invalid request
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/ErrorResponse'
+            '401':
+              description: Unauthorized - invalid credentials
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/ErrorResponse'
+      /logout:
+        post:
+          summary: User logout
+          operationId: logoutUser
+          responses:
+            '204':
+              description: Successful logout
+            '500':
+              description: Internal server error
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/ErrorResponse'
+      /change-password:
+        post:
+          summary: Change user password
+          operationId: changePassword
+          requestBody:
+            description: Password change request
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ChangePasswordRequest'
+          responses:
+            '200':
+              description: Password changed successfully
+            '400':
+              description: Invalid request
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/ErrorResponse'
+            '401':
+              description: Unauthorized - invalid current password
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/ErrorResponse'
+            '500':
+              description: Internal server error
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/ErrorResponse'
+      /panels/{panel_id}:
+          get:
+            summary: Get details of a specific panel
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+            responses:
+              '200':
+                description: Panel details retrieved successfully
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/PanelYieldData'
+              '404':
+                description: Panel not found
+          patch:
+            summary: Update details of a specific panel
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+            requestBody:
+              required: true
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/UpdatePanelRequest'
+            responses:
+              '200':
+                description: Panel updated successfully
+              '400':
+                description: Invalid input data
+              '404':
+                description: Panel not found
+          delete:
+            summary: Delete a specific panel
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+            responses:
+              '200':
+                description: Panel deleted successfully
+              '404':
+                description: Panel not found
+      
+      /panels/{panel_id}/yield_data:
+          get:
+            summary: Gets solar yield data for a single solar panel between specified dates
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+              - in: query
+                name: start_date
+                schema:
+                  type: string
+                description: Gets data starting from this date
+              - in: query
+                name: end_date
+                schema:
+                  type: string
+                description: Gets data up to this date      
+            responses:
+              '200':
+                description: Panel details retrieved successfully
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/PanelYieldData'
+              '404':
+                description: Panel not found
+          patch:
+            summary: Update solar yieldData of a specific panel
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+            requestBody:
+              required: true
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/UpdatePanelRequest'
+            responses:
+              '200':
+                description: Panel updated successfully
+              '400':
+                description: Invalid input data
+              '404':
+                description: Panel not found
+      
+      /panels/{panel_id}/consumption_data:
+          get:
+            summary: Gets solar consumption data for a single solar panel between specified dates
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+              - in: query
+                name: start_date
+                schema:
+                  type: string
+                description: Gets data starting from this date
+              - in: query
+                name: end_date
+                schema:
+                  type: string
+                description: Gets data up to this date
+            responses:
+              '200':
+                description: Panel details retrieved successfully
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/ConsumptionData'
+              '404':
+                description: Panel not found   
+    components:
+      schemas:
+        Panel:
+            type: object
+            properties:
+              panel_id:
+                type: integer
+              name:
+                type: string
+              location:
+                type: string
+              installation_date:
+                type: string
+                format: date
+              capacity_kW:
+                type: number
+                format: float
+              consumed_kW:
+                type: number
+                format: float
+        PanelYieldData:
+        # {data: [ {id: 0}, {id: 1}]}
+         # {data: [ {date: '5/11/2024', kwh_yield: 1}, {date: '5/12/2024', kwh_yield: 2}]}
+          type: object
+          properties:
+            yield_data:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  kwh_yield:
+                    type: integer
+        ConsumptionData:
+          type: object
+          properties:
+            consumption_data:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  kwh_consumed:
+                    type: integer
+        
+        UpdatePanelRequest:
+            type: object
+            properties:
+              name:
+                type: string
+              location:
+                type: string
+              installation_date:
+                type: string
+                format: date
+              capacity_kW:
+                type: number
+                format: float
+        LoginRequest:
+          type: object
+          properties:
+            username:
+              type: string
+              example: "user1"
+            password:
+              type: string
+              example: "password123"
+        LoginResponse:
+          type: object
+          properties:
+            redirect_url:
+              type: string
+              example: "/"
+            match:
+              type: boolean
+              example: true
+            cookie:
+              type: string
+              example: "session_id_value"
+        ChangePasswordRequest:
+          type: object
+          properties:
+            current_password:
+              type: string
+              example: "currentPassword123"
+            new_password:
+              type: string
+              example: "newPassword456"
+        ErrorResponse:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "Invalid request"
