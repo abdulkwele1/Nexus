@@ -178,7 +178,7 @@
               '404':
                 description: Panel not found
           patch:
-            summary: Update details of a specific panel
+            summary: Update solar yieldData of a specific panel
             parameters:
               - in: path
                 name: panel_id
