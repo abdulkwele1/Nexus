@@ -33,7 +33,7 @@ const createChart = () => {
     .padding(0.1);
 
   const y = d3.scaleLinear()
-    .domain([0, d3.max(props.solarData, d => d.production) || 1])
+    .domain([0, d3.max(props.solarData, d => d.kwh_yield) || 1])
     .range([height - margin.bottom, margin.top]);
 
   const svg = d3.select(chartContainer.value)
@@ -65,7 +65,7 @@ const createChart = () => {
 
   const showTooltip = (event, d) => {
     tooltip
-      .html(`Date: ${d3.timeFormat("%Y/%m/%d")(d.date)}<br>kWh: ${d.production}`)
+      .html(`Date: ${d3.timeFormat("%Y/%m/%d")(d.date)}<br>kWh: ${d.kwh_yield}`)
       .style("visibility", "visible");
   };
 
@@ -84,7 +84,7 @@ const createChart = () => {
     if (props.isLineChart) {
       const line = d3.line()
         .x(d => x(d3.timeFormat("%Y-%m-%d")(d.date)) + x.bandwidth() / 2)
-        .y(d => y(d.production));
+        .y(d => y(d.kwh_yield));
 
       svg.append("path")
         .datum(props.solarData)
@@ -99,7 +99,7 @@ const createChart = () => {
         .append("circle")
         .attr("class", "hover-circle")
         .attr("cx", d => x(d3.timeFormat("%Y-%m-%d")(d.date)) + x.bandwidth() / 2)
-        .attr("cy", d => y(d.production))
+        .attr("cy", d => y(d.kwh_yield))
         .attr("r", 4)
         .attr("fill", "#69b3a2")
         .on("mouseover", showTooltip)
@@ -112,9 +112,9 @@ const createChart = () => {
         .append("rect")
         .attr("class", "bar")
         .attr("x", d => x(d3.timeFormat("%Y-%m-%d")(d.date)))
-        .attr("y", d => y(d.production))
+        .attr("y", d => y(d.kwh_yield))
         .attr("width", x.bandwidth())
-        .attr("height", d => y(0) - y(d.production))
+        .attr("height", d => y(0) - y(d.kwh_yield))
         .attr("fill", "#69b3a2")
         .on("mouseover", showTooltip)
         .on("mousemove", moveTooltip)

@@ -194,14 +194,15 @@ onMounted(async() => {
   const defaultPanelId = 1
   const startDate = '5/11/2024'
   const endDate = '5/12/2024'
-  debugger
   const response = await store.user.getPanelYieldData(defaultPanelId, startDate, endDate)
   const responseData= await response.json()
   const yieldData = responseData.yield_data
   const mockData = generateSolarData(new Date("2023-01-01"), new Date("2023-01-31"));
+  console.log(mockData)
+  //debugger
   solarData.value = yieldData.map(item => ({
       date: new Date(item.date),
-      production: parseFloat(item.production) || 0,
+      kwh_yield: parseFloat(item.kwh_yield) || 0,
 }));
 
 });
