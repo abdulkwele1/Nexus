@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"math/rand"
 	"nexus-api/api"
 	"nexus-api/clients/database"
 	"nexus-api/logging"
@@ -9,6 +10,7 @@ import (
 	"nexus-api/sdk"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -198,4 +200,57 @@ func TestE2ETestLogoutDeletesCookieFromDatabase(t *testing.T) {
 	// test cookie is deleted from database
 	_, err = database.GetLoginCookie(testCtx, databaseClient.DB, response.Cookie)
 	assert.Error(t, err, "expected cookie to be deleted from database")
+}
+
+func TestE2ESetAndGetPanelYieldData(t *testing.T) {
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+
+	assert.NoError(t, err)
+
+	// Panel ID to test
+	panelID := rand.Intn(10000000)
+
+	// Test payload for setting yield data
+	expectedYieldData := api.SetPanelYieldDataResponse{YieldData: []api.YieldData{
+		{Date: time.Now().Add(1 * time.Second).UTC(), KwhYield: 100},
+		{Date: time.Now().Add(1 * time.Second).UTC(), KwhYield: 150},
+	}}
+
+	// Step 1: Set yield data for test panel
+	err = testClient.SetPanelYieldData(testCtx, panelID, expectedYieldData)
+
+	assert.NoError(t, err)
+
+	// Step 2: Call CreateGetPanelYieldDataHandler to get the yield data
+	getPanelYieldData, err := testClient.GetPanelYieldData(testCtx, panelID)
+
+	assert.NoError(t, err)
+
+	// Step 3: 	Assert that the data returned matches the data sent
+	assert.Equal(t, expectedYieldData.YieldData, getPanelYieldData.YieldData)
 }

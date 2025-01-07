@@ -34,7 +34,7 @@ async function handleLogin() {
       const responseData = await response.json();
 
       if (response.ok && responseData.match) {
-        // Set session cookie
+        // Set session cookie 
         document.cookie = `session_id=${responseData.cookie}; path=/; samesite=strict`; // Use session_id
         // update app state for current user
         store.user.userName = username

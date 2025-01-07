@@ -1,5 +1,9 @@
 package api
 
+import (
+	"time"
+)
+
 type UserCookies = map[string]string
 
 type LoginRequest struct {
@@ -45,10 +49,14 @@ type SuccessResponse struct {
 }
 
 type YieldData struct {
-	Date     string  `json:"date"`
-	KwhYield float64 `json:"kwh_yield"`
+	Date     time.Time `json:"date"`
+	KwhYield float64   `json:"kwh_yield"`
 }
 
-type GetYieldDataResponse struct {
+type GetPanelYieldDataResponse struct {
+	YieldData []YieldData `json:"yield_data"`
+}
+
+type SetPanelYieldDataResponse struct {
 	YieldData []YieldData `json:"yield_data"`
 }
