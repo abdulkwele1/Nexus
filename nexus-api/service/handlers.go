@@ -8,9 +8,11 @@ import (
 	"nexus-api/api"
 	"nexus-api/clients/database"
 	"nexus-api/password"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 func CreateHealthCheckHandler(databaseClient *database.PostgresClient) http.HandlerFunc {
@@ -226,4 +228,103 @@ func SettingsHandler(w http.ResponseWriter, r *http.Request) {
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.Context().Value("username").(string)
 	fmt.Fprintf(w, "Home page - only accessible with a valid cookie! User: %s", username)
+}
+
+func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		panelIDRaw := vars["panel_id"]
+
+		// Parse and validate panelID as an integer
+		panelID, err := strconv.Atoi(panelIDRaw)
+		if err != nil {
+			apiService.Error().Msgf("Invalid panel_id: %s", panelIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid panel_id"})
+			return
+		}
+
+		// Retrieve data for the panelID
+		data, err := database.GetDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoSolarPanelYieldData) {
+				apiService.Debug().Msgf("No data found for panel_id: %d", panelID)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No data found"})
+				return
+			}
+
+			apiService.Error().Msgf("Error retrieving data for panel_id: %d, error: %s", panelID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Convert database data to GetPanelYieldDataResponse
+		var response api.GetPanelYieldDataResponse
+		for _, d := range data {
+			response.YieldData = append(response.YieldData, api.YieldData{
+				Date:     d.Date,
+				KwhYield: d.KwHYield,
+			})
+		}
+
+		// Send the response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func CreateSetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		panelIDRaw := vars["panel_id"]
+
+		// Parse and validate panelID as an integer
+		panelID, err := strconv.Atoi(panelIDRaw)
+		if err != nil {
+			apiService.Error().Msgf("Invalid panel_id: %s", panelIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid panel_id"})
+			return
+		}
+
+		request := api.SetPanelYieldDataResponse{}
+		err = json.NewDecoder(r.Body).Decode(&request)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request"})
+			return
+		}
+
+		// Iterate over each YieldData item and save to the database
+		for _, yieldData := range request.YieldData {
+			solarPanelData := database.SolarPanelYieldData{
+				Date:     yieldData.Date,
+				KwHYield: yieldData.KwhYield,
+				PanelID:  panelID,
+			}
+
+			err := solarPanelData.Save(r.Context(), apiService.DatabaseClient.DB)
+			if err != nil {
+				apiService.Error().Msgf("Failed to save yield data for panel_id: %d, data: %+v, error: %s", panelID, solarPanelData, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to save yield data"})
+				return
+			}
+		}
+
+		// Send success response
+		apiService.Trace().Msgf("Successfully saved yield data for panel_id: %d", panelID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Yield data saved successfully"})
+	}
 }

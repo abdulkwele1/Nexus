@@ -9,115 +9,159 @@
 
     <!-- Conditional rendering of graphs and controls for Solar Yield -->
     <div class="chart-container" v-if="currentGraph === 'yield'">
-      <Graph :solarData="solarData" :isLineChart="isLineChart" />
-      
+      <!-- Graph Component -->
+      <Graph :solarData="solarData" :isLineChart="isLineChart"></Graph>
+
       <!-- Line chart switch button -->
       <button class="line-chart-toggle-button" @click="isLineChart = !isLineChart">
-  {{ isLineChart ? "Bar chart" : "Line chart" }}
+        {{ isLineChart ? "Bar chart" : "Line chart" }}
       </button>
+
       <!-- Export button -->
       <button class="export-button" @click="exportData">📄 Export</button>
 
-      <!-- Show panels button -->
+      <!-- Solar Panels Button and Modal -->
       <div class="solar-panel-container">
-        <button class="solar-panels-button" @click="showPanelModal = true">Solar Panels</button>
-
-        <div v-if="showDropdown" class="dropdown">
-          <ul>
-            <li @click="selectSolarPanel('Panel 1')">Panel 1</li>
-            <li @click="selectSolarPanel('Panel 2')">Panel 2</li>
-            <li @click="selectSolarPanel('Panel 3')">Panel 3</li>
-          </ul>
-        </div>
+        <button class="solar-panels-button" @click="togglePanelModal">Solar Panels</button>
       </div>
 
-      <!-- Calendar -->
-      <button class="current-date-button" @click="openCalendar">
-        Select Date Range &#9662;
-      </button>
-
-      <!-- Calendar modal -->
-      <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
-        <div class="modal" @click.stop>
-          <h2>Select Date Range</h2>
-          <div class="calendar-container">
-            <div class="calendar">
-              <h3>Start Point</h3>
-              <input type="date" v-model="startDate" />
-            </div>
-            <div class="calendar">
-              <h3>End Point</h3>
-              <input type="date" v-model="endDate" />
-            </div>
-          </div>
-          <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-          <button @click="closeCalendar">Close</button>
+      <!-- Conditional Rendering for Panels -->
+      <div v-if="currentPanel === 'panelOne'">
+        <!-- Content for Solar Panel 1 -->
+        <div class="panel-content">
+          <h3>Solar Panel 1 Data</h3>
+          <p>Manage and view data for Solar Panel 1 directly in this page.</p>
+          <!-- Add more content for Panel One if needed -->
         </div>
+      </div>
+      <div v-else-if="currentPanel === 'panelTwo'">
+        <panel-two></panel-two>
+      </div>
+      <div v-else-if="currentPanel === 'panelThree'">
+        <panel-three></panel-three>
       </div>
     </div>
-    <!-- Solar Panel Selection Modal -->
-      <div v-if="showPanelModal" class="modal-overlay" @click="showPanelModal = false">
-        <div class="modal" @click.stop>
-          <h2>Select Solar Panel</h2>
-          <div class="solar-panel-options">
-            <div class="solar-panel-card" @click="selectSolarPanel('Panel 1'); showPanelModal = false">
-              <h3>Panel 1</h3>          
-            </div>
-            <div class="solar-panel-card" @click="selectSolarPanel('Panel 2'); showPanelModal = false">
-              <h3>Panel 2</h3>
-            </div>
-            <div class="solar-panel-card" @click="selectSolarPanel('Panel 3'); showPanelModal = false">
-              <h3>Panel 3</h3>
-            </div>
+
+    <!-- Date Range Selection and Calendar Modal -->
+    <button class="current-date-button" @click="openCalendar">
+      Select Date Range &#9662;
+    </button>
+
+    <div v-if="showCalendar" class="modal-overlay" @click="closeCalendar">
+      <div class="modal" @click.stop>
+        <h2>Select Date Range</h2>
+        <div class="calendar-container">
+          <div class="calendar">
+            <h3>Start Point</h3>
+            <input type="date" v-model="startDate" />
           </div>
-          <button @click="showPanelModal = false">Close</button>
+          <div class="calendar">
+            <h3>End Point</h3>
+            <input type="date" v-model="endDate" />
+          </div>
         </div>
+        <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+        <button @click="closeCalendar">Close</button>
       </div>
+    </div>
 
+    <!-- Data Entry Form -->
+    <div class="data-entry-form">
+      <h3>Add Data Point</h3>
+      <input type="text" v-model="newDate" placeholder="YYYY/MM/DD" @input="formatDateInput" />
+      <input type="text" v-model="newProduction" placeholder="kWh Production" @keypress="allowOnlyNumbers" />
+      <button @click="addData">Add Data</button>
+      <button @click="clearData">Clear Data</button>
+    </div>
 
-    <!-- Solar Consumption graph -->
+    <!-- List of Data Points with Remove Option -->
+    <div class="data-list">
+      <h3>Data Points</h3>
+      <ul>
+        <li v-for="(point, index) in solarData" :key="index">
+          {{ point.date.toISOString().split('T')[0] }} - {{ point.production }} kWh
+          <button @click="removeData(index)">Remove</button>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Solar Consumption Graph -->
     <div class="chart-container" v-if="currentGraph === 'consumption'">
-      <BarGraph />
+      <BarGraph></BarGraph>
     </div>
   </div>
 </template>
 
-
-
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import Graph from './Graph.vue'; // Import the Solar Yield Graph component
-import BarGraph from './yieldGraph.vue';  // Bar graph for Solar Consumption
-import { useNexusStore } from '@/stores/nexus'
+import Graph from './Graph.vue';
+import BarGraph from './yieldGraph.vue';
+import panelTwo from './panelTwo.vue';
+import panelThree from './panelThree.vue';
 
-const store = useNexusStore()
-
-const {
-  VITE_NEXUS_API_URL,
-} = import.meta.env;
-
-const router = useRouter();
-const currentGraph = ref('yield');  // Default is Solar Yield graph
+const currentPanel = ref("panelOne"); // Default to Solar Panel 1
+const currentGraph = ref("yield");
+const isLineChart = ref(false);
+const solarData = ref([]);
 const showCalendar = ref(false);
-const showDropdown = ref(false);
 const startDate = ref(null);
 const endDate = ref(null);
-const solarData = ref([]);
+const newDate = ref("");
+const newProduction = ref("");
 const errorMessage = ref("");
-const isLineChart = ref(false);
-const selectedPanel = ref("Panel 1");
-const showPanelModal = ref(false);
 
+const router = useRouter();
 
-const switchGraph = (graphType) => {
-  if (currentGraph.value !== graphType) {
-    currentGraph.value = graphType;  // Switch graph if different from current
-  }
-};
+onMounted(() => {
+  const savedData = JSON.parse(localStorage.getItem("solarData") || "[]");
+  solarData.value = savedData.map((data) => ({
+    date: new Date(data.date),
+    production: data.production,
+  }));
+});
 
 const goTo = (path) => {
   router.push(path);
+};
+
+const switchGraph = (graphType) => {
+  currentGraph.value = graphType;
+};
+
+const formatDateInput = () => {
+  let date = newDate.value.replace(/\D/g, "");
+  if (date.length > 4) date = date.slice(0, 4) + "/" + date.slice(4);
+  if (date.length > 7) date = date.slice(0, 7) + "/" + date.slice(7);
+  newDate.value = date.slice(0, 10);
+};
+
+const allowOnlyNumbers = (event) => {
+  const char = String.fromCharCode(event.which);
+  if (!/[0-9]/.test(char)) event.preventDefault();
+};
+
+const addData = () => {
+  const [year, month, day] = newDate.value.split("/").map(Number);
+  if (newDate.value && newProduction.value > 0) {
+    solarData.value.push({
+      date: new Date(year, month - 1, day),
+      production: parseFloat(newProduction.value),
+    });
+    localStorage.setItem("solarData", JSON.stringify(solarData.value));
+    newDate.value = "";
+    newProduction.value = "";
+  }
+};
+
+const removeData = (index) => {
+  solarData.value.splice(index, 1);
+  localStorage.setItem("solarData", JSON.stringify(solarData.value));
+};
+
+const clearData = () => {
+  solarData.value = [];
+  localStorage.removeItem("solarData");
 };
 
 const openCalendar = () => {
@@ -128,85 +172,17 @@ const closeCalendar = () => {
   showCalendar.value = false;
 };
 
-const toggleDropdown = () => {
-  showDropdown.value = !showDropdown.value;
-};
-
-const selectSolarPanel = (panel) => {
-  selectedPanel.value = panel;
-  showDropdown.value = false;
-};
-
-const generateSolarData = (start, end) => {
-  const data = [];
-  const currentDate = new Date(start);
-  const endDate = new Date(end);
-
-  while (currentDate <= endDate) {
-    const month = currentDate.getMonth();
-    let production;
-    if (month === 5 || month === 6 || month === 7) {
-      production = Math.floor(Math.random() * 100) + 150;
-    } else {
-      production = Math.floor(Math.random() * 50) + 50;
-    }
-
-    data.push({
-      date: new Date(currentDate),
-      production,
-    });
-
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  return data;
-};
-
-watch([startDate, endDate], () => {
-  if (startDate.value && endDate.value) {
-    const start = new Date(startDate.value);
-    const end = new Date(endDate.value);
-    
-    if (end < start) {
-      errorMessage.value = "End point cannot be before starting point.";
-    } else {
-      solarData.value = generateSolarData(start, end);
-    }
-  }
-});
-
 const exportData = () => {
-  const header = "sensor_reading_date,daily_kw_generated\n";
-  const csvContent = "data:text/csv;charset=utf-8," 
-    + header 
-    + solarData.value.map(d => `${d.date.toISOString().split('T')[0]},${d.kwh_yield}`).join("\n");
-
-  const encodedUri = encodeURI(csvContent);
+  const data = JSON.stringify(solarData.value, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "solar_data.csv");
-  document.body.appendChild(link);
+  link.href = url;
+  link.download = "solar_data.json";
   link.click();
-  document.body.removeChild(link);
 };
-
-onMounted(async() => {
-  const defaultPanelId = 1
-  const startDate = '5/11/2024'
-  const endDate = '5/12/2024'
-  const response = await store.user.getPanelYieldData(defaultPanelId, startDate, endDate)
-  const responseData= await response.json()
-  const yieldData = responseData.yield_data
-  const mockData = generateSolarData(new Date("2023-01-01"), new Date("2023-01-31"));
-  console.log(mockData)
-  //debugger
-  solarData.value = yieldData.map(item => ({
-      date: new Date(item.date),
-      kwh_yield: parseFloat(item.kwh_yield) || 0,
-}));
-
-});
 </script>
+
 
 <style scoped>
 /* Navbar styling */
@@ -439,25 +415,59 @@ onMounted(async() => {
 }
 
 /* Solar Panel Selection Modal */
-.solar-panel-options {
-  display: flex;
-  flex-direction: column; /* Align options in a column */
-  gap: 15px; /* Space between options */
-  margin-top: 20px; /* Space above options */
+.solar-panel-container {
+  margin-top: 20px;
 }
 
-.solar-panel-card {
-  background: #f8f9fa; /* Light background color */
-  border: 1px solid #ced4da; /* Border for definition */
-  border-radius: 8px; /* Rounded corners */
-  padding: 15px; /* Padding for content */
-  transition: transform 0.1s ease, box-shadow 0.1s ease; /* Smooth transition for hover effects */
-  cursor: pointer; /* Pointer cursor to indicate it's clickable */
+.solar-panels-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: #5e60ce;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
 }
 
-.solar-panel-card:hover {
-  transform: translateY(-5px); /* Lift effect on hover */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Shadow effect on hover */
+.solar-panels-button:hover {
+  background-color: #4b4fb3;
+}
+
+.panel-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 20px;
+  background-color: #ffffff;
+  border: 1px solid #d3d3d3;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+  z-index: 1000; /* Ensure it’s above other elements */
+}
+
+.panel-modal h3 {
+  margin-bottom: 15px;
+}
+
+.panel-modal button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+  background-color: #5e60ce;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.panel-modal button:hover {
+  background-color: #4b4fb3;
 }
 
 button {
@@ -475,5 +485,4 @@ button:hover {
   background-color: #0056b3; /* Darker on hover */
   transform: scale(1.05); /* Slightly larger on hover */
 }
-
 </style>

@@ -24,8 +24,10 @@
   </div>
 </template>
 
-
 <style scoped>
+/* Importing Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@500&display=swap');
+
 /* Container style to center the boxes */
 .container {
   display: flex;
@@ -64,12 +66,16 @@
   height: auto;
 }
 
-/* Style for the text inside the box */
+/* Improved style for the text inside the box */
 .box-text {
   margin-top: 10px;
-  font-size: 16px;
+  font-size: 18px; /* Slightly larger font size */
   text-align: center;
-  font-family: 'MyCustomFont', sans-serif; 
+  font-family: 'Roboto', sans-serif; /* Use the imported font */
+  font-weight: 500; /* Medium weight */
+  letter-spacing: 0.5px; /* Adds space between letters */
+  text-transform: uppercase; /* Makes text uppercase */
+  color: #333; /* Darker color for better visibility */
 }
 </style>
 

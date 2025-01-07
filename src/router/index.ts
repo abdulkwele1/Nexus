@@ -5,7 +5,6 @@ import userSettings from '../components/userSettings.vue';
 import SolarPage from '../components/SolarPage.vue';
 import Sensors from '../components/sensors.vue';
 import Drone from '../components/drone.vue'
-
 import { useNexusStore } from '@/stores/nexus'
 
 const router = createRouter({

@@ -176,6 +176,72 @@ func (nc *NexusClient) Logout(ctx context.Context) error {
 	return nil
 }
 
+// GetPanelYieldData retrieves yield data for a specific panel
+func (nc *NexusClient) GetPanelYieldData(ctx context.Context, panelID int) (api.GetPanelYieldDataResponse, error) {
+	endpoint := fmt.Sprintf("%s/panels/%d/yield_data", nc.Config.NexusAPIEndpoint, panelID)
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return api.GetPanelYieldDataResponse{}, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return api.GetPanelYieldDataResponse{}, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return api.GetPanelYieldDataResponse{}, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return api.GetPanelYieldDataResponse{}, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var result api.GetPanelYieldDataResponse
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return api.GetPanelYieldDataResponse{}, err
+	}
+
+	return result, nil
+}
+
+// SetPanelYieldData saves yield data for a specific panel
+func (nc *NexusClient) SetPanelYieldData(ctx context.Context, panelID int, yieldData api.SetPanelYieldDataResponse) error {
+	endpoint := fmt.Sprintf("%s/panels/%d/yield_data", nc.Config.NexusAPIEndpoint, panelID)
+
+	body, err := json.Marshal(yieldData)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
 // SetAuthHeaders sets the headers needed to authenticate requests
 // to the Nexus API, returning error (if any)
 func SetAuthHeaders(request *http.Request, cookie *http.Cookie) error {
