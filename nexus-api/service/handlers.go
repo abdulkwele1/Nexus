@@ -254,7 +254,10 @@ func CreateGetConsumptionDataHandler(apiService *APIService) http.HandlerFunc {
 		panelID := vars["panel_id"]
 		// Replace this with database logic
 		readings := api.GetConsumptionDataResponse{
-			ConsumptionData: []api.ConsumptionData{{CapacityKw: 100, ConsumedKw: 80}, {CapacityKw: 80, ConsumedKw: 150}},
+			ConsumptionData: []api.ConsumptionData{
+				{CapacityKw: 100, ConsumedKw: 80},
+				{CapacityKw: 80, ConsumedKw: 150},
+			},
 		}
 		apiService.Trace().Msgf("Fetched readings for panel_id: %s", panelID)
 		w.Header().Set("Content-Type", "application/json")

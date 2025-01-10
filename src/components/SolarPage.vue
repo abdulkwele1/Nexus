@@ -179,11 +179,7 @@ const exportData = () => {
   const header = "sensor_reading_date,daily_kw_generated\n";
   const csvContent = "data:text/csv;charset=utf-8," 
     + header 
-<<<<<<< Updated upstream
     + solarData.value.map(d => `${d.date.toISOString().split('T')[0]},${d.kwh_yield}`).join("\n");
-=======
-    + solarData.value.map(d => `${d.date.toISOString().split('T')[0]},${d.production}`).join("\n");
->>>>>>> Stashed changes
 
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
