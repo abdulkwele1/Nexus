@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -13,10 +14,11 @@ var (
 
 type SolarPanelConsumptionData struct {
 	bun.BaseModel `bun:"table:solar_panel_consumption_data"`
-	ID            int     `bun:"id,pk,autoincrement"`
-	ConsumedKwh   float64 `bun:"consumed_kWh,notnull"`
-	CapacityKwh   float64 `bun:"capacity_kWh,notnull"`
-	PanelID       int     `bun:"panel_id,notnull"`
+	ID            int       `bun:"id,pk,autoincrement"`
+	Date          time.Time `bun:"date,notnull"`
+	ConsumedKwh   float64   `bun:"consumed_kwh,notnull"`
+	CapacityKwh   float64   `bun:"capacity_kwh,notnull"`
+	PanelID       int       `bun:"panel_id,notnull"`
 }
 
 // Save saves the current consumption data to
