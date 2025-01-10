@@ -17,8 +17,8 @@
               <span class="sensor-icon">🌱</span>
               <div class="sensor-info">
                 <p class="sensor-details">
-                  {{ sensor.label }} - Battery: {{ sensor.battery }}%
-                </p>
+                  {{ sensor.label }} - Battery: {{ sensor.battery }}%  Moisture: {{ sensor.soilMoisture }}%
+              </p>
                 <p class="sensor-coordinates">
                   Coordinates: ({{ sensor.coordinates.x }}, {{ sensor.coordinates.y }})
                 </p>
@@ -74,6 +74,7 @@ export default {
           x: (Math.random() * 100).toFixed(2),
           y: (Math.random() * 100).toFixed(2),
         },
+        soilMoisture: (Math.random() * 100).toFixed(2),
       };
     },
     generateMultipleCoordinates(count) {

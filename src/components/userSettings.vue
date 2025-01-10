@@ -2,7 +2,6 @@
   <div class="settings-container">
     <button class="home-button" @click="goHome">Home</button>
     <div class="settings-content">
-      <div class="option" @click="optionOne">Change email</div>
       <div class="divider"></div>
       <div class="option" @click="showChangePasswordModal = true">Change password</div>
       <div class="divider"></div>
@@ -168,6 +167,8 @@ const logout = async () => {
   text-align: center;
   cursor: pointer;
   transition: background-color 0.3s;
+  background-color: #D3D3D3;
+  border-radius: 15px;
 }
 
 .option:hover {
@@ -215,4 +216,6 @@ const logout = async () => {
   font-size: 14px;
   margin-top: 10px;
 }
-</style>
+
+
+</style>  

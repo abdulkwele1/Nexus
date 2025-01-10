@@ -20,6 +20,8 @@ const props = defineProps({
 
 const chartContainer = ref(null);
 
+
+
 const createChart = () => {
   d3.select(chartContainer.value).select("svg").remove();
 

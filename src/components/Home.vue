@@ -28,25 +28,67 @@
 /* Importing Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@500&display=swap');
 
-/* Container style to center the boxes */
-.container {
+/* =======================
+   Nav Bar Styles
+   ======================= */
+.navbar {
+  position: relative; /* or fixed if you want it always on top */
+  width: 100%;
+  height: 60px;
+  background-color: #f8f8f8; 
   display: flex;
-  justify-content: center;
   align-items: center;
-  height: calc(80vh - 60px); /* Adjust height for navbar */
-  gap: 50px; /* Spacing between boxes */
-  transform: translateX(5%);
+  /* If you want the navbar to stay at the top:
+     position: fixed;
+     top: 0;
+     left: 0; 
+     z-index: 999;
+  */
 }
 
-/* Style for each box */
+.navbar-content {
+  display: flex;
+  gap: 20px;
+  margin-left: 20px; /* spacing from the left edge */
+}
+
+.navbar-content a {
+  text-decoration: none;
+  color: #333;
+  font-weight: 500;
+}
+
+/* =======================
+   Main Container
+   ======================= */
+.container {
+  /* If navbar is fixed, add top padding. For example:
+  padding-top: 60px; 
+  */
+  display: flex;
+  flex-wrap: wrap; /* allow boxes to wrap to new line on smaller screens */
+  justify-content: center;
+  align-items: center;
+  min-height: calc(80vh - 60px); /* space for content */
+  gap: 50px; /* spacing between boxes */
+  margin: 0 auto;
+}
+
+/* =======================
+   Box Styles
+   ======================= */
+.box-link {
+  text-decoration: none; /* remove default link underline */
+}
+
 .box {
-  width: 200px;
-  height: 300px;
+  width: 200px;       /* fixed width on desktop */
+  height: 300px;      /* fixed height on desktop */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 2px solid transparent; /* Initially hide the border */
+  border: 2px solid transparent;
   border-radius: 10px;
   cursor: pointer;
   overflow: hidden;
@@ -56,36 +98,57 @@
 /* Hover effect for boxes */
 .box:hover {
   transform: scale(1.05);
-  border-color: #ccc; /* Show the border on hover */
+  border-color: #ccc;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* Style for the image inside the box */
 .box-image {
   width: 100%;
-  height: auto;
+  height: auto; /* maintain aspect ratio */
 }
 
-/* Improved style for the text inside the box */
+/* Text inside the box */
 .box-text {
   margin-top: 10px;
-  font-size: 18px; /* Slightly larger font size */
+  font-size: 18px;
   text-align: center;
-  font-family: 'Roboto', sans-serif; /* Use the imported font */
-  font-weight: 500; /* Medium weight */
-  letter-spacing: 0.5px; /* Adds space between letters */
-  text-transform: uppercase; /* Makes text uppercase */
-  color: #333; /* Darker color for better visibility */
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #333;
+}
+
+/* =======================
+   Responsive Media Queries
+   ======================= */
+
+/* For tablets and below (max-width: 768px) */
+@media screen and (max-width: 768px) {
+  .container {
+    flex-direction: column;   /* stack boxes vertically */
+    gap: 20px;               /* reduce gap */
+    min-height: auto;        /* let content grow */
+  }
+
+  .box {
+    width: 60%;  /* narrower than full width, but bigger than 200px */
+    max-width: 300px; /* so it doesn’t grow too big on mid-sized screens */
+    height: auto;     /* auto-height so images are not squashed */
+  }
+}
+
+/* For phones (max-width: 480px) */
+@media screen and (max-width: 480px) {
+  .box {
+    width: 80%; /* can be even more narrow on phones */
+    margin: 0 auto; /* center the box horizontally */
+  }
+
+  /* Font scaling for smaller screens, optional */
+  .box-text {
+    font-size: 16px;
+  }
 }
 </style>
-
-<script setup>
-import { onMounted } from 'vue'
-
-// run every time page (component) loads
-// https://learnvue.co/articles/vue-lifecycle-hooks-guide
-onMounted(() => {
-    console.log('hommie')
-    // If user is on home page and document.cookie == “” is true, redirect the user to the login page
-})
-</script>
