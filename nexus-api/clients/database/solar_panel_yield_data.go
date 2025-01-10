@@ -58,7 +58,7 @@ func (spyd *SolarPanelYieldData) Delete(ctx context.Context, db *bun.DB) error {
 	return err
 }
 
-func GetDataForPanelID(ctx context.Context, db *bun.DB, panelID int) ([]SolarPanelYieldData, error) {
+func GetYieldDataForPanelID(ctx context.Context, db *bun.DB, panelID int) ([]SolarPanelYieldData, error) {
 	var solarPanelData []SolarPanelYieldData
 	err := db.NewSelect().Model(&solarPanelData).Where("panel_id = ?", panelID).Scan(ctx)
 
