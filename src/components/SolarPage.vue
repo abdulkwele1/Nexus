@@ -179,11 +179,8 @@ const exportData = () => {
   const header = "sensor_reading_date,daily_kw_generated\n";
   const csvContent = "data:text/csv;charset=utf-8," 
     + header 
-<<<<<<< Updated upstream
     + solarData.value.map(d => `${d.date.toISOString().split('T')[0]},${d.kwh_yield}`).join("\n");
-=======
     + solarData.value.map(d => `${d.date.toISOString().split('T')[0]},${d.production}`).join("\n");
->>>>>>> Stashed changes
 
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
@@ -198,7 +195,6 @@ onMounted(async() => {
   const defaultPanelId = 1
   const startDate = '5/11/2024'
   const endDate = '5/12/2024'
-<<<<<<< Updated upstream
   const response = await store.user.getPanelYieldData(defaultPanelId, startDate, endDate)
   const responseData= await response.json()
   const yieldData = responseData.yield_data
@@ -209,15 +205,6 @@ onMounted(async() => {
       date: new Date(item.date),
       kwh_yield: parseFloat(item.kwh_yield) || 0,
 }));
-=======
-
-  debugger
-  const response = await store.user.getPanelYieldData(defaultPanelId, startDate, endDate)
-  const responseData= await response.json()
-  const yieldData = responseData.yield_data
-  const mockData = generateSolarData(new Date("2023-01-01"), new Date("2023-01-31"));
-  solarData.value = yieldData
->>>>>>> Stashed changes
 
 });
 </script>

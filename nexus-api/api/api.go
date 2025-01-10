@@ -52,3 +52,12 @@ type YieldData struct {
 type GetYieldDataResponse struct {
 	YieldData []YieldData `json:"yield_data"`
 }
+
+type ConsumptionData struct {
+	ConsumedKw float64 `json:"consumed_kW"`
+	CapacityKw float64 `json:"capacity_kW"`
+}
+
+type GetConsumptionDataResponse struct {
+	ConsumptionData []ConsumptionData `json:"consumption_data"`
+}

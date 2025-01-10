@@ -247,6 +247,22 @@ func CreateGetReadingsHandler(apiService *APIService) http.HandlerFunc {
 	}
 }
 
+// consumption Function
+func CreateGetConsumptionDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		panelID := vars["panel_id"]
+		// Replace this with database logic
+		readings := api.GetConsumptionDataResponse{
+			ConsumptionData: []api.ConsumptionData{{CapacityKw: 100, ConsumedKw: 80}, {CapacityKw: 80, ConsumedKw: 150}},
+		}
+		apiService.Trace().Msgf("Fetched readings for panel_id: %s", panelID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(readings)
+	}
+}
+
 func CreateLogReadingHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)

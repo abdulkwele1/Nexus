@@ -33,6 +33,8 @@
 import { ref, onMounted, watch } from 'vue';
 import { Chart } from 'chart.js/auto';
 
+
+
 // Refs for data and labels
 const yieldGraph = ref<HTMLCanvasElement | null>(null);
 const electricityUsageData = ref<number[]>([70, 50, 90, 60]); // Example percentage data for electricity usage
@@ -103,12 +105,10 @@ const renderChart = () => {
 // Function to generate random data based on the date range
 const generateRandomData = () => {
   // Generate random electricity usage data
-  electricityUsageData.value = Array.from({ length: 4 }, () => Math.floor(Math.random() * 101));
+  electricityUsageData.value = myApiResponse.map(item => item.capacityKw);
 
   // Ensure direct usage does not exceed electricity usage
-  directUsageData.value = electricityUsageData.value.map((usage) =>
-    Math.floor(Math.random() * (usage + 1)) // Generate a random value less than or equal to the electricity usage
-  );
+  directUsageData.value = apiResponse.map(item => item.consumedKw);
 };
 
 // Watch for changes in the startDate and endDate
@@ -142,7 +142,7 @@ const exportData = () => {
 };
 
 // Mount the chart on component load
-onMounted(() => {   
+onMounted(async() => {
   renderChart();
 });
 </script>
