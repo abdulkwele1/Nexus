@@ -246,7 +246,7 @@ func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 		}
 
 		// Retrieve data for the panelID
-		data, err := database.GetDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
+		data, err := database.GetYieldDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
 		if err != nil {
 			if errors.Is(err, database.ErrorNoSolarPanelYieldData) {
 				apiService.Debug().Msgf("No data found for panel_id: %d", panelID)
