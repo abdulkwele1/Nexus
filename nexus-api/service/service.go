@@ -84,6 +84,10 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/panels/{panel_id}/yield_data", CorsMiddleware(AuthMiddleware(CreateGetPanelYieldDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc("/panels/{panel_id}/yield_data", CorsMiddleware(AuthMiddleware(CreateSetPanelYieldDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
 
+	//new routes for Consumption logging + retrieval
+	router.HandleFunc("/panels/{panel_id}/yield_data", CorsMiddleware(AuthMiddleware(CreateGetPanelConsumptionDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/panels/{panel_id}/yield_data", CorsMiddleware(AuthMiddleware(CreateSetPanelConsumptionDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
+
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),
 		Handler: router,
