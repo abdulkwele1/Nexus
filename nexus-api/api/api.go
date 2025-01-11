@@ -67,7 +67,7 @@ type ConsumptionData struct {
 	ConsumedKwh float64   `json:"consumed_kwh"`
 }
 
-type GetConsumptionDataResponse struct {
+type GetPanelConsumptionDataResponse struct {
 	ConsumptionData []ConsumptionData `json:"consumption_data"`
 }
 
