@@ -253,4 +253,59 @@ func TestE2ESetAndGetPanelYieldData(t *testing.T) {
 
 	// Step 3: 	Assert that the data returned matches the data sent
 	assert.Equal(t, expectedYieldData.YieldData, getPanelYieldData.YieldData)
+
+}
+
+func TestE2ESetAndGetPanelConsumptionData(t *testing.T) {
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+
+	assert.NoError(t, err)
+
+	// Panel ID to test
+	panelID := rand.Intn(10000000)
+
+	// Test payload for setting consumption data
+	expectedConsumptionData := api.SetPanelConsumptionDataResponse{ConsumptionData: []api.ConsumptionData{
+		{Date: time.Now().Add(1 * time.Second).UTC(), ConsumedKwh: 100},
+		{Date: time.Now().Add(1 * time.Second).UTC(), CapacityKwh: 150},
+	}}
+
+	// Step 1: Set consumption data for test panel
+	err = testClient.SetPanelConsumptionData(testCtx, panelID, expectedConsumptionData)
+
+	assert.NoError(t, err)
+
+	// Step 2: Call CreateGetPanelConsumptionDataHandler to get the consumption data
+	getPanelConsumptionData, err := testClient.GetPanelConsumptionData(testCtx, panelID)
+
+	assert.NoError(t, err)
+
+	// Step 3: 	Assert that the data returned matches the data sent
+	assert.Equal(t, expectedConsumptionData.ConsumptionData, getPanelConsumptionData.ConsumptionData)
+
 }
