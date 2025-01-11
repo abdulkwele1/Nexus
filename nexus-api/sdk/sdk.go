@@ -242,6 +242,72 @@ func (nc *NexusClient) SetPanelYieldData(ctx context.Context, panelID int, yield
 	return nil
 }
 
+// GetPanelConsumptionData retrieves consumption data for a specific panel
+func (nc *NexusClient) GetPanelConsumptionData(ctx context.Context, panelID int) (api.GetPanelConsumptionDataResponse, error) {
+	endpoint := fmt.Sprintf("%s/panels/%d/consumption_data", nc.Config.NexusAPIEndpoint, panelID)
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return api.GetPanelConsumptionDataResponse{}, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return api.GetPanelConsumptionDataResponse{}, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return api.GetPanelConsumptionDataResponse{}, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return api.GetPanelConsumptionDataResponse{}, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var result api.GetPanelConsumptionDataResponse
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return api.GetPanelConsumptionDataResponse{}, err
+	}
+
+	return result, nil
+}
+
+// SetPanelConsumptionData saves Consumption data for a specific panel
+func (nc *NexusClient) SetPanelConsumptionData(ctx context.Context, panelID int, ConsumptionData api.SetPanelConsumptionDataResponse) error {
+	endpoint := fmt.Sprintf("%s/panels/%d/consumption_data", nc.Config.NexusAPIEndpoint, panelID)
+
+	body, err := json.Marshal(ConsumptionData)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
 // SetAuthHeaders sets the headers needed to authenticate requests
 // to the Nexus API, returning error (if any)
 func SetAuthHeaders(request *http.Request, cookie *http.Cookie) error {
