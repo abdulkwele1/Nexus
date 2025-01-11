@@ -328,3 +328,102 @@ func CreateSetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Yield data saved successfully"})
 	}
 }
+
+func CreateGetPanelConsumptionDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		panelIDRaw := vars["panel_id"]
+
+		// Parse and validate panelID as an integer
+		panelID, err := strconv.Atoi(panelIDRaw)
+		if err != nil {
+			apiService.Error().Msgf("Invalid panel_id: %s", panelIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid panel_id"})
+			return
+		}
+
+		// Retrieve data for the panelID
+		data, err := database.GetConsumptionDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoSolarPanelYieldData) {
+				apiService.Debug().Msgf("No data found for panel_id: %d", panelID)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No data found"})
+				return
+			}
+
+			apiService.Error().Msgf("Error retrieving data for panel_id: %d, error: %s", panelID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Convert database data to GetPanelConsumptionDataResponse
+		var response api.GetPanelConsumptionDataResponse
+		for _, d := range data {
+			response.ConsumptionData = append(response.ConsumptionData, api.ConsumptionData{
+				Date:        d.Date,
+				CapacityKwh: d.CapacityKwh,
+				ConsumedKwh: d.ConsumedKwh,
+			})
+		}
+		// Send the response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+func CreateSetPanelConsumptionDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		panelIDRaw := vars["panel_id"]
+
+		// Parse and validate panelID as an integer
+		panelID, err := strconv.Atoi(panelIDRaw)
+		if err != nil {
+			apiService.Error().Msgf("Invalid panel_id: %s", panelIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid panel_id"})
+			return
+		}
+
+		request := api.SetPanelConsumptionDataResponse{}
+		err = json.NewDecoder(r.Body).Decode(&request)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request"})
+			return
+		}
+
+		// Iterate over each ConsumptionData item and save to the database
+		for _, ConsumptionData := range request.ConsumptionData {
+			solarPanelData := database.SolarPanelConsumptionData{
+				Date:        ConsumptionData.Date,
+				CapacityKwh: ConsumptionData.CapacityKwh,
+				ConsumedKwh: ConsumptionData.ConsumedKwh,
+				PanelID:     panelID,
+			}
+
+			err := solarPanelData.Save(r.Context(), apiService.DatabaseClient.DB)
+			if err != nil {
+				apiService.Error().Msgf("Failed to save Consumption data for panel_id: %d, data: %+v, error: %s", panelID, solarPanelData, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to save Consumption data"})
+				return
+			}
+		}
+
+		// Send success response
+		apiService.Trace().Msgf("Successfully saved consumption data for panel_id: %d", panelID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Consumption data saved successfully"})
+	}
+}
