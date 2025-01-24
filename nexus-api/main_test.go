@@ -241,19 +241,16 @@ func TestE2ESetAndGetPanelYieldData(t *testing.T) {
 		{Date: time.Now().Add(1 * time.Second).UTC(), KwhYield: 150},
 	}}
 
-	// Step 1: Set yield data for test panel
+	// Step 1: POST (Set) yield data
 	err = testClient.SetPanelYieldData(testCtx, panelID, expectedYieldData)
+	assert.NoError(t, err, "Setting yield data should succeed")
 
-	assert.NoError(t, err)
+	// Step 2: GET yield data
+	gotYieldData, err := testClient.GetPanelYieldData(testCtx, panelID)
+	assert.NoError(t, err, "Retrieving yield data should succeed")
 
-	// Step 2: Call CreateGetPanelYieldDataHandler to get the yield data
-	getPanelYieldData, err := testClient.GetPanelYieldData(testCtx, panelID)
-
-	assert.NoError(t, err)
-
-	// Step 3: 	Assert that the data returned matches the data sent
-	assert.Equal(t, expectedYieldData.YieldData, getPanelYieldData.YieldData)
-
+	// Step 3: Compare
+	assert.Equal(t, expectedYieldData.YieldData, gotYieldData.YieldData, "Yield data should match what was set")
 }
 
 func TestE2ESetAndGetPanelConsumptionData(t *testing.T) {
@@ -295,17 +292,14 @@ func TestE2ESetAndGetPanelConsumptionData(t *testing.T) {
 		{Date: time.Now().Add(1 * time.Second).UTC(), CapacityKwh: 150},
 	}}
 
-	// Step 1: Set consumption data for test panel
+	// Step 1: POST (Set) consumption data
 	err = testClient.SetPanelConsumptionData(testCtx, panelID, expectedConsumptionData)
+	assert.NoError(t, err, "Setting consumption data should succeed")
 
-	assert.NoError(t, err)
+	// Step 2: GET consumption data
+	gotConsumptionData, err := testClient.GetPanelConsumptionData(testCtx, panelID)
+	assert.NoError(t, err, "Retrieving consumption data should succeed")
 
-	// Step 2: Call CreateGetPanelConsumptionDataHandler to get the consumption data
-	getPanelConsumptionData, err := testClient.GetPanelConsumptionData(testCtx, panelID)
-
-	assert.NoError(t, err)
-
-	// Step 3: 	Assert that the data returned matches the data sent
-	assert.Equal(t, expectedConsumptionData.ConsumptionData, getPanelConsumptionData.ConsumptionData)
-
+	// Step 3: Compare
+	assert.Equal(t, expectedConsumptionData.ConsumptionData, gotConsumptionData.ConsumptionData, "Consumption data should match what was set")
 }
