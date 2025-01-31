@@ -9,7 +9,7 @@
 
     <!-- Conditional rendering of graphs and controls for Solar Yield -->
     <div class="chart-container" v-if="currentGraph === 'yield'">
-      <Graph :solarData="solarData" :isLineChart="isLineChart" />
+      <Yield :solarData="solarData" :isLineChart="isLineChart" />
       
       <!-- Line chart switch button -->
       <button class="line-chart-toggle-button" @click="isLineChart = !isLineChart">
@@ -77,7 +77,7 @@
 
     <!-- Solar Consumption graph -->
     <div class="chart-container" v-if="currentGraph === 'consumption'">
-      <BarGraph />
+      <Consumption />
     </div>
   </div>
 </template>
@@ -85,8 +85,8 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import Graph from './yieldGraph.vue'; // Import the Solar Yield Graph component
-import BarGraph from './consumptionGraph.vue';  // Bar graph for Solar Consumption
+import Yield from './yieldGraph.vue'; // Import the Solar Yield Graph component
+import Consumption from './consumptionGraph.vue';  // Bar graph for Solar Consumption
 import { useNexusStore } from '@/stores/nexus'
 
 const store = useNexusStore()
