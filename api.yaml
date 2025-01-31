@@ -177,7 +177,7 @@
                       $ref: '#/components/schemas/PanelYieldData'
               '404':
                 description: Panel not found
-          patch:
+          post:
             summary: Update solar yieldData of a specific panel
             parameters:
               - in: path
@@ -191,7 +191,7 @@
               content:
                 application/json:
                   schema:
-                    $ref: '#/components/schemas/UpdatePanelRequest'
+                    $ref: '#/components/schemas/PanelYieldData'
             responses:
               '200':
                 description: Panel updated successfully
@@ -226,9 +226,32 @@
                 content:
                   application/json:
                     schema:
-                      $ref: '#/components/schemas/ConsumptionData'
+                      $ref: '#/components/schemas/PanelConsumptionData'
               '404':
                 description: Panel not found   
+          post:
+            summary: Update solar consumption data of a specific panel
+            parameters:
+              - in: path
+                name: panel_id
+                required: true
+                schema:
+                  type: integer
+                description: The unique ID of the panel
+            requestBody:
+              required: true
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/PanelConsumptionData'
+            responses:
+              '200':
+                description: Panel updated successfully
+              '400':
+                description: Invalid input data
+              '404':
+                description: Panel not found
+
     components:
       schemas:
         Panel:
@@ -250,8 +273,6 @@
                 type: number
                 format: float
         PanelYieldData:
-        # {data: [ {id: 0}, {id: 1}]}
-         # {data: [ {date: '5/11/2024', kwh_yield: 1}, {date: '5/12/2024', kwh_yield: 2}]}
           type: object
           properties:
             yield_data:
@@ -263,7 +284,7 @@
                     type: string
                   kwh_yield:
                     type: integer
-        ConsumptionData:
+        PanelConsumptionData:
           type: object
           properties:
             consumption_data:
@@ -276,7 +297,6 @@
                     format: date
                   kwh_consumed:
                     type: integer
-        
         UpdatePanelRequest:
             type: object
             properties:
