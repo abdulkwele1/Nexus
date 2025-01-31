@@ -82,8 +82,6 @@
   </div>
 </template>
 
-
-
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -197,9 +195,7 @@ onMounted(async() => {
   const response = await store.user.getPanelYieldData(defaultPanelId, startDate, endDate)
   const responseData= await response.json()
   const yieldData = responseData.yield_data
-  const mockData = generateSolarData(new Date("2023-01-01"), new Date("2023-01-31"));
-  console.log(mockData)
-  //debugger
+
   solarData.value = yieldData.map(item => ({
       date: new Date(item.date),
       kwh_yield: parseFloat(item.kwh_yield) || 0,
