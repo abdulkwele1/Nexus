@@ -60,3 +60,17 @@ type GetPanelYieldDataResponse struct {
 type SetPanelYieldDataResponse struct {
 	YieldData []YieldData `json:"yield_data"`
 }
+
+type ConsumptionData struct {
+	Date        time.Time `json:"date"`
+	CapacityKwh float64   `json:"capacity_kwh"`
+	ConsumedKwh float64   `json:"consumed_kwh"`
+}
+
+type GetPanelConsumptionDataResponse struct {
+	ConsumptionData []ConsumptionData `json:"consumption_data"`
+}
+
+type SetPanelConsumptionDataResponse struct {
+	ConsumptionData []ConsumptionData `json:"consumption_data"`
+}

@@ -125,3 +125,5 @@ seed-database:
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_login_authentication_seed.sql
 
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_panel_yield_data_seed.sql
+
+	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_panel_consumption_data_seed.sql
