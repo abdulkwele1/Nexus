@@ -87,7 +87,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import Graph from './Graph.vue'; // Import the Solar Yield Graph component
+import Graph from './yieldGraph.vue'; // Import the Solar Yield Graph component
 import BarGraph from './consumptionGraph.vue';  // Bar graph for Solar Consumption
 import { useNexusStore } from '@/stores/nexus'
 
