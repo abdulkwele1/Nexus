@@ -1,7 +1,7 @@
 <template>
-  <div class="yield-graph">
+  <div class="consumption-graph">
     <!-- Canvas for the graph -->
-    <canvas ref="yieldGraph"></canvas>
+    <canvas ref="consumptionGraph"></canvas>
 
     <!-- Export Button -->
     <button class="export-button" @click="exportData">📄 Export</button>
@@ -34,7 +34,7 @@ import { ref, onMounted, watch } from 'vue';
 import { Chart } from 'chart.js/auto';
 
 // Refs for data and labels
-const yieldGraph = ref<HTMLCanvasElement | null>(null);
+const consumptionGraph = ref<HTMLCanvasElement | null>(null);
 const electricityUsageData = ref<number[]>([70, 50, 90, 60]); // Example percentage data for electricity usage
 const directUsageData = ref<number[]>([60, 40, 80, 50]); // Example percentage data for direct usage
 const labels = ref<string[]>([]); // Updated to be dynamic with dates
@@ -63,7 +63,7 @@ const generateLabels = () => {
 // Function to render the chart
 let chartInstance: Chart | null = null; // Variable to store chart instance
 const renderChart = () => {
-  const ctx = yieldGraph.value?.getContext('2d');
+  const ctx = consumptionGraph.value?.getContext('2d');
   if (!ctx) return;
 
   // Destroy previous chart if it exists
@@ -148,7 +148,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.yield-graph {
+.consumption-graph {
   width: 900px;
   height: 600px;
   margin: auto;
