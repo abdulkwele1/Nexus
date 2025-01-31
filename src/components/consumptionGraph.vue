@@ -32,6 +32,9 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { Chart } from 'chart.js/auto';
+import { useNexusStore } from '@/stores/nexus'
+
+const store = useNexusStore()
 
 // Refs for data and labels
 const consumptionGraph = ref<HTMLCanvasElement | null>(null);
@@ -142,7 +145,15 @@ const exportData = () => {
 };
 
 // Mount the chart on component load
-onMounted(() => {   
+onMounted(async() => {
+  const defaultPanelId = 1
+  const startDate = '5/11/2024'
+  const endDate = '5/12/2024'
+  const consumptionResponse = await store.user.getPanelConsumptionData(defaultPanelId, startDate, endDate)
+  const consumptionResponseData= await consumptionResponse.json()
+  const consumptionSolarData = consumptionResponseData.consumption_data
+  console.log(JSON.stringify(consumptionSolarData))
+
   renderChart();
 });
 </script>

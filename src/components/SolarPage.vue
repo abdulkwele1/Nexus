@@ -77,7 +77,7 @@
 
     <!-- Solar Consumption graph -->
     <div class="chart-container" v-if="currentGraph === 'consumption'">
-      <Consumption />
+      <Consumption/>
     </div>
   </div>
 </template>
@@ -199,8 +199,7 @@ onMounted(async() => {
   solarData.value = yieldData.map(item => ({
       date: new Date(item.date),
       kwh_yield: parseFloat(item.kwh_yield) || 0,
-}));
-
+  }));
 });
 </script>
 
