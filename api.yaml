@@ -295,8 +295,10 @@
                   date:
                     type: string
                     format: date
-                  kwh_consumed:
-                    type: integer
+                  consumed_kwh:
+                    type: number
+                  capacity_kwh:
+                     type: number
         UpdatePanelRequest:
             type: object
             properties:
