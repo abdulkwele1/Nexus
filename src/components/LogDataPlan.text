@@ -1,0 +1,25 @@
+Step 1: create database to log panel data
+step 2: Create method to logPanelYieldData and logPanelConsumptionData
+
+   
+   
+   async logPanelConsumptionData(panelId: number, startDate: string, endDate: string,): Promise<any> {
+    const loginAPIUrl = `${VITE_NEXUS_API_URL}/logPanelConsumptionData`
+      
+      const response = await fetch(loginAPIUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      return response
+}
+
+step 3:  api.go
+step 4: handlers.go
+step 5: service.go
+step 6: sdk.go  
+step 7: main.go
+Final: Implement into man_test.go and make sure tests pass
