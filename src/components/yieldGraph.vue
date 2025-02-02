@@ -1,228 +1,138 @@
 <template>
-  <div class="yield-graph">
-    <!-- Canvas for the graph -->
-    <canvas ref="yieldGraph"></canvas>
-
-    <!-- Export Button -->
-    <button class="export-button" @click="exportData">📄 Export</button>
-
-    <!-- Dropdown Calendar Button -->
-    <button class="calendar-button" @click="toggleCalendar">Select Date Range &#9662;</button>
-
-    <!-- Calendar Modal for selecting date range -->
-    <div v-if="showCalendar" class="modal-overlay" @click="toggleCalendar">
-      <div class="modal" @click.stop>
-        <h2>Select Date Range</h2>
-        <div class="calendar-container">
-          <div class="calendar">
-            <label>Start point:</label>
-            <input type="date" v-model="startDate" />
-          </div>
-          <div class="calendar">
-            <label>End point:</label>
-            <input type="date" v-model="endDate" />
-          </div>
-        </div>
-        <button @click="toggleCalendar">Close</button>
-      </div>
-    </div>
-  </div>
+  <div ref="chartContainer" class="chart-container"></div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
-import { Chart } from 'chart.js/auto';
+import { onMounted, watch, defineProps, ref } from 'vue';
+import * as d3 from 'd3';
 
-// Refs for data and labels
-const yieldGraph = ref<HTMLCanvasElement | null>(null);
-const electricityUsageData = ref<number[]>([70, 50, 90, 60]); // Example percentage data for electricity usage
-const directUsageData = ref<number[]>([60, 40, 80, 50]); // Example percentage data for direct usage
-const labels = ref<string[]>([]); // Updated to be dynamic with dates
+const props = defineProps({
+  solarData: {
+    type: Array,
+    required: true,
+  },
 
-// Calendar date selection
-const startDate = ref<string>('');
-const endDate = ref<string>('');
-const showCalendar = ref(false); // Controls calendar modal visibility
-
-// Function to toggle the calendar modal
-const toggleCalendar = () => {
-  showCalendar.value = !showCalendar.value;
-};
-
-// Function to generate labels with panel names and dates
-const generateLabels = () => {
-  // Example logic: Display panels with selected date range
-  labels.value = [
-    `Panel 1 (${startDate.value} - ${endDate.value})`,
-    `Panel 2 (${startDate.value} - ${endDate.value})`,
-    `Panel 3 (${startDate.value} - ${endDate.value})`,
-    `Panel 4 (${startDate.value} - ${endDate.value})`,
-  ];
-};
-
-// Function to render the chart
-let chartInstance: Chart | null = null; // Variable to store chart instance
-const renderChart = () => {
-  const ctx = yieldGraph.value?.getContext('2d');
-  if (!ctx) return;
-
-  // Destroy previous chart if it exists
-  if (chartInstance) {
-    chartInstance.destroy();
-  }
-
-  chartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels.value,
-      datasets: [
-        {
-          label: 'Electricity Used (%)',
-          data: electricityUsageData.value,
-          backgroundColor: '#007bff', // Blue for electricity usage
-        },
-        {
-          label: 'Direct Usage (%)',
-          data: directUsageData.value,
-          backgroundColor: '#ffc107', // Yellow for direct usage
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: {
-          beginAtZero: true,
-          max: 100,
-        },
-      },
-    },
-  });
-};
-
-// Function to generate random data based on the date range
-const generateRandomData = () => {
-  // Generate random electricity usage data
-  electricityUsageData.value = Array.from({ length: 4 }, () => Math.floor(Math.random() * 101));
-
-  // Ensure direct usage does not exceed electricity usage
-  directUsageData.value = electricityUsageData.value.map((usage) =>
-    Math.floor(Math.random() * (usage + 1)) // Generate a random value less than or equal to the electricity usage
-  );
-};
-
-// Watch for changes in the startDate and endDate
-watch([startDate, endDate], ([newStartDate, newEndDate]) => {
-  if (newStartDate && newEndDate) {
-    console.log(`Fetching data between ${newStartDate} and ${newEndDate}`);
-    generateLabels();  // Generate labels with date range
-    generateRandomData();
-    updateGraphData(); // Automatically update the graph when dates are selected
-  }
+  isLineChart:{
+    type: Boolean,
+    required: true,
+  },
 });
 
-// Function to update the graph with new data
-const updateGraphData = () => {
-  console.log("Updating graph with new data from", startDate.value, "to", endDate.value);
-  renderChart(); // Re-render chart with updated data
+const chartContainer = ref(null);
+
+const createChart = () => {
+  d3.select(chartContainer.value).select("svg").remove();
+
+  const width = 960;
+  const height = 500;
+  const margin = { top: 30, right: 20, bottom: 50, left: 150 };
+
+  const x = d3.scaleBand()
+    .domain(props.solarData.length ? props.solarData.map(d => d3.timeFormat("%Y-%m-%d")(d.date)) : [" "])
+    .range([margin.left, width - margin.right])
+    .padding(0.1);
+
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(props.solarData, d => d.kwh_yield) || 1])
+    .range([height - margin.bottom, margin.top]);
+
+  const svg = d3.select(chartContainer.value)
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  svg.append("g")
+    .attr("transform", `translate(0,${height - margin.bottom})`)
+    .call(d3.axisBottom(x).tickValues(props.solarData.length ? x.domain() : [" "]))
+    .selectAll("text")
+    .attr("transform", "rotate(-45)")
+    .style("text-anchor", "end");
+
+  svg.append("g")
+    .attr("transform", `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y));
+
+  // Tooltip setup
+  const tooltip = d3.select(chartContainer.value)
+    .append("div")
+    .style("position", "absolute")
+    .style("background", "#f9f9f9")
+    .style("padding", "5px")
+    .style("border", "1px solid #d3d3d3")
+    .style("border-radius", "5px")
+    .style("visibility", "hidden")
+    .style("pointer-events", "none");
+
+  const showTooltip = (event, d) => {
+    tooltip
+      .html(`Date: ${d3.timeFormat("%Y/%m/%d")(d.date)}<br>kWh: ${d.kwh_yield}`)
+      .style("visibility", "visible");
+  };
+
+  const moveTooltip = (event) => {
+    tooltip
+      .style("top", (event.pageY - 10) + "px")
+      .style("left", (event.pageX + 10) + "px");
+  };
+
+  const hideTooltip = () => {
+    tooltip.style("visibility", "hidden");
+  };
+
+  // Render chart based on type
+  if (props.solarData.length) {
+    if (props.isLineChart) {
+      const line = d3.line()
+        .x(d => x(d3.timeFormat("%Y-%m-%d")(d.date)) + x.bandwidth() / 2)
+        .y(d => y(d.kwh_yield));
+
+      svg.append("path")
+        .datum(props.solarData)
+        .attr("fill", "none")
+        .attr("stroke", "#69b3a2")
+        .attr("stroke-width", 2)
+        .attr("d", line);
+
+      svg.selectAll(".hover-circle")
+        .data(props.solarData)
+        .enter()
+        .append("circle")
+        .attr("class", "hover-circle")
+        .attr("cx", d => x(d3.timeFormat("%Y-%m-%d")(d.date)) + x.bandwidth() / 2)
+        .attr("cy", d => y(d.kwh_yield))
+        .attr("r", 4)
+        .attr("fill", "#69b3a2")
+        .on("mouseover", showTooltip)
+        .on("mousemove", moveTooltip)
+        .on("mouseout", hideTooltip);
+    } else {
+      svg.selectAll(".bar")
+        .data(props.solarData)
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d3.timeFormat("%Y-%m-%d")(d.date)))
+        .attr("y", d => y(d.kwh_yield))
+        .attr("width", x.bandwidth())
+        .attr("height", d => y(0) - y(d.kwh_yield))
+        .attr("fill", "#69b3a2")
+        .on("mouseover", showTooltip)
+        .on("mousemove", moveTooltip)
+        .on("mouseout", hideTooltip);
+    }
+  }
 };
 
-// Function to export data as CSV
-const exportData = () => {
-  const csvContent = "data:text/csv;charset=utf-8,Panel,Electricity Used (%),Direct Usage (%)\n"
-    + labels.value.map((label, index) => `${label},${electricityUsageData.value[index]},${directUsageData.value[index]}`).join("\n");
+// Watch for changes in solarData or isLineChart to re-render chart
+watch(() => props.solarData, createChart, { immediate: true });
+watch(() => props.isLineChart, createChart, { immediate: true });
 
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "Consumption_data.csv");
-  document.body.appendChild(link); 
-  link.click();
-  document.body.removeChild(link);
-};
-
-// Mount the chart on component load
-onMounted(() => {   
-  renderChart();
-});
+onMounted(createChart);
 </script>
 
 <style scoped>
-.yield-graph {
-  width: 900px;
-  height: 600px;
-  margin: auto;
-  position: relative;
-}
-
-/* Export Button Styling */
-.export-button {
-  position: fixed;
-  top: 90px;
-  right: 30px;
-  z-index: 1001;
-  padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.export-button:hover {
-  background-color: #218838;
-}
-
-/* Calendar Button Styling */
-.calendar-button {
-  margin-top: 20px;
-  padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.calendar-button:hover {
-  background-color: #0056b3;
-}
-
-/* Modal for calendar overlay */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  width: 400px;
-  text-align: center;
-}
-
-/* Calendar container inside the modal */
-.calendar-container {
-  display: flex;
-  justify-content: space-between;
-  margin: 20px 0;
-}
-
-.calendar {
-  width: 45%;
-}
-
-.calendar label {
-  font-weight: bold;
+.chart-container {
+  width: 100%;
+  height: 100%;
 }
 </style>
