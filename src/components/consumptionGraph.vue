@@ -36,8 +36,8 @@ import { useNexusStore } from '@/stores/nexus'
 const store = useNexusStore()
 // Refs for data and labels
 const consumptionGraph = ref<HTMLCanvasElement | null>(null);
-const electricityUsageData = ref<number[]>([70, 50, 90, 60]); // Example percentage data for electricity usage
-const directUsageData = ref<number[]>([60, 40, 80, 50]); // Example percentage data for direct usage
+const electricityUsageData = ref([]); // Example percentage data for electricity usage
+const directUsageData = ref([]); // Example percentage data for direct usage
 const labels = ref<string[]>([]); // Updated to be dynamic with dates
 // Calendar date selection
 const startDate = ref<string>('');
@@ -72,7 +72,7 @@ const renderChart = () => {
       labels: labels.value,
       datasets: [
         {
-          label: 'Electricity Used (%)',
+          label: 'Electricity Stored (%)',
           data: electricityUsageData.value,
           backgroundColor: '#007bff', // Blue for electricity usage
         },
@@ -132,11 +132,16 @@ const exportData = () => {
 // Mount the chart on component load
 onMounted(async() => {
   const defaultPanelId = 1
-  const startDate = '5/11/2024'
-  const endDate = '5/12/2024'
+  const startDate = '2024-12-20'
+  const endDate = '2024-12-24'
   const consumptionResponse = await store.user.getPanelConsumptionData(defaultPanelId, startDate, endDate)
   const consumptionResponseData= await consumptionResponse.json()
   const consumptionSolarData = consumptionResponseData.consumption_data
+
+  electricityUsageData.value = consumptionSolarData.map(item => item.capacity_kwh); // Map to capacity_kwh
+  directUsageData.value = consumptionSolarData.map(item => item.consumed_kwh);    // Map to consumed_kwh
+  labels.value = consumptionSolarData.map(item => item.date.split('T')[0]);  // Format the date as YYYY-MM-DD
+
   console.log(JSON.stringify(consumptionSolarData))
   renderChart();
 });
