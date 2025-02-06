@@ -62,10 +62,17 @@ let chartInstance: Chart | null = null; // Variable to store chart instance
 const renderChart = () => {
   const ctx = consumptionGraph.value?.getContext('2d');
   if (!ctx) return;
+
   // Destroy previous chart if it exists
   if (chartInstance) {
     chartInstance.destroy();
   }
+
+  // Find the highest value in both datasets
+  const maxElectricity = Math.max(...electricityUsageData.value);
+  const maxDirectUsage = Math.max(...directUsageData.value);
+  const maxValue = Math.max(maxElectricity, maxDirectUsage); // Get the highest value overall
+
   chartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -88,12 +95,13 @@ const renderChart = () => {
       scales: {
         y: {
           beginAtZero: true,
-          max: 100,
+          max: maxValue + 10, // Adjust max to be slightly higher than the highest value
         },
       },
     },
   });
 };
+
 // Function to generate random data based on the date range
 const generateRandomData = () => {
   // Generate random electricity usage data
