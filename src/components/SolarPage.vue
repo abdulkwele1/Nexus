@@ -6,6 +6,13 @@
       <button class="nav-button" @click="switchGraph('yield')">Solar Yield</button>
       <button class="nav-button" @click="switchGraph('consumption')">Solar Consumption</button>
     </nav>
+  <div>
+    <!-- For the Yield Graph -->
+    <solarDataManagerUi graphType="yield" />
+
+    <!-- For the Consumption Graph -->
+    <!-- <solarDataManagerUi graphType="consumption" /> -->
+  </div>
 
     <!-- Conditional rendering of graphs and controls for Solar Yield -->
     <div class="chart-container" v-if="currentGraph === 'yield'">
@@ -80,6 +87,7 @@
       <Consumption/>
     </div>
   </div>
+
 </template>
 
 <script setup lang="ts">
@@ -88,6 +96,8 @@ import { useRouter } from 'vue-router';
 import Yield from './yieldGraph.vue'; // Import the Solar Yield Graph component
 import Consumption from './consumptionGraph.vue';  // Bar graph for Solar Consumption
 import { useNexusStore } from '@/stores/nexus'
+import solarDataManagerUi from '@/components/solarDataManagerUi.vue';
+
 
 const store = useNexusStore()
 
