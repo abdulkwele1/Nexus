@@ -45,7 +45,7 @@
         </div>
       </div>
 
-      <button type="submit">Add Solar Data</button>
+      <button type="submit" :class="{'add-btn': !isEditing, 'edit-btn': isEditing}">Add Solar Data</button>
     </form>
 
     <!-- Button for removing solar data -->
@@ -156,7 +156,7 @@ export default {
 
 .remove-btn {
   margin-top: 1rem;
-  background-color: #f44336;
+  background-color: #007bff;
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -164,6 +164,19 @@ export default {
 }
 
 .remove-btn:hover {
-  background-color: #d32f2f;
+  background-color: #0056b3;
+}
+
+.add-btn {
+  margin-top: 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.add-btn:hover {
+  background-color: #0056b3
 }
 </style>
