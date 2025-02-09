@@ -91,7 +91,7 @@ class User {
         return response
   }
 
-  async logPanelYieldData(panelId: number, startDate: string, endDate: string,): Promise<any> {
+  async setPanelYieldData(panelId: number, startDate: string, endDate: string,): Promise<any> {
       const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/yield_data`
 
       const response = await fetch(url, {
@@ -106,7 +106,7 @@ class User {
   }
 
 
-  async logPanelConsumptionData(panelId: number, startDate: string, endDate: string,): Promise<any> {
+  async setPanelConsumptionData(panelId: number, startDate: string, endDate: string,): Promise<any> {
       const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/consumption_data`
 
       const response = await fetch(url, {
