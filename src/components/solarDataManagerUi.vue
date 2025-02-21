@@ -45,7 +45,9 @@
         </div>
       </div>
 
-      <button type="submit" :class="{'add-btn': !isEditing, 'edit-btn': isEditing}">Add Solar Data</button>
+      <button type="submit" class="add-btn">
+        Add Solar Data
+      </button>
     </form>
 
     <!-- Button for removing solar data -->
@@ -55,91 +57,72 @@
   </div>
 </template>
 
-<script>
-import axios from 'axios';
+<script setup lang="ts">
+const { VITE_NEXUS_API_URL } = import.meta.env;
 
-export default {
-  name: "SolarDataManagerUi",
-  props: {
-    // Accepts a graphType prop which must be either 'yield' or 'consumption'
-    graphType: {
-      type: String,
-      required: true,
-      validator: (value) => ['yield', 'consumption'].includes(value)
-    }
+
+import { defineProps, ref } from 'vue';
+import moment from 'moment';
+
+const props = defineProps({
+  solarData: {
+    type: Array,
+    required: true,
   },
-  data() {
-    return {
-      // Initialize with fields for both graph types.
-      solarData: {
-        date: '',
-        // For yield graph:
-        kwhProduced: null,
-        // For consumption graph:
-        totalStored: null,
-        kwhUsed: null,
-      },
-    };
+
+  graphType:{
+    type: String,
+    required: true,
   },
-  methods: {
-    async addSolarData() {
-      try {
-        let endpoint = '';
-        let payload = {};
+});
 
-        if (this.graphType === 'yield') {
-          // Define endpoint and payload for yield data.
-          endpoint = '/api/solarData/yield';
-          payload = {
-            date: this.solarData.date,
-            kwhProduced: this.solarData.kwhProduced,
-          };
-        } else if (this.graphType === 'consumption') {
-          // Define endpoint and payload for consumption data.
-          endpoint = '/api/solarData/consumption';
-          payload = {
-            date: this.solarData.date,
-            totalStored: this.solarData.totalStored,
-            kwhUsed: this.solarData.kwhUsed,
-          };
-        }
+const addSolarData = (async() =>  {
+    try {
+      let endpoint = '';
+      let payload = {};
 
-        // Adjust the endpoint and payload as needed for your backend API.
-        const response = await axios.post(endpoint, payload);
-        console.log('Added solar data:', response.data);
-        this.resetForm();
-      } catch (error) {
-        console.error('Error adding solar data:', error);
-      }
-    },
-    async removeSolarData() {
-      try {
-        let endpoint = '';
-        if (this.graphType === 'yield') {
-          endpoint = '/api/solarData/yield/last';
-        } else if (this.graphType === 'consumption') {
-          endpoint = '/api/solarData/consumption/last';
-        }
-
-        // Adjust the logic and endpoint as needed.
-        const response = await axios.delete(endpoint);
-        console.log('Removed solar data:', response.data);
-      } catch (error) {
-        console.error('Error removing solar data:', error);
-      }
-    },
-    resetForm() {
-      // Reset the common field.
-      this.solarData.date = '';
-      if (this.graphType === 'yield') {
-        this.solarData.kwhProduced = null;
+      if (props.graphType === 'yield') {
+        // Adjust the URL to match your backend endpoint.  
+        // Here the panel_id is hard-coded as 1, change as needed.
+        endpoint = `${VITE_NEXUS_API_URL}/panels/1/yield_data`;
+        payload = {
+          yield_data: [{
+            date: moment(new Date(props.solarData.date)).format("YYYY-MM-DDTHH:mm:ssZ"),
+            kwh_yield: props.solarData.kwhProduced,
+          }],
+        };
       } else if (this.graphType === 'consumption') {
-        this.solarData.totalStored = null;
-        this.solarData.kwhUsed = null;
+        endpoint = `${VITE_NEXUS_API_URL}/panels/1/consumption_data`;
+        payload = {
+          consumption_data: [{
+            date: props.solarData.date,
+            capacity_kwh: props.solarData.totalStored,
+            consumed_kwh: props.solarData.kwhUsed,
+          }],
+        };
       }
-    },
-  },
-};
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+          credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Added solar data:', data);
+      this.resetForm();
+    } catch (error) {
+      console.error('Error adding solar data:', error);
+    }
+  });
+
 </script>
 
 <style scoped>
@@ -177,6 +160,6 @@ export default {
 }
 
 .add-btn:hover {
-  background-color: #0056b3
+  background-color: #0056b3;
 }
 </style>
