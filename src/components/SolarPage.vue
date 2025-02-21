@@ -8,10 +8,10 @@
     </nav>
   <div>
     <!-- For the Yield Graph -->
-    <solarDataManagerUi graphType="yield" />
+    <solarDataManagerUi :graphType="graphType" :solarData="solarData" />
 
     <!-- For the Consumption Graph -->
-    <!-- <solarDataManagerUi graphType="consumption" /> -->
+    <!-- <solarDataManagerUi :graphType="consumption" :solarData="solarData"/> -->
   </div>
 
     <!-- Conditional rendering of graphs and controls for Solar Yield -->
@@ -116,6 +116,7 @@ const errorMessage = ref("");
 const isLineChart = ref(false);
 const selectedPanel = ref("Panel 1");
 const showPanelModal = ref(false);
+const graphType = ref('');
 
 
 const switchGraph = (graphType) => {
@@ -210,6 +211,8 @@ onMounted(async() => {
       date: new Date(item.date),
       kwh_yield: parseFloat(item.kwh_yield) || 0,
   }));
+
+  graphType.value = 'yield'
 });
 </script>
 
