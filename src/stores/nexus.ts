@@ -91,15 +91,21 @@ class User {
         return response
   }
 
-  async setPanelYieldData(panelId: number, startDate: string, endDate: string,): Promise<any> {
+  async setPanelYieldData(panelId: number, startDate: string, endDate: string, yieldData: object): Promise<any> {
       const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/yield_data`
 
+      let payload = {
+        yield_data: yieldData
+
+      }
+      
       const response = await fetch(url, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
         method: 'POST',
+        body: JSON.stringify(payload),
         });
 
         return response
