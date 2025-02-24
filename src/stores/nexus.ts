@@ -77,7 +77,7 @@ class User {
         return response
   }
 
-    async getPanelConsumptionData(panelId: number, startDate: string, endDate: string,): Promise<any> {
+  async getPanelConsumptionData(panelId: number, startDate: string, endDate: string,): Promise<any> {
       const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/consumption_data`
 
       const response = await fetch(url, {
@@ -90,6 +90,42 @@ class User {
 
         return response
   }
+
+  async setPanelYieldData(panelId: number, startDate: string, endDate: string, yieldData: object): Promise<any> {
+      const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/yield_data`
+
+      let payload = {
+        yield_data: yieldData
+
+      }
+      
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+        body: JSON.stringify(payload),
+        });
+
+        return response
+  }
+
+
+  async setPanelConsumptionData(panelId: number, startDate: string, endDate: string,): Promise<any> {
+      const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/consumption_data`
+
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+        });
+
+        return response
+}
+
 
 
    async logPanelData(userName: any, password: any): Promise<any> {
@@ -109,6 +145,7 @@ class User {
 
       return response
 }
+
 
 
     // Function to get a cookie by name
