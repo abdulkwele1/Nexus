@@ -1,4 +1,3 @@
-<!-- src/components/solarDataManagerUi.vue -->
 <template>
   <div class="solar-data-manager">
     <h2>Manage Solar Data</h2>
@@ -7,7 +6,7 @@
       <!-- Common Field: Date -->
       <div class="form-group">
         <label for="date">Date:</label>
-        <input type="date" id="date" v-model="solarData.date" required />
+        <input type="date" id="date" v-model="formData.date" required />
       </div>
 
       <!-- Fields for Yield Graph -->
@@ -17,7 +16,7 @@
           <input
             type="number"
             id="kwhProduced"
-            v-model.number="solarData.kwhProduced"
+            v-model.number="formData.kwhProduced"
             required
           />
         </div>
@@ -30,7 +29,7 @@
           <input
             type="number"
             id="totalStored"
-            v-model.number="solarData.totalStored"
+            v-model.number="formData.totalStored"
             required
           />
         </div>
@@ -39,7 +38,7 @@
           <input
             type="number"
             id="kwhUsed"
-            v-model.number="solarData.kwhUsed"
+            v-model.number="formData.kwhUsed"
             required
           />
         </div>
@@ -58,71 +57,89 @@
 </template>
 
 <script setup lang="ts">
-const { VITE_NEXUS_API_URL } = import.meta.env;
-
-
-import { defineProps, ref } from 'vue';
+import { ref } from 'vue';
 import moment from 'moment';
 
+const { VITE_NEXUS_API_URL } = import.meta.env;
+
+// Define props the same way as in your first code.
 const props = defineProps({
   solarData: {
     type: Array,
     required: true,
   },
-
-  graphType:{
+  graphType: {
     type: String,
     required: true,
   },
 });
 
-const addSolarData = (async() =>  {
-    try {
-      let endpoint = '';
-      let payload = {};
+// Create a local reactive object for the form data so it doesn't conflict with the passed-in solarData.
+const formData = ref({
+  date: '',
+  kwhProduced: 0,
+  totalStored: 0,
+  kwhUsed: 0,
+});
 
-      if (props.graphType === 'yield') {
-        // Adjust the URL to match your backend endpoint.  
-        // Here the panel_id is hard-coded as 1, change as needed.
-        endpoint = `${VITE_NEXUS_API_URL}/panels/1/yield_data`;
-        payload = {
-          yield_data: [{
-            date: moment(new Date(props.solarData.date)).format("YYYY-MM-DDTHH:mm:ssZ"),
-            kwh_yield: props.solarData.kwhProduced,
-          }],
-        };
-      } else if (this.graphType === 'consumption') {
-        endpoint = `${VITE_NEXUS_API_URL}/panels/1/consumption_data`;
-        payload = {
-          consumption_data: [{
-            date: props.solarData.date,
-            capacity_kwh: props.solarData.totalStored,
-            consumed_kwh: props.solarData.kwhUsed,
-          }],
-        };
-      }
+const resetForm = () => {
+  formData.value = {
+    date: '',
+    kwhProduced: 0,
+    totalStored: 0,
+    kwhUsed: 0,
+  };
+};
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-          credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+const addSolarData = async () => {
+  try {
+    let endpoint = '';
+    let payload = {};
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Added solar data:', data);
-      this.resetForm();
-    } catch (error) {
-      console.error('Error adding solar data:', error);
+    if (props.graphType === 'yield') {
+      endpoint = `${VITE_NEXUS_API_URL}/panels/1/yield_data`;
+      payload = {
+        yield_data: [{
+          date: moment(new Date(formData.value.date)).format("YYYY-MM-DDTHH:mm:ssZ"),
+          kwh_yield: formData.value.kwhProduced,
+        }],
+      };
+    } else if (props.graphType === 'consumption') {
+      endpoint = `${VITE_NEXUS_API_URL}/panels/1/consumption_data`;
+      payload = {
+        consumption_data: [{
+          date: formData.value.date,
+          capacity_kwh: formData.value.totalStored,
+          consumed_kwh: formData.value.kwhUsed,
+        }],
+      };
     }
-  });
 
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Added solar data:', data);
+    resetForm();
+  } catch (error) {
+    console.error('Error adding solar data:', error);
+  }
+};
+
+const removeSolarData = () => {
+  // Implement your removal logic here
+  console.log('Remove solar data clicked');
+};
 </script>
 
 <style scoped>
