@@ -62,6 +62,7 @@ import moment from 'moment';
 
 const { VITE_NEXUS_API_URL } = import.meta.env;
 
+
 // Define props the same way as in your first code.
 const props = defineProps({
   solarData: {
@@ -108,7 +109,7 @@ const addSolarData = async () => {
       endpoint = `${VITE_NEXUS_API_URL}/panels/1/consumption_data`;
       payload = {
         consumption_data: [{
-          date: formData.value.date,
+          date: moment(new Date(formData.value.date)).format("YYYY-MM-DDTHH:mm:ssZ"),
           capacity_kwh: formData.value.totalStored,
           consumed_kwh: formData.value.kwhUsed,
         }],
@@ -130,11 +131,15 @@ const addSolarData = async () => {
 
     const data = await response.json();
     console.log('Added solar data:', data);
+
+  
+
     resetForm();
   } catch (error) {
     console.error('Error adding solar data:', error);
   }
 };
+
 
 const removeSolarData = () => {
   // Implement your removal logic here
