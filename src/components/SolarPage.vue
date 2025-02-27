@@ -11,7 +11,7 @@
     <solarDataManagerUi :graphType="graphType" :solarData="solarData" />
 
     <!-- For the Consumption Graph -->
-    <!-- <solarDataManagerUi :graphType="consumption" :solarData="solarData"/> -->
+    <!-- <solarDataManagerUi :graphType="consumption" :solarData="solarData" /> -->
   </div>
 
     <!-- Conditional rendering of graphs and controls for Solar Yield -->
@@ -119,9 +119,12 @@ const showPanelModal = ref(false);
 const graphType = ref('');
 
 
-const switchGraph = (graphType) => {
-  if (currentGraph.value !== graphType) {
-    currentGraph.value = graphType;  // Switch graph if different from current
+
+
+const switchGraph = (type) => {
+  if (currentGraph.value !== type) {
+    currentGraph.value = type;
+    graphType.value = type;  // Update the ref correctly
   }
 };
 
@@ -212,6 +215,8 @@ onMounted(async() => {
       kwh_yield: parseFloat(item.kwh_yield) || 0,
   }));
 
+  // Initialize both currentGraph and graphType to 'yield'
+  currentGraph.value = 'yield'
   graphType.value = 'yield'
 });
 </script>
