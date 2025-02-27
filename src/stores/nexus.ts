@@ -112,15 +112,21 @@ class User {
   }
 
 
-  async setPanelConsumptionData(panelId: number, startDate: string, endDate: string,): Promise<any> {
+  async setPanelConsumptionData(panelId: number, startDate: string, endDate: string, consumptionData: object): Promise<any> {
       const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/consumption_data`
+      
+      let payload = {
+        consumption_data: consumptionData
 
+      }
+    
       const response = await fetch(url, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
         method: 'POST',
+        body: JSON.stringify(payload),
         });
 
         return response
