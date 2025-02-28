@@ -59,8 +59,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import moment from 'moment';
+import { useNexusStore } from '../stores/nexus';
 
+const nexusStore = useNexusStore();
 const { VITE_NEXUS_API_URL } = import.meta.env;
+
 
 // Define props the same way as in your first code.
 const props = defineProps({
@@ -93,36 +96,24 @@ const resetForm = () => {
 
 const addSolarData = async () => {
   try {
-    let endpoint = '';
-    let payload = {};
+    const panelId = 1;
+    const formattedDate = moment(new Date(formData.value.date)).format("YYYY-MM-DDTHH:mm:ssZ");
+    let response;
 
     if (props.graphType === 'yield') {
-      endpoint = `${VITE_NEXUS_API_URL}/panels/1/yield_data`;
-      payload = {
-        yield_data: [{
-          date: moment(new Date(formData.value.date)).format("YYYY-MM-DDTHH:mm:ssZ"),
+      const yield_data = [{
+          date: formattedDate,
           kwh_yield: formData.value.kwhProduced,
-        }],
-      };
+        }];
+      response = await nexusStore.user.setPanelYieldData(1, formattedDate, formattedDate, yield_data);
     } else if (props.graphType === 'consumption') {
-      endpoint = `${VITE_NEXUS_API_URL}/panels/1/consumption_data`;
-      payload = {
-        consumption_data: [{
-          date: formData.value.date,
+      const consumption_data = [{
+          date: formattedDate,
           capacity_kwh: formData.value.totalStored,
           consumed_kwh: formData.value.kwhUsed,
-        }],
-      };
+        }];
+        response = await nexusStore.user.setPanelConsumptionData(panelId, formattedDate, formattedDate, consumption_data);
     }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -130,11 +121,13 @@ const addSolarData = async () => {
 
     const data = await response.json();
     console.log('Added solar data:', data);
+
     resetForm();
   } catch (error) {
     console.error('Error adding solar data:', error);
   }
 };
+
 
 const removeSolarData = () => {
   // Implement your removal logic here
