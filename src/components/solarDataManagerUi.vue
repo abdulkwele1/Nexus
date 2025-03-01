@@ -61,9 +61,11 @@ import { ref } from 'vue';
 import moment from 'moment';
 import { useNexusStore } from '../stores/nexus';
 
+// Add defineEmits import
+const emit = defineEmits(['dataAdded']);
+
 const nexusStore = useNexusStore();
 const { VITE_NEXUS_API_URL } = import.meta.env;
-
 
 // Define props the same way as in your first code.
 const props = defineProps({
@@ -102,17 +104,17 @@ const addSolarData = async () => {
 
     if (props.graphType === 'yield') {
       const yield_data = [{
-          date: formattedDate,
-          kwh_yield: formData.value.kwhProduced,
-        }];
+        date: formattedDate,
+        kwh_yield: formData.value.kwhProduced,
+      }];
       response = await nexusStore.user.setPanelYieldData(1, formattedDate, formattedDate, yield_data);
     } else if (props.graphType === 'consumption') {
       const consumption_data = [{
-          date: formattedDate,
-          capacity_kwh: formData.value.totalStored,
-          consumed_kwh: formData.value.kwhUsed,
-        }];
-        response = await nexusStore.user.setPanelConsumptionData(panelId, formattedDate, formattedDate, consumption_data);
+        date: formattedDate,
+        capacity_kwh: formData.value.totalStored,
+        consumed_kwh: formData.value.kwhUsed,
+      }];
+      response = await nexusStore.user.setPanelConsumptionData(panelId, formattedDate, formattedDate, consumption_data);
     }
 
     if (!response.ok) {
@@ -122,6 +124,9 @@ const addSolarData = async () => {
     const data = await response.json();
     console.log('Added solar data:', data);
 
+    // Emit an event to notify parent that data was added
+    emit('dataAdded');
+    
     resetForm();
   } catch (error) {
     console.error('Error adding solar data:', error);
