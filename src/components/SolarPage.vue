@@ -8,7 +8,7 @@
     </nav>
   <div>
     <!-- For the Yield Graph -->
-    <solarDataManagerUi :graphType="graphType" :solarData="solarData" />
+    <solarDataManagerUi :graphType="graphType" :solarData="solarData" @dataAdded="fetchLatestData" />
 
     <!-- For the Consumption Graph -->
     <!-- <solarDataManagerUi :graphType="consumption" :solarData="solarData" /> -->
@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Yield from './yieldGraph.vue'; // Import the Solar Yield Graph component
 import Consumption from './consumptionGraph.vue';  // Bar graph for Solar Consumption
@@ -117,6 +117,7 @@ const isLineChart = ref(false);
 const selectedPanel = ref("Panel 1");
 const showPanelModal = ref(false);
 const graphType = ref('');
+const refreshInterval = ref(null);
 
 
 
@@ -174,7 +175,28 @@ const generateSolarData = (start, end) => {
   return data;
 };
 
-watch([startDate, endDate], () => {
+const fetchLatestData = async () => {
+  try {
+    const panelId = parseInt(selectedPanel.value.replace('Panel ', '')) || 1;
+    const response = await store.user.getPanelYieldData(
+      panelId,
+      startDate.value || '5/11/2024', // Use existing date or default
+      endDate.value || '5/12/2024'
+    );
+    
+    const responseData = await response.json();
+    
+    // Update solarData with new yield data
+    solarData.value = responseData.yield_data.map(item => ({
+      date: new Date(item.date),
+      kwh_yield: parseFloat(item.kwh_yield) || 0,
+    }));
+  } catch (error) {
+    console.error("Error fetching updated data:", error);
+  }
+};
+
+watch([startDate, endDate], async () => {
   if (startDate.value && endDate.value) {
     const start = new Date(startDate.value);
     const end = new Date(endDate.value);
@@ -182,7 +204,25 @@ watch([startDate, endDate], () => {
     if (end < start) {
       errorMessage.value = "End point cannot be before starting point.";
     } else {
-      solarData.value = generateSolarData(start, end);
+      try {
+        // Get panel yield data from API
+        const response = await store.user.getPanelYieldData(
+          selectedPanel.value.replace('Panel ', '') || 1, // Convert "Panel 1" to 1
+          start.toLocaleDateString(), 
+          end.toLocaleDateString()
+        );
+        
+        const responseData = await response.json();
+        
+        // Update solarData with new yield data
+        solarData.value = responseData.yield_data.map(item => ({
+          date: new Date(item.date),
+          kwh_yield: parseFloat(item.kwh_yield) || 0,
+        }));
+      } catch (error) {
+        errorMessage.value = "Error fetching solar panel data";
+        console.error("Error:", error);
+      }
     }
   }
 });
@@ -218,6 +258,15 @@ onMounted(async() => {
   // Initialize both currentGraph and graphType to 'yield'
   currentGraph.value = 'yield'
   graphType.value = 'yield'
+
+  // Set up refresh interval (every 3 seconds)
+  refreshInterval.value = setInterval(fetchLatestData, 3000);
+});
+
+onUnmounted(() => {
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value);
+  }
 });
 </script>
 
