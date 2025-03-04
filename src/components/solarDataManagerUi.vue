@@ -124,8 +124,8 @@ const addSolarData = async () => {
     const data = await response.json();
     console.log('Added solar data:', data);
 
-    // Emit an event to notify parent that data was added
-    emit('dataAdded');
+    // Emit event with the type of data that was added
+    emit('dataAdded', props.graphType);
     
     resetForm();
   } catch (error) {
