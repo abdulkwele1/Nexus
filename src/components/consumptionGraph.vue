@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, onUnmounted } from 'vue';
 import { Chart } from 'chart.js/auto';
 import { useNexusStore } from '@/stores/nexus'
 const store = useNexusStore()
@@ -42,6 +42,8 @@ const labels = ref<string[]>([]); // Updated to be dynamic with dates
 // Calendar date selection
 const startDate = ref<string>('');
 const endDate = ref<string>('');
+const refreshInterval = ref(null);
+
 const showCalendar = ref(false); // Controls calendar modal visibility
 // Function to toggle the calendar modal
 const toggleCalendar = () => {
@@ -68,10 +70,11 @@ const renderChart = () => {
     chartInstance.destroy();
   }
 
-  // Find the highest value in both datasets
+  // Set a fixed maximum or calculate based on data
   const maxElectricity = Math.max(...electricityUsageData.value);
   const maxDirectUsage = Math.max(...directUsageData.value);
-  const maxValue = Math.max(maxElectricity, maxDirectUsage); // Get the highest value overall
+  const maxValue = Math.max(maxElectricity, maxDirectUsage);
+  const yAxisMax = Math.ceil(maxValue / 100) * 100; // Round up to nearest hundred
 
   chartInstance = new Chart(ctx, {
     type: 'bar',
@@ -81,42 +84,61 @@ const renderChart = () => {
         {
           label: 'Electricity Stored (%)',
           data: electricityUsageData.value,
-          backgroundColor: '#007bff', // Blue for electricity usage
+          backgroundColor: '#007bff',
         },
         {
           label: 'Direct Usage (%)',
           data: directUsageData.value,
-          backgroundColor: '#ffc107', // Yellow for direct usage
+          backgroundColor: '#ffc107',
         },
       ],
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       scales: {
         y: {
           beginAtZero: true,
-          max: maxValue + 10, // Adjust max to be slightly higher than the highest value
-        },
+          max: yAxisMax, // Use rounded max value
+          ticks: {
+            stepSize: Math.max(10, Math.floor(yAxisMax / 10)) // Adjust step size based on max value
+          }
+        }
       },
+      animation: {
+        duration: 0 // Reduce animation duration for more frequent updates
+      }
     },
   });
 };
 
-// Function to generate random data based on the date range
-const generateRandomData = () => {
-  // Generate random electricity usage data
-  electricityUsageData.value = Array.from({ length: 4 }, () => Math.floor(Math.random() * 101));
-  // Ensure direct usage does not exceed electricity usage
-  directUsageData.value = electricityUsageData.value.map((usage) =>
-    Math.floor(Math.random() * (usage + 1)) // Generate a random value less than or equal to the electricity usage
-  );
+const fetchLatestData = async () => {
+  try {
+    const panelId = parseInt(selectedPanel.value?.replace('Panel ', '') || '1');
+    const response = await store.user.getPanelConsumptionData(
+      panelId,
+      startDate.value || '2024-12-20',
+      endDate.value || '2024-12-24'
+    );
+
+    const responseData = await response.json();
+    const consumptionSolarData = responseData.consumption_data;
+
+    electricityUsageData.value = consumptionSolarData.map(item => item.capacity_kwh);
+    directUsageData.value = consumptionSolarData.map(item => item.consumed_kwh);
+    labels.value = consumptionSolarData.map(item => item.date.split('T')[0]);
+
+    renderChart(); // Add this to update the chart with new data
+  } catch (error) {
+    console.error("Error fetching updated data:", error);
+  }
 };
+
 // Watch for changes in the startDate and endDate
 watch([startDate, endDate], ([newStartDate, newEndDate]) => {
   if (newStartDate && newEndDate) {
     console.log(`Fetching data between ${newStartDate} and ${newEndDate}`);
     generateLabels();  // Generate labels with date range
-    generateRandomData();
     updateGraphData(); // Automatically update the graph when dates are selected
   }
 });
@@ -152,7 +174,18 @@ onMounted(async() => {
 
   console.log(JSON.stringify(consumptionSolarData))
   renderChart();
+
+  //set up refresh interval
+  refreshInterval.value = setInterval(fetchLatestData, 3000);
 });
+
+onUnmounted(() => {
+  if (refreshInterval.value){
+    clearInterval(refreshInterval.value);
+  }
+})
+
+const selectedPanel = ref('Panel 1'); // Add this if it's missing
 </script>
 
 <style scoped>
