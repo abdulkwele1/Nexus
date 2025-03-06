@@ -99,7 +99,10 @@ const resetForm = () => {
 const addSolarData = async () => {
   try {
     const panelId = 1;
-    const formattedDate = moment(new Date(formData.value.date)).format("YYYY-MM-DDTHH:mm:ssZ");
+    // Set the time to noon UTC to avoid timezone issues
+    const date = new Date(formData.value.date);
+    date.setUTCHours(12, 0, 0, 0);
+    const formattedDate = date.toISOString();
     let response;
 
     if (props.graphType === 'yield') {
