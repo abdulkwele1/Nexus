@@ -100,7 +100,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Sensor'
+                $ref: '#/components/schemas/ListSensorsResponse'
         '404':
           description: Sensors not found
   /sensors/{sensor_id}:
@@ -168,6 +168,16 @@ paths:
           schema:
             type: integer
           description: The unique ID of the sensor
+        - in: query
+          name: start_date
+          schema:
+            type: string
+          description: Gets data starting from this date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+          description: Gets data up to this date
       responses:
         '200':
           description: Soil moisture data retrieved successfully
@@ -209,6 +219,16 @@ paths:
           schema:
             type: integer
           description: The unique ID of the sensor
+        - in: query
+          name: start_date
+          schema:
+            type: string
+          description: Gets data starting from this date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+          description: Gets data up to this date
       responses:
         '200':
           description: Temperature data retrieved successfully
@@ -554,3 +574,12 @@ components:
         error:
           type: string
           example: "Invalid request"
+    ListSensorsResponse:
+      type: object
+      properties:
+        sensors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Sensor'
+      required:
+        - sensors
