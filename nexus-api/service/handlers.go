@@ -506,13 +506,22 @@ func CreateSetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 
 		// Iterate over each SensorMoistureData item and save to the database
 		for _, sensorMoistureData := range request.SensorMoistureData {
+			// Parse the date string into time.Time
+			date, err := time.Parse(time.RFC3339, sensorMoistureData.Date)
+			if err != nil {
+				apiService.Error().Msgf("Failed to parse date: %s, error: %s", sensorMoistureData.Date, err)
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid date format"})
+				return
+			}
+
 			moistureData := database.SensorMoistureData{
 				SensorID:     sensorID,
-				Date:         sensorMoistureData.Date,
+				Date:         date,
 				SoilMoisture: sensorMoistureData.SoilMoisture,
 			}
 
-			err := moistureData.Save(r.Context(), apiService.DatabaseClient.DB)
+			err = moistureData.Save(r.Context(), apiService.DatabaseClient.DB)
 			if err != nil {
 				apiService.Error().Msgf("Failed to save moisture data for sensor_id: %d, data: %+v, error: %s", sensorID, moistureData, err)
 				w.Header().Set("Content-Type", "application/json")
@@ -607,13 +616,22 @@ func CreateSetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 
 		// Iterate over each SensorTemperatureData item and save to the database
 		for _, sensorTemperatureData := range request.SensorTemperatureData {
+			// Parse the date string into time.Time
+			date, err := time.Parse(time.RFC3339, sensorTemperatureData.Date)
+			if err != nil {
+				apiService.Error().Msgf("Failed to parse date: %s, error: %s", sensorTemperatureData.Date, err)
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid date format"})
+				return
+			}
+
 			temperatureData := database.SensorTemperatureData{
 				SensorID:        sensorID,
-				Date:            sensorTemperatureData.Date,
+				Date:            date,
 				SoilTemperature: sensorTemperatureData.SoilTemperature,
 			}
 
-			err := temperatureData.Save(r.Context(), apiService.DatabaseClient.DB)
+			err = temperatureData.Save(r.Context(), apiService.DatabaseClient.DB)
 			if err != nil {
 				apiService.Error().Msgf("Failed to save temperature data for sensor_id: %d, data: %+v, error: %s", sensorID, temperatureData, err)
 				w.Header().Set("Content-Type", "application/json")
