@@ -102,3 +102,11 @@ type SensorTemperatureData struct {
 	Date            string  `json:"date"`
 	SoilTemperature float64 `json:"soil_temperature"`
 }
+
+type SetSensorMoistureDataResponse struct {
+	SensorMoistureData []SensorMoistureData `json:"sensor_moisture_data"`
+}
+
+type SetSensorTemperatureDataResponse struct {
+	SensorTemperatureData []SensorTemperatureData `json:"sensor_temperature_data"`
+}
