@@ -61,6 +61,13 @@ type SetPanelYieldDataResponse struct {
 	YieldData []YieldData `json:"yield_data"`
 }
 
+type GetSensorMoistureDataResponse struct {
+	SensorMoistureData []SensorMoistureData `json:"sensor_moisture_data"`
+}
+
+type GetSensorTemperatureDataResponse struct {
+	SensorTemperatureData []SensorTemperatureData `json:"sensor_temperature_data"`
+}
 type ConsumptionData struct {
 	Date        time.Time `json:"date"`
 	CapacityKwh float64   `json:"capacity_kwh"`
@@ -73,4 +80,25 @@ type GetPanelConsumptionDataResponse struct {
 
 type SetPanelConsumptionDataResponse struct {
 	ConsumptionData []ConsumptionData `json:"consumption_data"`
+}
+
+type Sensor struct {
+	ID               int    `json:"id"`
+	Name             string `json:"name"`
+	Location         string `json:"location"`
+	InstallationDate string `json:"installation_date"`
+}
+
+type SensorMoistureData struct {
+	ID           int     `json:"id"`
+	SensorID     int     `json:"sensor_id"`
+	Date         string  `json:"date"`
+	SoilMoisture float64 `json:"soil_moisture"`
+}
+
+type SensorTemperatureData struct {
+	ID              int     `json:"id"`
+	SensorID        int     `json:"sensor_id"`
+	Date            string  `json:"date"`
+	SoilTemperature float64 `json:"soil_temperature"`
 }
