@@ -242,6 +242,138 @@ func (nc *NexusClient) SetPanelYieldData(ctx context.Context, panelID int, yield
 	return nil
 }
 
+// GetSensorMoistureData retrieves moisture data for a specific sensor
+func (nc *NexusClient) GetSensorMoistureData(ctx context.Context, sensorID int) (api.GetSensorMoistureDataResponse, error) {
+	endpoint := fmt.Sprintf("%s/sensors/%d/moisture_data", nc.Config.NexusAPIEndpoint, sensorID)
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return api.GetSensorMoistureDataResponse{}, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return api.GetSensorMoistureDataResponse{}, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return api.GetSensorMoistureDataResponse{}, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return api.GetSensorMoistureDataResponse{}, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var result api.GetSensorMoistureDataResponse
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return api.GetSensorMoistureDataResponse{}, err
+	}
+
+	return result, nil
+}
+
+// SetSensorMoistureData saves moisture data for a specific sensor
+func (nc *NexusClient) SetSensorMoistureData(ctx context.Context, sensorID int, moistureData api.SetSensorMoistureDataResponse) error {
+	endpoint := fmt.Sprintf("%s/sensors/%d/moisture_data", nc.Config.NexusAPIEndpoint, sensorID)
+
+	body, err := json.Marshal(moistureData)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
+// GetSensorTemperatureData retrieves temperature data for a specific sensor
+func (nc *NexusClient) GetSensorTemperatureData(ctx context.Context, sensorID int) (api.GetSensorTemperatureDataResponse, error) {
+	endpoint := fmt.Sprintf("%s/sensors/%d/temperature_data", nc.Config.NexusAPIEndpoint, sensorID)
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return api.GetSensorTemperatureDataResponse{}, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return api.GetSensorTemperatureDataResponse{}, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return api.GetSensorTemperatureDataResponse{}, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return api.GetSensorTemperatureDataResponse{}, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var result api.GetSensorTemperatureDataResponse
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return api.GetSensorTemperatureDataResponse{}, err
+	}
+
+	return result, nil
+}
+
+// SetSensorTemperatureData saves temperature data for a specific sensor
+func (nc *NexusClient) SetSensorTemperatureData(ctx context.Context, sensorID int, temperatureData api.SetSensorTemperatureDataResponse) error {
+	endpoint := fmt.Sprintf("%s/sensors/%d/temperature_data", nc.Config.NexusAPIEndpoint, sensorID)
+
+	body, err := json.Marshal(temperatureData)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
 // GetPanelConsumptionData retrieves consumption data for a specific panel
 func (nc *NexusClient) GetPanelConsumptionData(ctx context.Context, panelID int) (api.GetPanelConsumptionDataResponse, error) {
 	endpoint := fmt.Sprintf("%s/panels/%d/consumption_data", nc.Config.NexusAPIEndpoint, panelID)
