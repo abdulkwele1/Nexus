@@ -377,6 +377,7 @@ func CreateGetPanelConsumptionDataHandler(apiService *APIService) http.HandlerFu
 		json.NewEncoder(w).Encode(response)
 	}
 }
+
 func CreateSetPanelConsumptionDataHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
@@ -425,5 +426,207 @@ func CreateSetPanelConsumptionDataHandler(apiService *APIService) http.HandlerFu
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Consumption data saved successfully"})
+	}
+}
+
+func CreateGetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		sensorIDRaw := vars["sensor_id"]
+
+		// Parse and validate sensorID as an integer
+		sensorID, err := strconv.Atoi(sensorIDRaw)
+		if err != nil {
+			apiService.Error().Msgf("Invalid sensor_id: %s", sensorIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid sensor_id"})
+			return
+		}
+
+		// Retrieve data for the sensorID
+		data, err := database.GetSensorMoistureDataForSensorID(r.Context(), apiService.DatabaseClient.DB, sensorID)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoSensorMoistureData) {
+				apiService.Debug().Msgf("No data found for sensor_id: %d", sensorID)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No data found"})
+				return
+			}
+
+			apiService.Error().Msgf("Error retrieving data for sensor_id: %d, error: %s", sensorID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Convert database data to GetSensorMoistureDataResponse
+		var response api.GetSensorMoistureDataResponse
+		for _, d := range data {
+			response.SensorMoistureData = append(response.SensorMoistureData, api.SensorMoistureData{
+				ID:           d.ID,
+				SensorID:     d.SensorID,
+				Date:         d.Date.Format(time.RFC3339),
+				SoilMoisture: d.SoilMoisture,
+			})
+		}
+
+		// Send the response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func CreateSetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		sensorIDRaw := vars["sensor_id"]
+
+		// Parse and validate sensorID as an integer
+		sensorID, err := strconv.Atoi(sensorIDRaw)
+		if err != nil {
+			apiService.Error().Msgf("Invalid sensor_id: %s", sensorIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid sensor_id"})
+			return
+		}
+
+		request := api.SetSensorMoistureDataResponse{}
+		err = json.NewDecoder(r.Body).Decode(&request)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request"})
+			return
+		}
+
+		// Iterate over each SensorMoistureData item and save to the database
+		for _, sensorMoistureData := range request.SensorMoistureData {
+			moistureData := database.SensorMoistureData{
+				SensorID:     sensorID,
+				Date:         sensorMoistureData.Date,
+				SoilMoisture: sensorMoistureData.SoilMoisture,
+			}
+
+			err := moistureData.Save(r.Context(), apiService.DatabaseClient.DB)
+			if err != nil {
+				apiService.Error().Msgf("Failed to save moisture data for sensor_id: %d, data: %+v, error: %s", sensorID, moistureData, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to save moisture data"})
+				return
+			}
+		}
+
+		// Send success response
+		apiService.Trace().Msgf("Successfully saved moisture data for sensor_id: %d", sensorID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Moisture data saved successfully"})
+	}
+}
+
+func CreateGetSensorTemperatureDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		sensorIDRaw := vars["sensor_id"]
+
+		// Parse and validate sensorID as an integer
+		sensorID, err := strconv.Atoi(sensorIDRaw)
+		if err != nil {
+			apiService.Error().Msgf("Invalid sensor_id: %s", sensorIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid sensor_id"})
+			return
+		}
+
+		// Retrieve data for the sensorID
+		data, err := database.GetSensorTemperatureDataForSensorID(r.Context(), apiService.DatabaseClient.DB, sensorID)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoSensorTemperatureData) {
+				apiService.Debug().Msgf("No data found for sensor_id: %d", sensorID)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No data found"})
+				return
+			}
+
+			apiService.Error().Msgf("Error retrieving data for sensor_id: %d, error: %s", sensorID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Convert database data to GetSensorTemperatureDataResponse
+		var response api.GetSensorTemperatureDataResponse
+		for _, d := range data {
+			response.SensorTemperatureData = append(response.SensorTemperatureData, api.SensorTemperatureData{
+				ID:              d.ID,
+				SensorID:        d.SensorID,
+				Date:            d.Date.Format(time.RFC3339),
+				SoilTemperature: d.SoilTemperature,
+			})
+		}
+
+		// Send the response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func CreateSetSensorTemperatureDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		sensorIDRaw := vars["sensor_id"]
+
+		// Parse and validate sensorID as an integer
+		sensorID, err := strconv.Atoi(sensorIDRaw)
+		if err != nil {
+			apiService.Error().Msgf("Invalid sensor_id: %s", sensorIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid sensor_id"})
+			return
+		}
+
+		request := api.SetSensorTemperatureDataResponse{}
+		err = json.NewDecoder(r.Body).Decode(&request)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request"})
+			return
+		}
+
+		// Iterate over each SensorTemperatureData item and save to the database
+		for _, sensorTemperatureData := range request.SensorTemperatureData {
+			temperatureData := database.SensorTemperatureData{
+				SensorID:        sensorID,
+				Date:            sensorTemperatureData.Date,
+				SoilTemperature: sensorTemperatureData.SoilTemperature,
+			}
+
+			err := temperatureData.Save(r.Context(), apiService.DatabaseClient.DB)
+			if err != nil {
+				apiService.Error().Msgf("Failed to save temperature data for sensor_id: %d, data: %+v, error: %s", sensorID, temperatureData, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to save temperature data"})
+				return
+			}
+		}
+
+		// Send success response
+		apiService.Trace().Msgf("Successfully saved temperature data for sensor_id: %d", sensorID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Temperature data saved successfully"})
 	}
 }
