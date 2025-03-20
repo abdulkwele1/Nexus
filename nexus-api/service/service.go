@@ -88,6 +88,14 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/panels/{panel_id}/consumption_data", CorsMiddleware(AuthMiddleware(CreateGetPanelConsumptionDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc("/panels/{panel_id}/consumption_data", CorsMiddleware(AuthMiddleware(CreateSetPanelConsumptionDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
 
+	//new routes for SensorMoisture logging + retrieval
+	router.HandleFunc("/sensors/{sensor_id}/moisture_data", CorsMiddleware(AuthMiddleware(CreateGetSensorMoistureDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/sensors/{sensor_id}/moisture_data", CorsMiddleware(AuthMiddleware(CreateSetSensorMoistureDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
+
+	//new routes for SensorTemperature logging + retrieval
+	router.HandleFunc("/sensors/{sensor_id}/temperature_data", CorsMiddleware(AuthMiddleware(CreateGetSensorTemperatureDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/sensors/{sensor_id}/temperature_data", CorsMiddleware(AuthMiddleware(CreateSetSensorTemperatureDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
+
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),
 		Handler: router,
