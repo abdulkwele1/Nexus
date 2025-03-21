@@ -489,7 +489,7 @@ components:
           type: string
         location:
           type: string
-        coordinates:
+        SensorCoordinates:
           type: object
           properties:
             latitude:
@@ -547,7 +547,7 @@ components:
         soil_temperature:
           type: number
           format: float
-        coordinates:
+        SensorCoordinates:
           type: object
           properties:
             latitude:
