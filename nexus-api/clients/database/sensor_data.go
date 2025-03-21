@@ -27,6 +27,19 @@ type SensorTemperatureData struct {
 	SoilTemperature float64   `bun:"soil_temperature"`
 }
 
+type SensorCoordinates struct {
+	Latitude  float64 `bun:"latitude"`
+	Longitude float64 `bun:"longitude"`
+}
+
+type Sensor struct {
+	ID                int    `json:"id"`
+	Name              string `json:"name"`
+	Location          string `json:"location"`
+	InstallationDate  string `json:"installation_date"`
+	SensorCoordinates `json:"sensor_coordinates"`
+}
+
 func GetSensorMoistureDataForSensorID(ctx context.Context, db *bun.DB, sensorID int) ([]SensorMoistureData, error) {
 	var data []SensorMoistureData
 	err := db.NewSelect().
