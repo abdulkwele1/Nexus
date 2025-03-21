@@ -36,6 +36,7 @@ type UpdatePanelRequest struct {
 	Location         string  `json:"location"`          // Location of the panel
 	InstallationDate string  `json:"installation_date"` // Installation date in YYYY-MM-DD format
 	CapacityKW       float64 `json:"capacity_kW"`       // Capacity in kilowatts
+
 }
 
 // ErrorResponse represents a common error response structure.
@@ -83,10 +84,11 @@ type SetPanelConsumptionDataResponse struct {
 }
 
 type Sensor struct {
-	ID               int    `json:"id"`
-	Name             string `json:"name"`
-	Location         string `json:"location"`
-	InstallationDate string `json:"installation_date"`
+	ID                int    `json:"id"`
+	Name              string `json:"name"`
+	Location          string `json:"location"`
+	InstallationDate  string `json:"installation_date"`
+	SensorCoordinates `json:"sensor_coordinates"`
 }
 
 type SensorMoistureData struct {
@@ -109,4 +111,9 @@ type SetSensorMoistureDataResponse struct {
 
 type SetSensorTemperatureDataResponse struct {
 	SensorTemperatureData []SensorTemperatureData `json:"sensor_temperature_data"`
+}
+
+type SensorCoordinates struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
 }
