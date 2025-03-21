@@ -489,6 +489,15 @@ components:
           type: string
         location:
           type: string
+        coordinates:
+          type: object
+          properties:
+            latitude:
+              type: number
+              format: float
+            longitude:
+              type: number
+              format: float
         installation_date:
           type: string
           format: date
@@ -538,6 +547,15 @@ components:
         soil_temperature:
           type: number
           format: float
+        coordinates:
+          type: object
+          properties:
+            latitude:
+              type: number
+              format: float
+            longitude:
+              type: number
+              format: float
     LoginRequest:
       type: object
       properties:
