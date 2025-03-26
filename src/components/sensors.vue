@@ -5,24 +5,22 @@
       <button class="nav-button" @click="goTo('/home')">Home</button>
     </nav>
   </div>
- <div>
-  <!-- SoilMoisture graph -->
-  <:graphType = "graphType"/>
- </div>
- 
+  <div class="sensors-content">
+    <!-- SoilMoisture graph -->
+    <SoilMoistureGraph />
+  </div>
 </template>
 
 <script setup lang="ts">
 //imports
 import { useRouter } from 'vue-router';
+import SoilMoistureGraph from './soilMoistureGraph.vue';
 
 //const
 const router = useRouter();
-const goTo = (path) => {
+const goTo = (path: string) => {
   router.push(path);
 };
-
-
 </script>
 
 <style>
@@ -70,5 +68,14 @@ const goTo = (path) => {
 .navbar.scrolled {
   background-color: rgba(255, 255, 255, 1); /* Fully opaque when scrolled */
   box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* More shadow when scrolled */
+}
+
+.sensors-content {
+  margin-top: 80px; /* Add space below the fixed navbar */
+  padding: 20px;
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>
