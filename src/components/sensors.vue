@@ -5,191 +5,236 @@
       <button class="nav-button" @click="goTo('/home')">Home</button>
     </nav>
   </div>
-  <div class="center-container">
-    <div class="button-container">
-      <div v-for="(button, index) in buttons" :key="index" class="dropdown-button">
-        <button @click="toggleDropdown(index)">
-          {{ button.name }}
-        </button>
-        <transition name="fade-slide">
-          <div v-if="button.showSensors" class="sensor-dropdown">
-            <div class="sensor" v-if="index < 4" v-for="sensor in button.sensors" :key="sensor.id">
-              <span class="sensor-icon">🌱</span>
-              <div class="sensor-info">
-                <p class="sensor-details">
-                  {{ sensor.label }} - Battery: {{ sensor.battery }}%
-                </p>
-                <p class="sensor-coordinates">
-                  Coordinates: ({{ sensor.coordinates.x }}, {{ sensor.coordinates.y }})
-                </p>
-              </div>
+  
+  <div class="main-content">
+    <!-- Query Side Panel -->
+    <div class="query-panel">
+      <div class="panel-section">
+        <h3>Date Range</h3>
+        <div class="date-inputs">
+          <div class="input-group">
+            <label>Start Date</label>
+            <input 
+              type="datetime-local" 
+              v-model="queryParams.startDate"
+              @change="updateGraphData"
+            >
+          </div>
+          <div class="input-group">
+            <label>End Date</label>
+            <input 
+              type="datetime-local" 
+              v-model="queryParams.endDate"
+              @change="updateGraphData"
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Data Range</h3>
+        <div class="range-inputs">
+          <div class="input-group">
+            <label>Min Moisture (%)</label>
+            <input 
+              type="number" 
+              v-model="queryParams.minMoisture"
+              min="0"
+              max="100"
+              @change="updateGraphData"
+            >
+          </div>
+          <div class="input-group">
+            <label>Max Moisture (%)</label>
+            <input 
+              type="number" 
+              v-model="queryParams.maxMoisture"
+              min="0"
+              max="100"
+              @change="updateGraphData"
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Data Resolution</h3>
+        <select v-model="queryParams.resolution" @change="updateGraphData">
+          <option value="raw">Raw Data</option>
+          <option value="hourly">Hourly Average</option>
+          <option value="daily">Daily Average</option>
+          <option value="weekly">Weekly Average</option>
+        </select>
+      </div>
+
+      <div class="panel-section">
+        <h3>Quick Filters</h3>
+        <div class="quick-filters">
+          <button @click="setTimeRange('1h')">Last Hour</button>
+          <button @click="setTimeRange('24h')">Last 24 Hours</button>
+          <button @click="setTimeRange('7d')">Last 7 Days</button>
+          <button @click="setTimeRange('30d')">Last 30 Days</button>
+        </div>
+      </div>
+
+      <button class="apply-btn" @click="updateGraphData">
+        Apply Filters
+      </button>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="sensors-content">
+      <SoilMoistureGraph :queryParams="queryParams" />
+      
+      <!-- Real-time data display -->
+      <div class="realtime-container">
+        <div class="timer">{{ formattedTime }}</div>
+        
+        <div class="sensor-carousel">
+          <button class="carousel-btn prev" @click="prevSensor">&lt;</button>
+          
+          <div class="sensor-card" :style="{ '--sensor-color': colors[currentSensorIndex] }">
+            <h3>{{ currentSensor.name }}</h3>
+            <div class="sensor-value">
+              {{ currentSensor.moisture.toFixed(1) }}%
             </div>
-            <div v-if="index === 4" class="sensor-info">
-              <p>Coordinates for Solar Panels:</p>
-              <div v-for="(coordinate, coordIndex) in button.coordinates" :key="coordIndex" class="sensor-coordinates">
-                Solar Panel {{ coordIndex + 1 }}: Coordinates: ({{ coordinate.x }}, {{ coordinate.y }})
-              </div>
+            <div class="sensor-time">
+              Last updated: {{ new Date().toLocaleTimeString() }}
             </div>
           </div>
-        </transition>
+          
+          <button class="carousel-btn next" @click="nextSensor">&gt;</button>
+        </div>
+        
+        <div class="sensor-dots">
+          <span 
+            v-for="(_, index) in sensors" 
+            :key="index"
+            :class="{ active: index === currentSensorIndex }"
+            @click="currentSensorIndex = index"
+          ></span>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import SoilMoistureGraph from './soilMoistureGraph.vue';
 
-export default {
-  setup() {
-    const router = useRouter(); // Initialize the router
+const router = useRouter();
+const goTo = (path: string) => {
+  router.push(path);
+};
 
-    const goTo = (path) => {
-      router.push(path);
-    };
+// Real-time data setup
+const currentTime = ref(new Date());
+const currentSensorIndex = ref(0);
+const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 
-    return { goTo };
-  },
-  data() {
-    return {
-      buttons: [
-        { name: "North field", showSensors: false, sensors: [this.generateSensor("Sensor 1"), this.generateSensor("Sensor 2")] },
-        { name: "South field", showSensors: false, sensors: [this.generateSensor("Sensor 1"), this.generateSensor("Sensor 2")] },
-        { name: "West field", showSensors: false, sensors: [this.generateSensor("Sensor 1"), this.generateSensor("Sensor 2")] },
-        { name: "East field", showSensors: false, sensors: [this.generateSensor("Sensor 1"), this.generateSensor("Sensor 2")] },
-        { name: "Solar Panels", showSensors: false, coordinates: this.generateMultipleCoordinates(3) }, // 3 random coordinates
-      ],
-    };
-  },
-  methods: {
-    toggleDropdown(index) {
-      this.buttons[index].showSensors = !this.buttons[index].showSensors;
-    },
-    generateSensor(label) {
-      return {
-        id: Math.random(),
-        label: label,
-        battery: Math.floor(Math.random() * 101),
-        coordinates: {
-          x: (Math.random() * 100).toFixed(2),
-          y: (Math.random() * 100).toFixed(2),
-        },
-      };
-    },
-    generateMultipleCoordinates(count) {
-      return Array.from({ length: count }, () => this.generateCoordinates());
-    },
-    generateCoordinates() {
-      return {
-        x: (Math.random() * 100).toFixed(2),
-        y: (Math.random() * 100).toFixed(2),
-      };
-    },
-  },
+interface SensorReading {
+  name: string;
+  moisture: number;
+}
+
+const sensors = ref<SensorReading[]>([
+  { name: 'Sensor 1', moisture: 30 },
+  { name: 'Sensor 2', moisture: 35 },
+  { name: 'Sensor 3', moisture: 25 },
+  { name: 'Sensor 4', moisture: 40 }
+]);
+
+// Computed properties
+const formattedTime = computed(() => {
+  return currentTime.value.toLocaleTimeString();
+});
+
+const currentSensor = computed(() => {
+  return sensors.value[currentSensorIndex.value];
+});
+
+// Navigation methods
+const nextSensor = () => {
+  currentSensorIndex.value = (currentSensorIndex.value + 1) % sensors.value.length;
+};
+
+const prevSensor = () => {
+  currentSensorIndex.value = (currentSensorIndex.value - 1 + sensors.value.length) % sensors.value.length;
+};
+
+// Timer and data update setup
+let timeInterval: number;
+let dataInterval: number;
+
+onMounted(() => {
+  // Update time every second
+  timeInterval = setInterval(() => {
+    currentTime.value = new Date();
+  }, 1000);
+
+  // Update sensor data every 3 seconds
+  dataInterval = setInterval(() => {
+    sensors.value = sensors.value.map(sensor => ({
+      ...sensor,
+      moisture: Math.random() * 30 + 20 // Random value between 20-50
+    }));
+  }, 3000);
+});
+
+onUnmounted(() => {
+  clearInterval(timeInterval);
+  clearInterval(dataInterval);
+});
+
+interface QueryParams {
+  startDate: string;
+  endDate: string;
+  minMoisture: number;
+  maxMoisture: number;
+  resolution: 'raw' | 'hourly' | 'daily' | 'weekly';
+}
+
+const queryParams = ref<QueryParams>({
+  startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+  endDate: new Date().toISOString().slice(0, 16),
+  minMoisture: 0,
+  maxMoisture: 100,
+  resolution: 'raw'
+});
+
+const setTimeRange = (range: string) => {
+  const now = new Date();
+  let start = new Date();
+
+  switch (range) {
+    case '1h':
+      start = new Date(now.getTime() - 60 * 60 * 1000);
+      break;
+    case '24h':
+      start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      break;
+    case '7d':
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case '30d':
+      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      break;
+  }
+
+  queryParams.value.startDate = start.toISOString().slice(0, 16);
+  queryParams.value.endDate = now.toISOString().slice(0, 16);
+  updateGraphData();
+};
+
+const updateGraphData = () => {
+  // This will trigger the graph update through props
+  queryParams.value = { ...queryParams.value };
 };
 </script>
 
 <style>
-.center-container {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  height: 100vh;
-  padding-top: 30vh;
-}
-
-.button-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 800px; /* Increased width for button container */
-}
-
-.dropdown-button button {
-  width: 100%; /* Full width button */
-  padding: 0.5rem;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  cursor: pointer;
-  border-radius: 5px;
-  transition: background-color 0.3s, transform 0.3s, box-shadow 0.3s; /* Include box-shadow for hover */
-}
-
-.dropdown-button button:hover {
-  background-color: #0056b3;
-  transform: scale(1.05);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Add shadow on hover */
-}
-
-.dropdown-button button:focus {
-  outline: none; /* Remove default outline */
-  box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.5); /* Custom focus outline */
-}
-
-.sensor-dropdown {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  background-color: #f9f9f9; /* Slightly lighter background */
-  border: 1px solid #ddd;
-  border-radius: 8px; /* Slightly larger radius for dropdown */
-  margin-top: 0.5rem;
-  width: 100%;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Add shadow to dropdown */
-}
-
-.sensor {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: #e8f5e9;
-  border-radius: 5px;
-  transition: transform 0.2s, box-shadow 0.2s; /* Include transition */
-}
-
-.sensor:hover {
-  transform: translateY(-2px); /* Lift effect on hover */
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Shadow effect on hover */
-}
-
-.sensor-icon {
-  font-size: 24px; /* Adjusts size of the emoji */
-}
-
-.sensor-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.sensor-details {
-  font-size: 1.1rem; /* Slightly larger text */
-  color: #333; /* Darker color for better readability */
-}
-
-.sensor-coordinates {
-  font-size: 0.9rem; /* Smaller font size for coordinates */
-  color: #666; /* Lighter color for less emphasis */
-}
-
-.fade-slide-enter-active, .fade-slide-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.fade-slide-enter, .fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .button-container {
-    width: 100%; /* Full width on smaller screens */
-    padding: 1rem; /* Add some padding */
-  }
-}
-
 .navbar {
   position: fixed;
   left: 0;
@@ -234,5 +279,200 @@ export default {
 .navbar.scrolled {
   background-color: rgba(255, 255, 255, 1); /* Fully opaque when scrolled */
   box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* More shadow when scrolled */
+}
+
+.main-content {
+  display: flex;
+  margin-top: 60px;
+  min-height: calc(100vh - 60px);
+}
+
+.query-panel {
+  width: 300px;
+  background: #f8f9fa;
+  padding: 20px;
+  border-right: 1px solid #dee2e6;
+  height: calc(100vh - 60px);
+  position: fixed;
+  overflow-y: auto;
+}
+
+.panel-section {
+  margin-bottom: 24px;
+}
+
+.panel-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: #333;
+}
+
+.date-inputs, .range-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-group label {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.input-group input,
+select {
+  padding: 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.quick-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.quick-filters button {
+  padding: 8px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-filters button:hover {
+  background: #f0f0f0;
+  border-color: #adb5bd;
+}
+
+.apply-btn {
+  width: 100%;
+  padding: 12px;
+  background: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.apply-btn:hover {
+  background: #004494;
+}
+
+.sensors-content {
+  margin-left: 300px; /* Match query-panel width */
+  flex-grow: 1;
+  padding: 20px;
+}
+
+.realtime-container {
+  margin-top: 40px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.timer {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.sensor-carousel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.carousel-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 10px;
+  color: #666;
+  transition: color 0.3s;
+}
+
+.carousel-btn:hover {
+  color: #333;
+}
+
+.sensor-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid var(--sensor-color);
+  min-width: 200px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.sensor-card h3 {
+  margin: 0 0 10px 0;
+  color: var(--sensor-color);
+}
+
+.sensor-value {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.sensor-time {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.sensor-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sensor-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ddd;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.sensor-dots span.active {
+  background: #666;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .query-panel {
+    width: 100%;
+    height: auto;
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .sensors-content {
+    margin-left: 0;
+  }
 }
 </style>
