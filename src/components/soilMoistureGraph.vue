@@ -33,6 +33,18 @@ interface Sensor {
   visible: boolean;
 }
 
+interface Props {
+  queryParams: {
+    startDate: string;
+    endDate: string;
+    minMoisture: number;
+    maxMoisture: number;
+    resolution: 'raw' | 'hourly' | 'daily' | 'weekly';
+  }
+}
+
+const props = defineProps<Props>();
+
 const chartContainer = ref<HTMLElement | null>(null);
 const svg = ref<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
 const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -257,6 +269,52 @@ const createChart = () => {
 watch(() => sensors.value.map(s => s.visible), () => {
   createChart();
 }, { deep: true });
+
+// Add watch for queryParams
+watch(() => props.queryParams, () => {
+  // Filter and process data based on query params
+  const filteredData = filterData(props.queryParams);
+  updateChart(filteredData);
+}, { deep: true });
+
+// Add data filtering function
+const filterData = (params: Props['queryParams']) => {
+  const startDate = new Date(params.startDate);
+  const endDate = new Date(params.endDate);
+
+  const filtered = sensors.value.map(sensor => ({
+    ...sensor,
+    data: sensor.data.filter(point => {
+      const date = new Date(point.time);
+      return (
+        date >= startDate &&
+        date <= endDate &&
+        point.moisture >= params.minMoisture &&
+        point.moisture <= params.maxMoisture
+      );
+    })
+  }));
+
+  // Apply resolution aggregation if needed
+  if (params.resolution !== 'raw') {
+    return aggregateData(filtered, params.resolution);
+  }
+
+  return filtered;
+};
+
+// Add data aggregation function
+const aggregateData = (data: Sensor[], resolution: string) => {
+  // Implementation of data aggregation based on resolution
+  // This is a placeholder - implement the actual aggregation logic
+  return data;
+};
+
+// Modify createChart to accept filtered data
+const updateChart = (filteredData: Sensor[]) => {
+  sensors.value = filteredData;
+  createChart();
+};
 
 onMounted(() => {
   createChart();

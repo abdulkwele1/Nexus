@@ -5,37 +5,115 @@
       <button class="nav-button" @click="goTo('/home')">Home</button>
     </nav>
   </div>
-  <div class="sensors-content">
-    <!-- SoilMoisture graph -->
-    <SoilMoistureGraph />
-    
-    <!-- Real-time data display -->
-    <div class="realtime-container">
-      <div class="timer">{{ formattedTime }}</div>
-      
-      <div class="sensor-carousel">
-        <button class="carousel-btn prev" @click="prevSensor">&lt;</button>
-        
-        <div class="sensor-card" :style="{ '--sensor-color': colors[currentSensorIndex] }">
-          <h3>{{ currentSensor.name }}</h3>
-          <div class="sensor-value">
-            {{ currentSensor.moisture.toFixed(1) }}%
+  
+  <div class="main-content">
+    <!-- Query Side Panel -->
+    <div class="query-panel">
+      <div class="panel-section">
+        <h3>Date Range</h3>
+        <div class="date-inputs">
+          <div class="input-group">
+            <label>Start Date</label>
+            <input 
+              type="datetime-local" 
+              v-model="queryParams.startDate"
+              @change="updateGraphData"
+            >
           </div>
-          <div class="sensor-time">
-            Last updated: {{ new Date().toLocaleTimeString() }}
+          <div class="input-group">
+            <label>End Date</label>
+            <input 
+              type="datetime-local" 
+              v-model="queryParams.endDate"
+              @change="updateGraphData"
+            >
           </div>
         </div>
-        
-        <button class="carousel-btn next" @click="nextSensor">&gt;</button>
       </div>
+
+      <div class="panel-section">
+        <h3>Data Range</h3>
+        <div class="range-inputs">
+          <div class="input-group">
+            <label>Min Moisture (%)</label>
+            <input 
+              type="number" 
+              v-model="queryParams.minMoisture"
+              min="0"
+              max="100"
+              @change="updateGraphData"
+            >
+          </div>
+          <div class="input-group">
+            <label>Max Moisture (%)</label>
+            <input 
+              type="number" 
+              v-model="queryParams.maxMoisture"
+              min="0"
+              max="100"
+              @change="updateGraphData"
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Data Resolution</h3>
+        <select v-model="queryParams.resolution" @change="updateGraphData">
+          <option value="raw">Raw Data</option>
+          <option value="hourly">Hourly Average</option>
+          <option value="daily">Daily Average</option>
+          <option value="weekly">Weekly Average</option>
+        </select>
+      </div>
+
+      <div class="panel-section">
+        <h3>Quick Filters</h3>
+        <div class="quick-filters">
+          <button @click="setTimeRange('1h')">Last Hour</button>
+          <button @click="setTimeRange('24h')">Last 24 Hours</button>
+          <button @click="setTimeRange('7d')">Last 7 Days</button>
+          <button @click="setTimeRange('30d')">Last 30 Days</button>
+        </div>
+      </div>
+
+      <button class="apply-btn" @click="updateGraphData">
+        Apply Filters
+      </button>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="sensors-content">
+      <SoilMoistureGraph :queryParams="queryParams" />
       
-      <div class="sensor-dots">
-        <span 
-          v-for="(_, index) in sensors" 
-          :key="index"
-          :class="{ active: index === currentSensorIndex }"
-          @click="currentSensorIndex = index"
-        ></span>
+      <!-- Real-time data display -->
+      <div class="realtime-container">
+        <div class="timer">{{ formattedTime }}</div>
+        
+        <div class="sensor-carousel">
+          <button class="carousel-btn prev" @click="prevSensor">&lt;</button>
+          
+          <div class="sensor-card" :style="{ '--sensor-color': colors[currentSensorIndex] }">
+            <h3>{{ currentSensor.name }}</h3>
+            <div class="sensor-value">
+              {{ currentSensor.moisture.toFixed(1) }}%
+            </div>
+            <div class="sensor-time">
+              Last updated: {{ new Date().toLocaleTimeString() }}
+            </div>
+          </div>
+          
+          <button class="carousel-btn next" @click="nextSensor">&gt;</button>
+        </div>
+        
+        <div class="sensor-dots">
+          <span 
+            v-for="(_, index) in sensors" 
+            :key="index"
+            :class="{ active: index === currentSensorIndex }"
+            @click="currentSensorIndex = index"
+          ></span>
+        </div>
       </div>
     </div>
   </div>
@@ -109,6 +187,51 @@ onUnmounted(() => {
   clearInterval(timeInterval);
   clearInterval(dataInterval);
 });
+
+interface QueryParams {
+  startDate: string;
+  endDate: string;
+  minMoisture: number;
+  maxMoisture: number;
+  resolution: 'raw' | 'hourly' | 'daily' | 'weekly';
+}
+
+const queryParams = ref<QueryParams>({
+  startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+  endDate: new Date().toISOString().slice(0, 16),
+  minMoisture: 0,
+  maxMoisture: 100,
+  resolution: 'raw'
+});
+
+const setTimeRange = (range: string) => {
+  const now = new Date();
+  let start = new Date();
+
+  switch (range) {
+    case '1h':
+      start = new Date(now.getTime() - 60 * 60 * 1000);
+      break;
+    case '24h':
+      start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      break;
+    case '7d':
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case '30d':
+      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      break;
+  }
+
+  queryParams.value.startDate = start.toISOString().slice(0, 16);
+  queryParams.value.endDate = now.toISOString().slice(0, 16);
+  updateGraphData();
+};
+
+const updateGraphData = () => {
+  // This will trigger the graph update through props
+  queryParams.value = { ...queryParams.value };
+};
 </script>
 
 <style>
@@ -158,13 +281,97 @@ onUnmounted(() => {
   box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* More shadow when scrolled */
 }
 
-.sensors-content {
-  margin-top: 80px; /* Add space below the fixed navbar */
+.main-content {
+  display: flex;
+  margin-top: 60px;
+  min-height: calc(100vh - 60px);
+}
+
+.query-panel {
+  width: 300px;
+  background: #f8f9fa;
   padding: 20px;
+  border-right: 1px solid #dee2e6;
+  height: calc(100vh - 60px);
+  position: fixed;
+  overflow-y: auto;
+}
+
+.panel-section {
+  margin-bottom: 24px;
+}
+
+.panel-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: #333;
+}
+
+.date-inputs, .range-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-group label {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.input-group input,
+select {
+  padding: 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.quick-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.quick-filters button {
+  padding: 8px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-filters button:hover {
+  background: #f0f0f0;
+  border-color: #adb5bd;
+}
+
+.apply-btn {
   width: 100%;
-  max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
+  padding: 12px;
+  background: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.apply-btn:hover {
+  background: #004494;
+}
+
+.sensors-content {
+  margin-left: 300px; /* Match query-panel width */
+  flex-grow: 1;
+  padding: 20px;
 }
 
 .realtime-container {
@@ -248,5 +455,24 @@ onUnmounted(() => {
 
 .sensor-dots span.active {
   background: #666;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .query-panel {
+    width: 100%;
+    height: auto;
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .sensors-content {
+    margin-left: 0;
+  }
 }
 </style>
