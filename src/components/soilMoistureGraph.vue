@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, defineExpose } from 'vue';
 import * as d3 from 'd3';
 
 interface DataPoint {
@@ -51,6 +51,7 @@ const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(
 
 const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 
+//Mock Data
 const mockData: SensorData = {
   sensor1: Array.from({ length: 24 }, (_, i) => ({
     time: new Date(2024, 0, 1, i),
@@ -70,6 +71,7 @@ const mockData: SensorData = {
   }))
 };
 
+//possibly where I would put the real data in due time
 const sensors = ref<Sensor[]>([
   { data: mockData.sensor1, name: 'Sensor 1', visible: true },
   { data: mockData.sensor2, name: 'Sensor 2', visible: true },
@@ -315,6 +317,17 @@ const updateChart = (filteredData: Sensor[]) => {
   sensors.value = filteredData;
   createChart();
 };
+
+// Update the getFilteredData function to return only currently visible data
+const getFilteredData = () => {
+  const filteredData = filterData(props.queryParams);
+  // Only return sensors that are currently visible
+  return filteredData.filter(sensor => sensor.visible);
+};
+
+defineExpose({
+  getFilteredData
+});
 
 onMounted(() => {
   createChart();
