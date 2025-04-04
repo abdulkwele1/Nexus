@@ -80,11 +80,18 @@
       <button class="apply-btn" @click="updateGraphData">
         Apply Filters
       </button>
+      
+      <button class="export-btn" @click="exportToCSV">
+        Export to CSV
+      </button>
     </div>
 
     <!-- Main Content Area -->
     <div class="sensors-content">
-      <SoilMoistureGraph :queryParams="queryParams" />
+      <SoilMoistureGraph 
+        ref="graphComponent"
+        :queryParams="queryParams" 
+      />
       
       <!-- Real-time data display -->
       <div class="realtime-container">
@@ -232,6 +239,52 @@ const updateGraphData = () => {
   // This will trigger the graph update through props
   queryParams.value = { ...queryParams.value };
 };
+
+// Add ref for the graph component
+const graphComponent = ref<InstanceType<typeof SoilMoistureGraph> | null>(null);
+
+const exportToCSV = () => {
+  const data = graphComponent.value?.getFilteredData();
+  
+  if (!data || !data.length) {
+    alert('No data available to export');
+    return;
+  }
+
+  // Format the data for CSV
+  const headers = ['Timestamp', 'Sensor', 'Moisture (%)'];
+  const csvRows = [headers];
+
+  data.forEach(sensor => {
+    if (sensor.visible) { // Only export visible sensors
+      sensor.data.forEach(point => {
+        csvRows.push([
+          new Date(point.time).toISOString(),
+          sensor.name,
+          point.moisture.toFixed(1)
+        ]);
+      });
+    }
+  });
+
+  // Create CSV content
+  const csvContent = csvRows
+    .map(row => row.join(','))
+    .join('\n');
+
+  // Create and trigger download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', `sensor_data_${new Date().toISOString().slice(0,19).replace(/[:]/g, '-')}.csv`);
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url); // Clean up the URL object
+};
 </script>
 
 <style>
@@ -362,10 +415,28 @@ select {
   cursor: pointer;
   font-weight: bold;
   transition: background-color 0.2s;
+  margin-bottom: 0;
 }
 
 .apply-btn:hover {
   background: #004494;
+}
+
+.export-btn {
+  width: 100%;
+  padding: 12px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  margin-top: 12px;
+}
+
+.export-btn:hover {
+  background: #218838;
 }
 
 .sensors-content {
