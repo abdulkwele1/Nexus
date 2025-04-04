@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"nexus-api/clients"
 	"nexus-api/clients/database"
 	"nexus-api/logging"
 	"nexus-api/service"
 
 	"os"
+	"strings"
+	"time"
 )
 
 var (
@@ -36,6 +39,70 @@ func main() {
 	}
 
 	serviceLogger.Trace().Msgf("loaded databaseClient config %+v", databaseConfig)
+
+	// parse MQTT configuration from the environment
+	mqttConfig := clients.MQTTConfig{
+		BrokerURL:      os.Getenv("MQTT_BROKER_URL"),
+		ClientID:       os.Getenv("MQTT_CLIENT_ID"),
+		Username:       os.Getenv("MQTT_USERNAME"),
+		Password:       os.Getenv("MQTT_PASSWORD"),
+		CleanSession:   os.Getenv("MQTT_CLEAN_SESSION") != "false",
+		AutoReconnect:  os.Getenv("MQTT_AUTO_RECONNECT") != "false",
+		ConnectTimeout: 10 * time.Second,
+		Logger:         &serviceLogger,
+	}
+
+	serviceLogger.Trace().Msgf("loaded MQTT client config %+v", mqttConfig)
+
+	// Initialize MQTT client
+	mqttClient, err := clients.NewMQTTClient(mqttConfig)
+	if err != nil {
+		serviceLogger.Error().Err(err).Msg("Failed to initialize MQTT client")
+	} else {
+		defer mqttClient.Disconnect()
+		serviceLogger.Info().Msg("MQTT client initialized successfully")
+
+		// Set up message handlers
+		handlers := map[string]clients.MQTTMessageHandler{
+			"/device_sensor_data/444574498032128/+/+/+/+": clients.DefaultSensorDataHandler,
+			"system/status": clients.DefaultSystemStatusHandler,
+		}
+
+		// Create a message handler
+		messageHandler := clients.CreateMQTTMessageHandler(serviceCtx, &serviceLogger, handlers)
+
+		// Subscribe to MQTT topics
+		mqttTopics := os.Getenv("MQTT_TOPICS")
+		if mqttTopics == "" {
+			// Default topics if none specified
+			mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+"
+		}
+
+		// Subscribe to each topic
+		topics := strings.Split(mqttTopics, ",")
+		for _, topic := range topics {
+			topic = strings.TrimSpace(topic)
+			if topic != "" {
+				err := mqttClient.Subscribe(serviceCtx, topic, 1, messageHandler)
+				if err != nil {
+					serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
+				} else {
+					serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
+				}
+			}
+		}
+
+		// Publish initial system status
+		status := map[string]interface{}{
+			"status":    "online",
+			"version":   "1.0.0",
+			"startTime": time.Now().Format(time.RFC3339),
+		}
+		err = clients.PublishSystemStatus(serviceCtx, mqttClient, status, &serviceLogger)
+		if err != nil {
+			serviceLogger.Error().Err(err).Msg("Failed to publish initial system status")
+		}
+	}
 
 	// parse api config from the environment
 	apiConfig := service.APIConfig{
