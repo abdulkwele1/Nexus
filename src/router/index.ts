@@ -16,7 +16,7 @@ const router = createRouter({
       name: 'drone',
       component: Drone,
       meta: { requiresAuth: true }
-    },
+    },  
 
     {
       path: '/sensors',
