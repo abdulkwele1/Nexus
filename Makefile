@@ -134,6 +134,6 @@ seed-database:
 
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_sensor_temperature_data_seed.sql
 
-	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_sensor_data_seed.sql
+	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_sensors_data_seed.sql
 	
 
