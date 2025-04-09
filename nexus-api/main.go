@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"nexus-api/clients"
 	"nexus-api/clients/database"
+	mqttclient "nexus-api/clients/mqtt"
 	"nexus-api/logging"
 	"nexus-api/service"
 
@@ -40,37 +40,48 @@ func main() {
 
 	serviceLogger.Trace().Msgf("loaded databaseClient config %+v", databaseConfig)
 
-	// parse MQTT configuration from the environment
-	mqttConfig := clients.MQTTConfig{
-		BrokerURL:      os.Getenv("MQTT_BROKER_URL"),
-		ClientID:       os.Getenv("MQTT_CLIENT_ID"),
-		Username:       os.Getenv("MQTT_USERNAME"),
-		Password:       os.Getenv("MQTT_PASSWORD"),
-		CleanSession:   os.Getenv("MQTT_CLEAN_SESSION") != "false",
-		AutoReconnect:  os.Getenv("MQTT_AUTO_RECONNECT") != "false",
-		ConnectTimeout: 10 * time.Second,
-		Logger:         &serviceLogger,
-	}
+	// Check if MQTT is enabled
+	enableMQTT := os.Getenv("ENABLE_MQTT") == "true"
+	var mqttClient *mqttclient.MQTTClient
+	var handlers map[string]mqttclient.MQTTMessageHandler
 
-	serviceLogger.Trace().Msgf("loaded MQTT client config %+v", mqttConfig)
+	if enableMQTT {
+		// parse MQTT configuration from the environment
+		mqttConfig := mqttclient.MQTTConfig{
+			BrokerURL:     os.Getenv("MQTT_BROKER_URL"),
+			ClientID:      os.Getenv("MQTT_CLIENT_ID"),
+			Username:      os.Getenv("MQTT_USERNAME"),
+			Password:      os.Getenv("MQTT_PASSWORD"),
+			CleanSession:  os.Getenv("MQTT_CLEAN_SESSION") != "false",
+			AutoReconnect: os.Getenv("MQTT_AUTO_RECONNECT") != "false",
+			Logger:        &serviceLogger,
+		}
 
-	// Initialize MQTT client
-	mqttClient, err := clients.NewMQTTClient(mqttConfig)
-	if err != nil {
-		serviceLogger.Error().Err(err).Msg("Failed to initialize MQTT client")
-	} else {
+		serviceLogger.Trace().Msgf("loaded MQTT client config %+v", mqttConfig)
+
+		// Initialize MQTT client
+		var err error
+		mqttClient, err = mqttclient.NewMQTTClient(mqttConfig)
+		if err != nil {
+			serviceLogger.Error().Err(err).Msg("Failed to initialize MQTT client")
+			os.Exit(1)
+		}
 		defer mqttClient.Disconnect()
 		serviceLogger.Info().Msg("MQTT client initialized successfully")
 
-		// Set up message handlers
-		handlers := map[string]clients.MQTTMessageHandler{
-			"/device_sensor_data/444574498032128/+/+/+/+": clients.DefaultSensorDataHandler,
-			"system/status": clients.DefaultSystemStatusHandler,
+		// Define message handlers for different topics
+		handlers = map[string]mqttclient.MQTTMessageHandler{
+			"/device_sensor_data/444574498032128/+/+/+/+": mqttclient.DefaultSensorDataHandler,
+			"system/status": mqttclient.DefaultSystemStatusHandler,
 		}
+	} else {
+		serviceLogger.Info().Msg("MQTT is disabled, skipping MQTT client initialization")
+	}
 
-		// Create a message handler
-		messageHandler := clients.CreateMQTTMessageHandler(serviceCtx, &serviceLogger, handlers)
+	// Create a message handler
+	messageHandler := mqttclient.CreateMQTTMessageHandler(serviceCtx, &serviceLogger, handlers)
 
+	if enableMQTT {
 		// Subscribe to MQTT topics
 		mqttTopics := os.Getenv("MQTT_TOPICS")
 		if mqttTopics == "" {
@@ -98,7 +109,7 @@ func main() {
 			"version":   "1.0.0",
 			"startTime": time.Now().Format(time.RFC3339),
 		}
-		err = clients.PublishSystemStatus(serviceCtx, mqttClient, status, &serviceLogger)
+		err = mqttclient.PublishSystemStatus(serviceCtx, mqttClient, status, &serviceLogger)
 		if err != nil {
 			serviceLogger.Error().Err(err).Msg("Failed to publish initial system status")
 		}
