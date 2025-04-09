@@ -23,6 +23,7 @@ COPY password password
 COPY api api
 COPY service service
 COPY clients clients
+COPY sdk sdk
 
 # build service from latest sources
 # with all compiler optimizations off to support debugging
