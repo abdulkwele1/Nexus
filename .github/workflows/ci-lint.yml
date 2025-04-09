@@ -12,5 +12,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
             go-version-file: 'nexus-api/go.mod'
+            working-directory: 'nexus-api'
       - name: golangci-lint
         run: make lint

@@ -12,6 +12,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'nexus-api/go.mod'
+          working-directory: 'nexus-api'
       - name: build application docker image
         run: make build
   unit-test:
@@ -23,5 +24,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
             go-version-file: 'nexus-api/go.mod'
+            working-directory: 'nexus-api'
       - name: run unit tests
         run: make unit-test
