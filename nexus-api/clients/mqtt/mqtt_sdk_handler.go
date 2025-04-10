@@ -39,9 +39,23 @@ func NewSDKMQTTHandler(sdkClient *sdk.NexusClient, logger *logging.ServiceLogger
 	}
 }
 
-// getSensorName returns a formatted sensor name based on the sensor ID
-func getSensorName(sensorID int) string {
-	return fmt.Sprintf("Sensor%d", sensorID)
+// getSensorName returns a formatted sensor name based on the sensor ID and type
+func getSensorName(sensorID int, sensorType string) string {
+	// Extract the last 4 characters of the sensor ID to create a unique identifier
+	sensorIDStr := fmt.Sprintf("%d", sensorID)
+	if len(sensorIDStr) > 4 {
+		sensorIDStr = sensorIDStr[len(sensorIDStr)-4:]
+	}
+
+	// Create a descriptive name based on sensor type
+	switch sensorType {
+	case SensorTypeMoisture:
+		return fmt.Sprintf("Moisture_Sensor_%s", sensorIDStr)
+	case SensorTypeTemperature:
+		return fmt.Sprintf("Temperature_Sensor_%s", sensorIDStr)
+	default:
+		return fmt.Sprintf("Sensor_%s", sensorIDStr)
+	}
 }
 
 // HandleSensorData processes sensor data messages and forwards them to the SDK
@@ -73,7 +87,7 @@ func (h *SDKMQTTHandler) HandleSensorData(ctx context.Context, topic string, pay
 	}
 
 	// Generate sensor name using the new naming convention
-	sensorName := getSensorName(sensorIDInt)
+	sensorName := getSensorName(sensorIDInt, sensorType)
 	h.logger.Info().Msgf("Processing sensor data - Name: %s, Type: %s", sensorName, sensorType)
 
 	// Convert timestamp from milliseconds to time.Time
