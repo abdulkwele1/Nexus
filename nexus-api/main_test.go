@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"nexus-api/api"
 	"nexus-api/clients/database"
+	"nexus-api/clients/database/schemas/postgres/migrations"
 	"nexus-api/logging"
 	"nexus-api/password"
 	"nexus-api/sdk"
@@ -51,7 +53,7 @@ var (
 			DatabasePassword:      os.Getenv("TEST_DATABASE_PASSWORD"),
 			SSLEnabled:            false,
 			QueryLoggingEnabled:   false,
-			RunDatabaseMigrations: false,
+			RunDatabaseMigrations: true,
 			Logger:                &testLogger,
 		})
 
@@ -62,6 +64,17 @@ var (
 		return &client
 	}()
 )
+
+func TestMain(m *testing.M) {
+	// Run migrations before tests
+	_, err := database.Migrate(testCtx, databaseClient.DB, *migrations.Migrations, &testLogger)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to run migrations: %v", err))
+	}
+
+	// Run the tests
+	os.Exit(m.Run())
+}
 
 func TestE2ETestHealthCheckReturns200(t *testing.T) {
 	// prepare test data
@@ -302,4 +315,190 @@ func TestE2ESetAndGetPanelConsumptionData(t *testing.T) {
 
 	// Step 3: Compare
 	assert.Equal(t, expectedConsumptionData.ConsumptionData, gotConsumptionData.ConsumptionData, "Consumption data should match what was set")
+}
+
+func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
+	// Create a test sensor first
+	sensor := &database.Sensor{
+		Name:             fmt.Sprintf("Test Sensor %d", time.Now().Unix()),
+		Location:         "Test Location",
+		InstallationDate: time.Now(),
+		SensorCoordinates: database.SensorCoordinates{
+			Latitude:  37.7749,
+			Longitude: -122.4194,
+		},
+	}
+
+	// Save the sensor to the database
+	err := sensor.Save(testCtx, databaseClient.DB)
+	if err != nil {
+		t.Fatalf("Failed to save sensor: %v", err)
+	}
+
+	if sensor.ID == 0 {
+		t.Fatal("Sensor ID was not set after save")
+	}
+
+	// Use a unique timestamp for this test run
+	testTime := time.Now().Add(time.Hour * 24) // Use tomorrow to avoid conflicts
+
+	// Prepare test data
+	testData := api.SetSensorMoistureDataResponse{
+		SensorMoistureData: []api.SensorMoistureData{
+			{
+				SensorID:     sensor.ID,
+				Date:         testTime.Format(time.RFC3339),
+				SoilMoisture: 42.5,
+			},
+		},
+	}
+
+	// Generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+
+	// Add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// Create test client with credentials
+	testClient := nexusClientGenerator()
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// Login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+	if err != nil {
+		t.Fatalf("Failed to login: %v", err)
+	}
+
+	// Set moisture data
+	err = testClient.SetSensorMoistureData(testCtx, sensor.ID, testData)
+	if err != nil {
+		t.Fatalf("Failed to set moisture data: %v", err)
+	}
+
+	// Get moisture data
+	retrievedData, err := testClient.GetSensorMoistureData(testCtx, sensor.ID)
+	if err != nil {
+		t.Fatalf("Failed to get moisture data: %v", err)
+	}
+
+	// Verify the data
+	if len(retrievedData.SensorMoistureData) != len(testData.SensorMoistureData) {
+		t.Errorf("Expected %d records, got %d", len(testData.SensorMoistureData), len(retrievedData.SensorMoistureData))
+	}
+
+	for i, data := range retrievedData.SensorMoistureData {
+		if data.SensorID != testData.SensorMoistureData[i].SensorID {
+			t.Errorf("Expected SensorID %d, got %d", testData.SensorMoistureData[i].SensorID, data.SensorID)
+		}
+		if data.SoilMoisture != testData.SensorMoistureData[i].SoilMoisture {
+			t.Errorf("Expected SoilMoisture %f, got %f", testData.SensorMoistureData[i].SoilMoisture, data.SoilMoisture)
+		}
+	}
+}
+
+func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
+	// Create a test sensor first
+	sensor := &database.Sensor{
+		Name:             fmt.Sprintf("Test Sensor %d", time.Now().Unix()),
+		Location:         "Test Location",
+		InstallationDate: time.Now(),
+		SensorCoordinates: database.SensorCoordinates{
+			Latitude:  37.7749,
+			Longitude: -122.4194,
+		},
+	}
+
+	// Save the sensor to the database
+	err := sensor.Save(testCtx, databaseClient.DB)
+	if err != nil {
+		t.Fatalf("Failed to save sensor: %v", err)
+	}
+
+	if sensor.ID == 0 {
+		t.Fatal("Sensor ID was not set after save")
+	}
+
+	// Use a unique timestamp for this test run
+	testTime := time.Now().Add(time.Hour * 48) // Use day after tomorrow to avoid conflicts
+
+	// Prepare test data
+	testData := api.SetSensorTemperatureDataResponse{
+		SensorTemperatureData: []api.SensorTemperatureData{
+			{
+				SensorID:        sensor.ID,
+				Date:            testTime.Format(time.RFC3339),
+				SoilTemperature: 25.5,
+			},
+		},
+	}
+
+	// Generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+
+	// Add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// Create test client with credentials
+	testClient := nexusClientGenerator()
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// Login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+	if err != nil {
+		t.Fatalf("Failed to login: %v", err)
+	}
+
+	// Set temperature data
+	err = testClient.SetSensorTemperatureData(testCtx, sensor.ID, testData)
+	if err != nil {
+		t.Fatalf("Failed to set temperature data: %v", err)
+	}
+
+	// Get temperature data
+	retrievedData, err := testClient.GetSensorTemperatureData(testCtx, sensor.ID)
+	if err != nil {
+		t.Fatalf("Failed to get temperature data: %v", err)
+	}
+
+	// Verify the data
+	if len(retrievedData.SensorTemperatureData) != len(testData.SensorTemperatureData) {
+		t.Errorf("Expected %d records, got %d", len(testData.SensorTemperatureData), len(retrievedData.SensorTemperatureData))
+	}
+
+	for i, data := range retrievedData.SensorTemperatureData {
+		if data.SensorID != testData.SensorTemperatureData[i].SensorID {
+			t.Errorf("Expected SensorID %d, got %d", testData.SensorTemperatureData[i].SensorID, data.SensorID)
+		}
+		if data.SoilTemperature != testData.SensorTemperatureData[i].SoilTemperature {
+			t.Errorf("Expected SoilTemperature %f, got %f", testData.SensorTemperatureData[i].SoilTemperature, data.SoilTemperature)
+		}
+	}
 }

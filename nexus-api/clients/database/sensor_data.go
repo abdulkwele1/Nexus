@@ -33,11 +33,17 @@ type SensorCoordinates struct {
 }
 
 type Sensor struct {
-	ID                int    `json:"id"`
-	Name              string `json:"name"`
-	Location          string `json:"location"`
-	InstallationDate  string `json:"installation_date"`
-	SensorCoordinates `json:"sensor_coordinates"`
+	ID                int       `bun:"id,pk,autoincrement"`
+	Name              string    `bun:"name"`
+	Location          string    `bun:"location"`
+	InstallationDate  time.Time `bun:"installation_date"`
+	SensorCoordinates `bun:"embed"`
+}
+
+// Save saves the sensor to the database
+func (s *Sensor) Save(ctx context.Context, db *bun.DB) error {
+	_, err := db.NewInsert().Model(s).Exec(ctx)
+	return err
 }
 
 func GetSensorMoistureDataForSensorID(ctx context.Context, db *bun.DB, sensorID int) ([]SensorMoistureData, error) {
