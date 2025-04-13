@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"nexus-api/api"
 	"nexus-api/clients/database"
-	"nexus-api/clients/database/schemas/postgres/migrations"
 	"nexus-api/logging"
 	"nexus-api/password"
 	"nexus-api/sdk"
@@ -45,32 +44,36 @@ var (
 		return client
 	}
 
-	databaseClient = func() *database.PostgresClient {
-		client, err := database.NewPostgresClient(database.PostgresDatabaseConfig{
-			DatabaseName:          os.Getenv("TEST_DATABASE_NAME"),
-			DatabaseEndpointURL:   os.Getenv("TEST_DATABASE_ENDPOINT_URL"),
-			DatabaseUsername:      os.Getenv("TEST_DATABASE_USERNAME"),
-			DatabasePassword:      os.Getenv("TEST_DATABASE_PASSWORD"),
-			SSLEnabled:            false,
-			QueryLoggingEnabled:   false,
-			RunDatabaseMigrations: true,
-			Logger:                &testLogger,
-		})
-
-		if err != nil {
-			panic(err)
-		}
-
-		return &client
-	}()
+	databaseClient *database.PostgresClient
 )
 
 func TestMain(m *testing.M) {
-	// Run migrations before tests
-	_, err := database.Migrate(testCtx, databaseClient.DB, *migrations.Migrations, &testLogger)
+	// Set test environment variables for Docker environment
+	os.Setenv("TEST_DATABASE_ENDPOINT_URL", "localhost:5432")
+	os.Setenv("TEST_DATABASE_NAME", "postgres")
+	os.Setenv("TEST_DATABASE_USERNAME", "postgres")
+	os.Setenv("TEST_DATABASE_PASSWORD", "password")
+	os.Setenv("TEST_NEXUS_API_URL", "http://localhost:8080")
+	os.Setenv("TEST_NEXUS_SDK_USER_NAME", "test_user")
+	os.Setenv("TEST_NEXUS_SDK_PASSWORD", "test_password")
+
+	// Initialize database client after environment variables are set
+	client, err := database.NewPostgresClient(database.PostgresDatabaseConfig{
+		DatabaseName:          os.Getenv("TEST_DATABASE_NAME"),
+		DatabaseEndpointURL:   os.Getenv("TEST_DATABASE_ENDPOINT_URL"),
+		DatabaseUsername:      os.Getenv("TEST_DATABASE_USERNAME"),
+		DatabasePassword:      os.Getenv("TEST_DATABASE_PASSWORD"),
+		SSLEnabled:            false,
+		QueryLoggingEnabled:   false,
+		RunDatabaseMigrations: true,
+		Logger:                &testLogger,
+	})
+
 	if err != nil {
-		panic(fmt.Sprintf("Failed to run migrations: %v", err))
+		panic(fmt.Sprintf("Failed to initialize database client: %v", err))
 	}
+
+	databaseClient = &client
 
 	// Run the tests
 	os.Exit(m.Run())

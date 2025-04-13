@@ -25,25 +25,34 @@ var (
 		return logger
 	}()
 
-	databaseClient = func() *PostgresClient {
-		client, err := NewPostgresClient(PostgresDatabaseConfig{
-			DatabaseName:          os.Getenv("TEST_DATABASE_NAME"),
-			DatabaseEndpointURL:   os.Getenv("TEST_DATABASE_ENDPOINT_URL"),
-			DatabaseUsername:      os.Getenv("TEST_DATABASE_USERNAME"),
-			DatabasePassword:      os.Getenv("TEST_DATABASE_PASSWORD"),
-			SSLEnabled:            false,
-			QueryLoggingEnabled:   false,
-			RunDatabaseMigrations: false,
-			Logger:                &testLogger,
-		})
-
-		if err != nil {
-			panic(err)
-		}
-
-		return &client
-	}()
+	databaseClient *PostgresClient
 )
+
+func init() {
+	// Set test environment variables for Docker environment
+	os.Setenv("TEST_DATABASE_ENDPOINT_URL", "localhost:5432")
+	os.Setenv("TEST_DATABASE_NAME", "postgres")
+	os.Setenv("TEST_DATABASE_USERNAME", "postgres")
+	os.Setenv("TEST_DATABASE_PASSWORD", "password")
+
+	// Initialize database client after environment variables are set
+	client, err := NewPostgresClient(PostgresDatabaseConfig{
+		DatabaseName:          os.Getenv("TEST_DATABASE_NAME"),
+		DatabaseEndpointURL:   os.Getenv("TEST_DATABASE_ENDPOINT_URL"),
+		DatabaseUsername:      os.Getenv("TEST_DATABASE_USERNAME"),
+		DatabasePassword:      os.Getenv("TEST_DATABASE_PASSWORD"),
+		SSLEnabled:            false,
+		QueryLoggingEnabled:   false,
+		RunDatabaseMigrations: false,
+		Logger:                &testLogger,
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	databaseClient = &client
+}
 
 func TestE2ESaveAndGetConsumptionDataForPanelID(t *testing.T) {
 	// Step 1: Create test consumption data for a panel
