@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"nexus-api/api"
 	"nexus-api/clients/database"
@@ -46,6 +45,31 @@ var (
 
 	databaseClient *database.PostgresClient
 )
+
+// initDatabaseClient initializes the database client if it's not already initialized
+func initDatabaseClient(t *testing.T) {
+	if databaseClient != nil {
+		return
+	}
+
+	// Initialize database client
+	client, err := database.NewPostgresClient(database.PostgresDatabaseConfig{
+		DatabaseName:          os.Getenv("TEST_DATABASE_NAME"),
+		DatabaseEndpointURL:   os.Getenv("TEST_DATABASE_ENDPOINT_URL"),
+		DatabaseUsername:      os.Getenv("TEST_DATABASE_USERNAME"),
+		DatabasePassword:      os.Getenv("TEST_DATABASE_PASSWORD"),
+		SSLEnabled:            false,
+		QueryLoggingEnabled:   false,
+		RunDatabaseMigrations: false,
+		Logger:                &testLogger,
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to initialize database client: %v", err)
+	}
+
+	databaseClient = &client
+}
 
 func TestE2ETestHealthCheckReturns200(t *testing.T) {
 	// prepare test data
@@ -96,6 +120,9 @@ func TestE2ETestLoginWithValidCredentialsReturnsCookie(t *testing.T) {
 }
 
 func TestE2ETestChangePasswordAndLoginWithChangedPasswordSucceeds(t *testing.T) {
+	// Initialize database client
+	initDatabaseClient(t)
+
 	// prepare test data
 	testClient := nexusClientGenerator()
 	// generate user login info
@@ -145,6 +172,9 @@ func TestE2ETestChangePasswordAndLoginWithChangedPasswordSucceeds(t *testing.T) 
 }
 
 func TestE2ETestLogoutDeletesCookieFromDatabase(t *testing.T) {
+	// Initialize database client
+	initDatabaseClient(t)
+
 	// prepare test data
 	testClient := nexusClientGenerator()
 	// generate user login info
@@ -187,6 +217,9 @@ func TestE2ETestLogoutDeletesCookieFromDatabase(t *testing.T) {
 }
 
 func TestE2ESetAndGetPanelYieldData(t *testing.T) {
+	// Initialize database client
+	initDatabaseClient(t)
+
 	// Step: 0 prepare test data
 	testClient := nexusClientGenerator()
 	// generate user login info
@@ -238,6 +271,9 @@ func TestE2ESetAndGetPanelYieldData(t *testing.T) {
 }
 
 func TestE2ESetAndGetPanelConsumptionData(t *testing.T) {
+	// Initialize database client
+	initDatabaseClient(t)
+
 	// Step: 0 prepare test data
 	testClient := nexusClientGenerator()
 	// generate user login info
@@ -289,49 +325,18 @@ func TestE2ESetAndGetPanelConsumptionData(t *testing.T) {
 }
 
 func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
-	// Create a test sensor first
-	sensor := &database.Sensor{
-		Name:             fmt.Sprintf("Test Sensor %d", time.Now().Unix()),
-		Location:         "Test Location",
-		InstallationDate: time.Now(),
-		SensorCoordinates: database.SensorCoordinates{
-			Latitude:  37.7749,
-			Longitude: -122.4194,
-		},
-	}
+	// Initialize database client
+	initDatabaseClient(t)
 
-	// Save the sensor to the database
-	err := sensor.Save(testCtx, databaseClient.DB)
-	if err != nil {
-		t.Fatalf("Failed to save sensor: %v", err)
-	}
-
-	if sensor.ID == 0 {
-		t.Fatal("Sensor ID was not set after save")
-	}
-
-	// Use a unique timestamp for this test run
-	testTime := time.Now().Add(time.Hour * 24) // Use tomorrow to avoid conflicts
-
-	// Prepare test data
-	testData := api.SetSensorMoistureDataResponse{
-		SensorMoistureData: []api.SensorMoistureData{
-			{
-				SensorID:     sensor.ID,
-				Date:         testTime.Format(time.RFC3339),
-				SoilMoisture: 42.5,
-			},
-		},
-	}
-
-	// Generate user login info
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
 	testUserName := uuid.NewString()
 	testPassword := uuid.NewString()
 
 	testPasswordHash, err := password.HashPassword(testPassword)
 	assert.NoError(t, err)
-
-	// Add user to database
+	// add user to database
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
@@ -340,91 +345,52 @@ func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
 	assert.NoError(t, err)
 
-	// Create test client with credentials
-	testClient := nexusClientGenerator()
+	// update test client to have credentials for test user
 	testClient.Config.UserName = testUserName
 	testClient.Config.Password = testPassword
 
-	// Login user
+	// login user
 	_, err = testClient.Login(testCtx, api.LoginRequest{
 		Username: testUserName,
 		Password: testPassword,
 	})
-	if err != nil {
-		t.Fatalf("Failed to login: %v", err)
-	}
 
-	// Set moisture data
-	err = testClient.SetSensorMoistureData(testCtx, sensor.ID, testData)
-	if err != nil {
-		t.Fatalf("Failed to set moisture data: %v", err)
-	}
+	assert.NoError(t, err)
 
-	// Get moisture data
-	retrievedData, err := testClient.GetSensorMoistureData(testCtx, sensor.ID)
-	if err != nil {
-		t.Fatalf("Failed to get moisture data: %v", err)
-	}
+	// Panel ID to test
+	panelID := rand.Intn(10000000)
 
-	// Verify the data
-	if len(retrievedData.SensorMoistureData) != len(testData.SensorMoistureData) {
-		t.Errorf("Expected %d records, got %d", len(testData.SensorMoistureData), len(retrievedData.SensorMoistureData))
-	}
+	// Test payload for setting sensor moisture data
+	expectedSensorMoistureData := api.SetSensorMoistureDataResponse{SensorMoistureData: []api.SensorMoistureData{
+		{Date: time.Now().Add(1 * time.Second).UTC().Format(time.RFC3339), SoilMoisture: 100},
+		{Date: time.Now().Add(1 * time.Second).UTC().Format(time.RFC3339), SoilMoisture: 150},
+	}}
 
-	for i, data := range retrievedData.SensorMoistureData {
-		if data.SensorID != testData.SensorMoistureData[i].SensorID {
-			t.Errorf("Expected SensorID %d, got %d", testData.SensorMoistureData[i].SensorID, data.SensorID)
-		}
-		if data.SoilMoisture != testData.SensorMoistureData[i].SoilMoisture {
-			t.Errorf("Expected SoilMoisture %f, got %f", testData.SensorMoistureData[i].SoilMoisture, data.SoilMoisture)
-		}
-	}
+	// Step 1: POST (Set) sensor moisture data
+	err = testClient.SetSensorMoistureData(testCtx, panelID, expectedSensorMoistureData)
+	assert.NoError(t, err, "Setting sensor moisture data should succeed")
+
+	// Step 2: GET sensor moisture data
+	gotSensorMoistureData, err := testClient.GetSensorMoistureData(testCtx, panelID)
+	assert.NoError(t, err, "Retrieving sensor moisture data should succeed")
+
+	// Step 3: Compare
+	assert.Equal(t, expectedSensorMoistureData.SensorMoistureData, gotSensorMoistureData.SensorMoistureData, "Sensor moisture data should match what was set")
 }
 
 func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
-	// Create a test sensor first
-	sensor := &database.Sensor{
-		Name:             fmt.Sprintf("Test Sensor %d", time.Now().Unix()),
-		Location:         "Test Location",
-		InstallationDate: time.Now(),
-		SensorCoordinates: database.SensorCoordinates{
-			Latitude:  37.7749,
-			Longitude: -122.4194,
-		},
-	}
+	// Initialize database client
+	initDatabaseClient(t)
 
-	// Save the sensor to the database
-	err := sensor.Save(testCtx, databaseClient.DB)
-	if err != nil {
-		t.Fatalf("Failed to save sensor: %v", err)
-	}
-
-	if sensor.ID == 0 {
-		t.Fatal("Sensor ID was not set after save")
-	}
-
-	// Use a unique timestamp for this test run
-	testTime := time.Now().Add(time.Hour * 48) // Use day after tomorrow to avoid conflicts
-
-	// Prepare test data
-	testData := api.SetSensorTemperatureDataResponse{
-		SensorTemperatureData: []api.SensorTemperatureData{
-			{
-				SensorID:        sensor.ID,
-				Date:            testTime.Format(time.RFC3339),
-				SoilTemperature: 25.5,
-			},
-		},
-	}
-
-	// Generate user login info
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
 	testUserName := uuid.NewString()
 	testPassword := uuid.NewString()
 
 	testPasswordHash, err := password.HashPassword(testPassword)
 	assert.NoError(t, err)
-
-	// Add user to database
+	// add user to database
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
@@ -433,43 +399,35 @@ func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
 	assert.NoError(t, err)
 
-	// Create test client with credentials
-	testClient := nexusClientGenerator()
+	// update test client to have credentials for test user
 	testClient.Config.UserName = testUserName
 	testClient.Config.Password = testPassword
 
-	// Login user
+	// login user
 	_, err = testClient.Login(testCtx, api.LoginRequest{
 		Username: testUserName,
 		Password: testPassword,
 	})
-	if err != nil {
-		t.Fatalf("Failed to login: %v", err)
-	}
 
-	// Set temperature data
-	err = testClient.SetSensorTemperatureData(testCtx, sensor.ID, testData)
-	if err != nil {
-		t.Fatalf("Failed to set temperature data: %v", err)
-	}
+	assert.NoError(t, err)
 
-	// Get temperature data
-	retrievedData, err := testClient.GetSensorTemperatureData(testCtx, sensor.ID)
-	if err != nil {
-		t.Fatalf("Failed to get temperature data: %v", err)
-	}
+	// Panel ID to test
+	panelID := rand.Intn(10000000)
 
-	// Verify the data
-	if len(retrievedData.SensorTemperatureData) != len(testData.SensorTemperatureData) {
-		t.Errorf("Expected %d records, got %d", len(testData.SensorTemperatureData), len(retrievedData.SensorTemperatureData))
-	}
+	// Test payload for setting sensor temperature data
+	expectedSensorTemperatureData := api.SetSensorTemperatureDataResponse{SensorTemperatureData: []api.SensorTemperatureData{
+		{Date: time.Now().Add(1 * time.Second).UTC().Format(time.RFC3339), SoilTemperature: 100},
+		{Date: time.Now().Add(1 * time.Second).UTC().Format(time.RFC3339), SoilTemperature: 150},
+	}}
 
-	for i, data := range retrievedData.SensorTemperatureData {
-		if data.SensorID != testData.SensorTemperatureData[i].SensorID {
-			t.Errorf("Expected SensorID %d, got %d", testData.SensorTemperatureData[i].SensorID, data.SensorID)
-		}
-		if data.SoilTemperature != testData.SensorTemperatureData[i].SoilTemperature {
-			t.Errorf("Expected SoilTemperature %f, got %f", testData.SensorTemperatureData[i].SoilTemperature, data.SoilTemperature)
-		}
-	}
+	// Step 1: POST (Set) sensor temperature data
+	err = testClient.SetSensorTemperatureData(testCtx, panelID, expectedSensorTemperatureData)
+	assert.NoError(t, err, "Setting sensor temperature data should succeed")
+
+	// Step 2: GET sensor temperature data
+	gotSensorTemperatureData, err := testClient.GetSensorTemperatureData(testCtx, panelID)
+	assert.NoError(t, err, "Retrieving sensor temperature data should succeed")
+
+	// Step 3: Compare
+	assert.Equal(t, expectedSensorTemperatureData.SensorTemperatureData, gotSensorTemperatureData.SensorTemperatureData, "Sensor temperature data should match what was set")
 }
