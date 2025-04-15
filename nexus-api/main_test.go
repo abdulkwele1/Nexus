@@ -47,29 +47,6 @@ var (
 	databaseClient *database.PostgresClient
 )
 
-func TestMain(m *testing.M) {
-	// Initialize database client using environment variables from .env
-	client, err := database.NewPostgresClient(database.PostgresDatabaseConfig{
-		DatabaseName:          os.Getenv("TEST_DATABASE_NAME"),
-		DatabaseEndpointURL:   os.Getenv("TEST_DATABASE_ENDPOINT_URL"),
-		DatabaseUsername:      os.Getenv("TEST_DATABASE_USERNAME"),
-		DatabasePassword:      os.Getenv("TEST_DATABASE_PASSWORD"),
-		SSLEnabled:            false,
-		QueryLoggingEnabled:   false,
-		RunDatabaseMigrations: true,
-		Logger:                &testLogger,
-	})
-
-	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize database client: %v", err))
-	}
-
-	databaseClient = &client
-
-	// Run the tests
-	os.Exit(m.Run())
-}
-
 func TestE2ETestHealthCheckReturns200(t *testing.T) {
 	// prepare test data
 	testClient := nexusClientGenerator()
