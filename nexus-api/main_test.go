@@ -372,3 +372,72 @@ func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
 			"Date should be within 1 second of expected")
 	}
 }
+
+func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+
+	assert.NoError(t, err)
+
+	// sensor ID to test
+	sensorID := rand.Intn(10000000)
+
+	// add user to database
+	testSensor := database.Sensor{
+		ID: sensorID,
+	}
+
+	err = testSensor.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// Test payload for setting Moisture data
+	expectedTemperatureData := api.SetSensorTemperatureDataResponse{SensorTemperatureData: []api.SensorTemperatureData{
+		{Date: time.Now().Add(1 * time.Second).UTC(), SoilTemperature: 100, SensorID: sensorID},
+		{Date: time.Now().Add(1 * time.Second).UTC(), SoilTemperature: 150, SensorID: sensorID},
+	}}
+
+	// Step 1: POST (Set) moisture data
+	err = testClient.SetSensorTemperatureData(testCtx, sensorID, expectedTemperatureData)
+	assert.NoError(t, err, "Setting Temperature data should succeed")
+
+	// change to get sensor moisture data
+	gotTemperatureData, err := testClient.GetSensorTemperatureData(testCtx, sensorID)
+	assert.NoError(t, err, "Retrieving yield data should succeed")
+
+	// Step 3: compare to moisture data - ignoring ID field which is auto-generated
+	assert.Equal(t, len(expectedTemperatureData.SensorTemperatureData), len(gotTemperatureData.SensorTemperatureData),
+		"Number of moisture data entries should match")
+
+	for i, expected := range expectedTemperatureData.SensorTemperatureData {
+		actual := gotTemperatureData.SensorTemperatureData[i]
+		assert.Equal(t, expected.SensorID, actual.SensorID, "SensorID should match")
+		assert.Equal(t, expected.SoilTemperature, actual.SoilTemperature, "SoilTemperature should match")
+		// Compare dates with a small tolerance to account for potential time differences
+		assert.True(t, expected.Date.Sub(actual.Date) < time.Second,
+			"Date should be within 1 second of expected")
+	}
+}
