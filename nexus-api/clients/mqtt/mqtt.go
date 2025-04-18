@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"nexus-api/logging"
+	"nexus-api/sdk"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -20,12 +21,14 @@ type MQTTConfig struct {
 	AutoReconnect  bool
 	ConnectTimeout time.Duration
 	Logger         *logging.ServiceLogger
+	SDKClient      *sdk.NexusClient
 }
 
 // MQTTClient wraps a connection to an MQTT broker
 type MQTTClient struct {
-	client mqtt.Client
-	logger *logging.ServiceLogger
+	client    mqtt.Client
+	logger    *logging.ServiceLogger
+	sdkClient *sdk.NexusClient
 }
 
 // NewMQTTClient returns a new connection to the specified MQTT broker and error (if any)
@@ -64,8 +67,9 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 	}
 
 	return &MQTTClient{
-		client: client,
-		logger: config.Logger,
+		client:    client,
+		logger:    config.Logger,
+		sdkClient: config.SDKClient,
 	}, nil
 }
 

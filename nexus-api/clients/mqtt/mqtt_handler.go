@@ -16,7 +16,7 @@ import (
 type MQTTMessageHandler func(ctx context.Context, topic string, payload []byte, logger *logging.ServiceLogger) error
 
 // CreateMQTTMessageHandler creates a message handler for the MQTT client
-func CreateMQTTMessageHandler(ctx context.Context, logger *logging.ServiceLogger, handlers map[string]MQTTMessageHandler) mqtt.MessageHandler {
+func CreateMQTTMessageHandler(ctx context.Context, logger *logging.ServiceLogger, handlers map[string]MQTTMessageHandler, overrideHandlers map[string]MQTTMessageHandler) mqtt.MessageHandler {
 	return func(client mqtt.Client, msg mqtt.Message) {
 		topic := msg.Topic()
 		payload := msg.Payload()
@@ -26,11 +26,22 @@ func CreateMQTTMessageHandler(ctx context.Context, logger *logging.ServiceLogger
 		// Find the appropriate handler for this topic
 		var handler MQTTMessageHandler
 
-		// Check for exact match first
-		if h, exists := handlers[topic]; exists {
-			handler = h
-		} else {
-			// Check for wildcard match
+		// Check for override handler first
+		if overrideHandlers != nil {
+			if h, exists := overrideHandlers[topic]; exists {
+				handler = h
+			}
+		}
+
+		// If no override handler, check for exact match
+		if handler == nil {
+			if h, exists := handlers[topic]; exists {
+				handler = h
+			}
+		}
+
+		// If still no handler, check for wildcard match
+		if handler == nil {
 			for pattern, h := range handlers {
 				if strings.Contains(pattern, "+") || strings.Contains(pattern, "#") {
 					if matchTopic(pattern, topic) {
