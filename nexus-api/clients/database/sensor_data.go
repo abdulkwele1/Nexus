@@ -16,7 +16,7 @@ var (
 type SensorMoistureData struct {
 	ID           int       `bun:"id,pk,autoincrement"`
 	SensorID     int       `bun:"sensor_id"`
-	Date         time.Time `bun:"date"`
+	Date         time.Time `bun:"date,notnull"`
 	SoilMoisture float64   `bun:"soil_moisture"`
 }
 
@@ -33,10 +33,10 @@ type SensorCoordinates struct {
 }
 
 type Sensor struct {
-	ID                int    `json:"id"`
-	Name              string `json:"name"`
-	Location          string `json:"location"`
-	InstallationDate  string `json:"installation_date"`
+	ID                int       `json:"id"`
+	Name              string    `json:"name"`
+	Location          string    `json:"location"`
+	InstallationDate  time.Time `json:"installation_date"`
 	SensorCoordinates `json:"sensor_coordinates"`
 }
 
@@ -79,8 +79,6 @@ func GetSensorTemperatureDataForSensorID(ctx context.Context, db *bun.DB, sensor
 func (d *SensorMoistureData) Save(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewInsert().
 		Model(d).
-		On("CONFLICT (sensor_id, date) DO UPDATE").
-		Set("soil_moisture = EXCLUDED.soil_moisture").
 		Exec(ctx)
 	return err
 }
@@ -88,8 +86,12 @@ func (d *SensorMoistureData) Save(ctx context.Context, db *bun.DB) error {
 func (d *SensorTemperatureData) Save(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewInsert().
 		Model(d).
-		On("CONFLICT (sensor_id, date) DO UPDATE").
-		Set("soil_temperature = EXCLUDED.soil_temperature").
 		Exec(ctx)
+	return err
+}
+
+func (spyd *Sensor) Save(ctx context.Context, db *bun.DB) error {
+	_, err := db.NewInsert().Model(spyd).Exec(ctx)
+
 	return err
 }

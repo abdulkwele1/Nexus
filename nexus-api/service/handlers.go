@@ -468,7 +468,7 @@ func CreateGetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 			response.SensorMoistureData = append(response.SensorMoistureData, api.SensorMoistureData{
 				ID:           d.ID,
 				SensorID:     d.SensorID,
-				Date:         d.Date.Format(time.RFC3339),
+				Date:         d.Date,
 				SoilMoisture: d.SoilMoisture,
 			})
 		}
@@ -506,18 +506,10 @@ func CreateSetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 
 		// Iterate over each SensorMoistureData item and save to the database
 		for _, sensorMoistureData := range request.SensorMoistureData {
-			// Parse the date string into time.Time
-			date, err := time.Parse(time.RFC3339, sensorMoistureData.Date)
-			if err != nil {
-				apiService.Error().Msgf("Failed to parse date: %s, error: %s", sensorMoistureData.Date, err)
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid date format"})
-				return
-			}
 
 			moistureData := database.SensorMoistureData{
 				SensorID:     sensorID,
-				Date:         date,
+				Date:         sensorMoistureData.Date,
 				SoilMoisture: sensorMoistureData.SoilMoisture,
 			}
 
@@ -578,7 +570,7 @@ func CreateGetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 			response.SensorTemperatureData = append(response.SensorTemperatureData, api.SensorTemperatureData{
 				ID:              d.ID,
 				SensorID:        d.SensorID,
-				Date:            d.Date.Format(time.RFC3339),
+				Date:            d.Date,
 				SoilTemperature: d.SoilTemperature,
 			})
 		}
@@ -616,18 +608,10 @@ func CreateSetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 
 		// Iterate over each SensorTemperatureData item and save to the database
 		for _, sensorTemperatureData := range request.SensorTemperatureData {
-			// Parse the date string into time.Time
-			date, err := time.Parse(time.RFC3339, sensorTemperatureData.Date)
-			if err != nil {
-				apiService.Error().Msgf("Failed to parse date: %s, error: %s", sensorTemperatureData.Date, err)
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid date format"})
-				return
-			}
 
 			temperatureData := database.SensorTemperatureData{
 				SensorID:        sensorID,
-				Date:            date,
+				Date:            sensorTemperatureData.Date,
 				SoilTemperature: sensorTemperatureData.SoilTemperature,
 			}
 

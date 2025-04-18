@@ -75,7 +75,7 @@ func (h *SDKMQTTHandler) HandleSensorData(ctx context.Context, topic string, pay
 		moistureData := api.SetSensorMoistureDataResponse{
 			SensorMoistureData: []api.SensorMoistureData{
 				{
-					Date:         timestamp.Format(time.RFC3339),
+					Date:         timestamp,
 					SoilMoisture: sensorMsg.Value,
 				},
 			},
@@ -88,7 +88,7 @@ func (h *SDKMQTTHandler) HandleSensorData(ctx context.Context, topic string, pay
 		temperatureData := api.SetSensorTemperatureDataResponse{
 			SensorTemperatureData: []api.SensorTemperatureData{
 				{
-					Date:            timestamp.Format(time.RFC3339),
+					Date:            timestamp,
 					SoilTemperature: sensorMsg.Value,
 				},
 			},

@@ -92,17 +92,17 @@ type Sensor struct {
 }
 
 type SensorMoistureData struct {
-	ID           int     `json:"id"`
-	SensorID     int     `json:"sensor_id"`
-	Date         string  `json:"date"`
-	SoilMoisture float64 `json:"soil_moisture"`
+	ID           int       `json:"id"`
+	SensorID     int       `json:"sensor_id"`
+	Date         time.Time `json:"date"`
+	SoilMoisture float64   `json:"soil_moisture"`
 }
 
 type SensorTemperatureData struct {
-	ID              int     `json:"id"`
-	SensorID        int     `json:"sensor_id"`
-	Date            string  `json:"date"`
-	SoilTemperature float64 `json:"soil_temperature"`
+	ID              int       `json:"id"`
+	SensorID        int       `json:"sensor_id"`
+	Date            time.Time `json:"date"`
+	SoilTemperature float64   `json:"soil_temperature"`
 }
 
 type SetSensorMoistureDataResponse struct {

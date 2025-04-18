@@ -303,3 +303,72 @@ func TestE2ESetAndGetPanelConsumptionData(t *testing.T) {
 	// Step 3: Compare
 	assert.Equal(t, expectedConsumptionData.ConsumptionData, gotConsumptionData.ConsumptionData, "Consumption data should match what was set")
 }
+
+func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+
+	assert.NoError(t, err)
+
+	// sensor ID to test
+	sensorID := rand.Intn(10000000)
+
+	// add user to database
+	testSensor := database.Sensor{
+		ID: sensorID,
+	}
+
+	err = testSensor.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// Test payload for setting Moisture data
+	expectedMoistureData := api.SetSensorMoistureDataResponse{SensorMoistureData: []api.SensorMoistureData{
+		{Date: time.Now().Add(1 * time.Second).UTC(), SoilMoisture: 100, SensorID: sensorID},
+		{Date: time.Now().Add(1 * time.Second).UTC(), SoilMoisture: 150, SensorID: sensorID},
+	}}
+
+	// Step 1: POST (Set) moisture data
+	err = testClient.SetSensorMoistureData(testCtx, sensorID, expectedMoistureData)
+	assert.NoError(t, err, "Setting yield data should succeed")
+
+	// change to get sensor moisture data
+	gotMoistureData, err := testClient.GetSensorMoistureData(testCtx, sensorID)
+	assert.NoError(t, err, "Retrieving yield data should succeed")
+
+	// Step 3: compare to moisture data - ignoring ID field which is auto-generated
+	assert.Equal(t, len(expectedMoistureData.SensorMoistureData), len(gotMoistureData.SensorMoistureData),
+		"Number of moisture data entries should match")
+
+	for i, expected := range expectedMoistureData.SensorMoistureData {
+		actual := gotMoistureData.SensorMoistureData[i]
+		assert.Equal(t, expected.SensorID, actual.SensorID, "SensorID should match")
+		assert.Equal(t, expected.SoilMoisture, actual.SoilMoisture, "SoilMoisture should match")
+		// Compare dates with a small tolerance to account for potential time differences
+		assert.True(t, expected.Date.Sub(actual.Date) < time.Second,
+			"Date should be within 1 second of expected")
+	}
+}
