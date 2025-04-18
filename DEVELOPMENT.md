@@ -78,3 +78,9 @@ git stash- saving local changes
 git pull - pulling local changes
 
 git stash apply - re-adding local changes I had pushed away
+
+make down to stop all the services
+
+make reset refresh ready to restart datatabse stuff and wait for the database to be ready
+
+make it p=TestE2E to run a new test
