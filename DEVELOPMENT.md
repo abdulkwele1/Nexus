@@ -83,4 +83,6 @@ make down to stop all the services
 
 make reset refresh ready to restart datatabse stuff and wait for the database to be ready
 
-make it p=TestE2E to run a new test
+make it p=TestE2E to run a just a single test
+
+make test- runs all the tests
