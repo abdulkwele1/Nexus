@@ -93,22 +93,24 @@ func main() {
 	}
 
 	if enableMQTT {
-		// Subscribe to a single MQTT topic
-		mqttTopics := os.Getenv("MQTT_TOPICS")
-		if mqttTopics == "" {
-			// Default topic if none specified
-			mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+"
-		}
-		topic := strings.Split(strings.TrimSpace(mqttTopics), ",")[0]
-		topic = strings.TrimSpace(topic)
-		if topic != "" {
-			err := mqttClient.Subscribe(serviceCtx, topic, 1, mqttClient.HandleMessage)
-			if err != nil {
-				serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
-			} else {
-				serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
+		go func() {
+			// Subscribe to a single MQTT topic
+			mqttTopics := os.Getenv("MQTT_TOPICS")
+			if mqttTopics == "" {
+				// Default topic if none specified
+				mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+"
 			}
-		}
+			topic := strings.Split(strings.TrimSpace(mqttTopics), ",")[0]
+			topic = strings.TrimSpace(topic)
+			if topic != "" {
+				err := mqttClient.Subscribe(serviceCtx, topic, 1, mqttClient.HandleMessage)
+				if err != nil {
+					serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
+				} else {
+					serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
+				}
+			}
+		}()
 	}
 
 	// parse api config from the environment
