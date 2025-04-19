@@ -11,7 +11,6 @@ import (
 
 	"os"
 	"strings"
-	"time"
 )
 
 var (
@@ -45,7 +44,6 @@ func main() {
 	enableMQTT := os.Getenv("ENABLE_MQTT") == "true"
 	var mqttClient *mqttclient.MQTTClient
 	var sdkClient *sdk.NexusClient
-	var handlers map[string]mqttclient.MQTTMessageHandler
 
 	if enableMQTT {
 		// Setup SDK client config from environment
@@ -90,50 +88,26 @@ func main() {
 		}
 		defer mqttClient.Disconnect()
 		serviceLogger.Info().Msg("MQTT client initialized successfully")
-
-		// Define message handlers for different topics
-		handlers = map[string]mqttclient.MQTTMessageHandler{
-			"/device_sensor_data/444574498032128/+/+/+/+": mqttclient.DefaultSensorDataHandler,
-			"system/status": mqttclient.DefaultSystemStatusHandler,
-		}
 	} else {
 		serviceLogger.Info().Msg("MQTT is disabled, skipping MQTT client initialization")
 	}
 
-	// Create a message handler
-	messageHandler := mqttclient.CreateMQTTMessageHandler(serviceCtx, &serviceLogger, handlers, nil)
-
 	if enableMQTT {
-		// Subscribe to MQTT topics
+		// Subscribe to a single MQTT topic
 		mqttTopics := os.Getenv("MQTT_TOPICS")
 		if mqttTopics == "" {
-			// Default topics if none specified
+			// Default topic if none specified
 			mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+"
 		}
-
-		// Subscribe to each topic
-		topics := strings.Split(mqttTopics, ",")
-		for _, topic := range topics {
-			topic = strings.TrimSpace(topic)
-			if topic != "" {
-				err := mqttClient.Subscribe(serviceCtx, topic, 1, messageHandler)
-				if err != nil {
-					serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
-				} else {
-					serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
-				}
+		topic := strings.Split(strings.TrimSpace(mqttTopics), ",")[0]
+		topic = strings.TrimSpace(topic)
+		if topic != "" {
+			err := mqttClient.Subscribe(serviceCtx, topic, 1, mqttClient.HandleMessage)
+			if err != nil {
+				serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
+			} else {
+				serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
 			}
-		}
-
-		// Publish initial system status
-		status := map[string]interface{}{
-			"status":    "online",
-			"version":   "1.0.0",
-			"startTime": time.Now().Format(time.RFC3339),
-		}
-		err = mqttclient.PublishSystemStatus(serviceCtx, mqttClient, status, &serviceLogger)
-		if err != nil {
-			serviceLogger.Error().Err(err).Msg("Failed to publish initial system status")
 		}
 	}
 

@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -126,4 +127,25 @@ func (m *MQTTClient) HealthCheck() error {
 		return fmt.Errorf("MQTT client is not connected")
 	}
 	return nil
+}
+
+// HandleMessage implements mqtt.MessageHandler and has access to sdkClient and logger
+func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
+	topic := msg.Topic()
+	payload := msg.Payload()
+
+	m.logger.Info().Msgf("Received message on topic %s: %s", topic, string(payload))
+
+	// Parse payload as JSON
+	var data map[string]interface{}
+	err := json.Unmarshal(payload, &data)
+	if err != nil {
+		m.logger.Error().Err(err).Msgf("Failed to parse payload as JSON on topic %s", topic)
+		return
+	}
+
+	m.logger.Info().Interface("data", data).Msgf("Processed message on topic %s", topic)
+
+	// Example: use m.sdkClient here if needed
+	// _ = m.sdkClient
 }
