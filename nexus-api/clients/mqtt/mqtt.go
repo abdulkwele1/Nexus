@@ -2,10 +2,12 @@ package clients
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"nexus-api/logging"
+	"nexus-api/sdk"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -20,12 +22,14 @@ type MQTTConfig struct {
 	AutoReconnect  bool
 	ConnectTimeout time.Duration
 	Logger         *logging.ServiceLogger
+	SDKClient      *sdk.NexusClient
 }
 
 // MQTTClient wraps a connection to an MQTT broker
 type MQTTClient struct {
-	client mqtt.Client
-	logger *logging.ServiceLogger
+	client    mqtt.Client
+	logger    *logging.ServiceLogger
+	sdkClient *sdk.NexusClient
 }
 
 // NewMQTTClient returns a new connection to the specified MQTT broker and error (if any)
@@ -64,8 +68,9 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 	}
 
 	return &MQTTClient{
-		client: client,
-		logger: config.Logger,
+		client:    client,
+		logger:    config.Logger,
+		sdkClient: config.SDKClient,
 	}, nil
 }
 
@@ -122,4 +127,25 @@ func (m *MQTTClient) HealthCheck() error {
 		return fmt.Errorf("MQTT client is not connected")
 	}
 	return nil
+}
+
+// HandleMessage implements mqtt.MessageHandler and has access to sdkClient and logger
+func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
+	topic := msg.Topic()
+	payload := msg.Payload()
+
+	m.logger.Info().Msgf("Received message on topic %s: %s", topic, string(payload))
+
+	// Parse payload as JSON
+	var data map[string]interface{}
+	err := json.Unmarshal(payload, &data)
+	if err != nil {
+		m.logger.Error().Err(err).Msgf("Failed to parse payload as JSON on topic %s", topic)
+		return
+	}
+
+	m.logger.Info().Interface("data", data).Msgf("Processed message on topic %s", topic)
+
+	// Example: use m.sdkClient here if needed
+	// _ = m.sdkClient
 }
