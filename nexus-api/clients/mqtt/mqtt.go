@@ -15,80 +15,6 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-// SensorMessage is the message structure for sensor data
-type SensorMessage struct {
-	SensorID  string  `json:"sensor_id"`
-	Value     float64 `json:"value"`
-	Timestamp int64   `json:"timestamp"`
-}
-
-// SDKMQTTHandler is the handler for SDK MQTT messages
-type SDKMQTTHandler struct {
-	sdkClient *sdk.NexusClient
-	logger    *logging.ServiceLogger
-}
-
-// NewSDKMQTTHandler creates a new SDKMQTTHandler
-func NewSDKMQTTHandler(sdkClient *sdk.NexusClient, logger *logging.ServiceLogger) *SDKMQTTHandler {
-	return &SDKMQTTHandler{sdkClient: sdkClient, logger: logger}
-}
-
-func (h *SDKMQTTHandler) HandleSensorData(ctx context.Context, topic string, payload []byte) error {
-	var msg SensorMessage
-	if err := json.Unmarshal(payload, &msg); err != nil {
-		return fmt.Errorf("parse sensor message: %w", err)
-	}
-
-	parts := strings.Split(topic, "/")
-	if len(parts) < 7 {
-		return fmt.Errorf("invalid topic format: %s", topic)
-	}
-
-	sensorID := parts[2]
-	sensorType := parts[len(parts)-1]
-	h.logger.Info().Msgf("Sensor ID=%s Type=%s", sensorID, sensorType)
-
-	idInt, err := strconv.Atoi(sensorID)
-	if err != nil {
-		h.logger.Warn().Err(err).
-			Msgf("non‐numeric sensor ID %s, defaulting to 0", sensorID)
-		idInt = 0
-	}
-
-	ts := time.UnixMilli(msg.Timestamp)
-
-	switch sensorType {
-	case "4102": // moisture
-		payload := api.SetSensorMoistureDataResponse{
-			SensorMoistureData: []api.SensorMoistureData{{
-				Date:         ts,
-				SoilMoisture: msg.Value,
-			}},
-		}
-		if err := h.sdkClient.SetSensorMoistureData(ctx, idInt, payload); err != nil {
-			return fmt.Errorf("save moisture: %w", err)
-		}
-		h.logger.Info().Msgf("Saved moisture for %s", sensorID)
-
-	case "4103": // temperature
-		payload := api.SetSensorTemperatureDataResponse{
-			SensorTemperatureData: []api.SensorTemperatureData{{
-				Date:            ts,
-				SoilTemperature: msg.Value,
-			}},
-		}
-		if err := h.sdkClient.SetSensorTemperatureData(ctx, idInt, payload); err != nil {
-			return fmt.Errorf("save temperature: %w", err)
-		}
-		h.logger.Info().Msgf("Saved temperature for %s", sensorID)
-
-	default:
-		return fmt.Errorf("unknown sensor type %s", sensorType)
-	}
-
-	return nil
-}
-
 // MQTTConfig contains values for creating a new connection to an MQTT broker
 type MQTTConfig struct {
 	BrokerURL      string
@@ -104,9 +30,9 @@ type MQTTConfig struct {
 
 // MQTTClient wraps a connection to an MQTT broker
 type MQTTClient struct {
-	client  mqtt.Client
-	logger  *logging.ServiceLogger
-	handler *SDKMQTTHandler
+	client    mqtt.Client
+	logger    *logging.ServiceLogger
+	sdkClient *sdk.NexusClient
 }
 
 // NewMQTTClient returns a new connection to the specified MQTT broker and error (if any)
@@ -144,12 +70,10 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 		return nil, fmt.Errorf("failed to connect to MQTT broker: %w", token.Error())
 	}
 
-	handler := NewSDKMQTTHandler(config.SDKClient, config.Logger)
-
 	return &MQTTClient{
-		client:  client,
-		logger:  config.Logger,
-		handler: handler,
+		client:    client,
+		logger:    config.Logger,
+		sdkClient: config.SDKClient,
 	}, nil
 }
 
@@ -208,15 +132,71 @@ func (m *MQTTClient) HealthCheck() error {
 	return nil
 }
 
-// HandleMessage implements mqtt.MessageHandler and has access to sdkClient and logger
-func (m *MQTTClient) HandleMessage(_ mqtt.Client, msg mqtt.Message) {
-	topic, payload := msg.Topic(), msg.Payload()
-	m.logger.Info().Msgf("Received message on topic %s: %s", topic, string(payload))
+// HandleMessage implements mqtt.MessageHandler, determines data type from topic,
+// parses payload, and calls the appropriate SDK method.
+func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
+	topic := msg.Topic()
+	payload := msg.Payload()
+	ctx := context.Background() // Or derive context from elsewhere if appropriate
 
-	// 4️⃣ hand off to your parsing & SDK logic
-	if err := m.handler.HandleSensorData(context.Background(), topic, payload); err != nil {
-		m.logger.Error().
-			Err(err).
-			Msgf("failed to process sensor data on %s", topic)
+	m.logger.Info().Str("topic", topic).Msg("Received message")
+
+	// New expected topic structure: /device_sensor_data/{deviceID}/{sensorID_numeric}/{sensorID_hex?}/{channel?}/{typeCode}/{value?}
+	// Example: /device_sensor_data/444574498032128/2CF7F1C0627000B2/1/vs/4103
+	parts := strings.Split(topic, "/")
+
+	// Check format: needs at least 6 parts (due to leading /) and specific prefix
+	if len(parts) < 6 || parts[0] != "" || parts[1] != "device_sensor_data" {
+		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format")
+		return
+	}
+
+	// Assuming the numeric ID (parts[2]) is the one needed by the SDK
+	sensorIDStr := parts[2]
+	// Assuming the type code (parts[5]) determines the data type
+	dataTypeCode := parts[5]
+
+	// Convert sensor ID string to integer
+	sensorIDInt, err := strconv.Atoi(sensorIDStr)
+	if err != nil {
+		m.logger.Error().Err(err).Str("topic", topic).Str("sensorIDStr", sensorIDStr).Msg("Failed to convert sensor ID to integer")
+		return
+	}
+
+	// Process based on the type code from the topic
+	// !!! Update these case values ("vt", "vs") to match your actual type codes !!!
+	switch dataTypeCode {
+	case "vt": // Placeholder code for temperature
+		var tempData api.SetSensorTemperatureDataResponse
+		err := json.Unmarshal(payload, &tempData)
+		if err != nil {
+			m.logger.Error().Err(err).Str("topic", topic).Msg("Failed to unmarshal temperature data")
+			return
+		}
+		// Assuming SetSensorTemperatureData exists and takes int sensorID and data
+		err = m.sdkClient.SetSensorTemperatureData(ctx, sensorIDInt, tempData)
+		if err != nil {
+			m.logger.Error().Err(err).Int("sensorID", sensorIDInt).Msg("Failed to set sensor temperature data via SDK")
+			return
+		}
+		m.logger.Info().Int("sensorID", sensorIDInt).Interface("data", tempData).Msg("Successfully processed and sent temperature data")
+
+	case "vs": // Placeholder code for moisture (based on example)
+		var moistureData api.SetSensorMoistureDataResponse
+		err := json.Unmarshal(payload, &moistureData)
+		if err != nil {
+			m.logger.Error().Err(err).Str("topic", topic).Msg("Failed to unmarshal moisture data")
+			return
+		}
+		// Assuming SetSensorMoistureData exists and takes int sensorID and data
+		err = m.sdkClient.SetSensorMoistureData(ctx, sensorIDInt, moistureData)
+		if err != nil {
+			m.logger.Error().Err(err).Int("sensorID", sensorIDInt).Msg("Failed to set sensor moisture data via SDK")
+			return
+		}
+		m.logger.Info().Int("sensorID", sensorIDInt).Interface("data", moistureData).Msg("Successfully processed and sent moisture data")
+
+	default:
+		m.logger.Warn().Str("topic", topic).Str("typeCode", dataTypeCode).Msg("Received message with unhandled data type code")
 	}
 }
