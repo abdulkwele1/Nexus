@@ -40,30 +40,36 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 
 	// create database client
 	databaseClient, err := database.NewPostgresClient(config.DatabaseConfig)
-
 	if err != nil {
 		return nexusAPI, fmt.Errorf("error %s creating database client with %+v", err, config.DatabaseConfig)
 	}
 
-	// run migrations based on configuration
+	// Assign logger and DB client to the struct early so methods can use them
+	nexusAPI.ServiceLogger = config.ServiceLogger
+	nexusAPI.DatabaseClient = &databaseClient
+
+	// Run migrations synchronously before starting the server
 	if config.DatabaseConfig.RunDatabaseMigrations {
-		go func() {
-			for {
-				ranMigrations, err := database.Migrate(ctx, databaseClient.DB, *migrations.Migrations, config.ServiceLogger)
+		// Wait for the database to be responsive first
+		config.ServiceLogger.Info().Msg("Waiting for database to be online before running migrations...")
+		database.AwaitDatabaseOnline(databaseClient, *config.ServiceLogger)
+		config.ServiceLogger.Info().Msg("Database online. Running migrations...")
 
-				if err != nil {
-					config.ServiceLogger.Error().Msgf("error %s running migrations %+v, will retry in 3 seconds", err, migrations.Migrations)
+		// Loop with retry for migrations, but block NewAPIService until done
+		for {
+			ranMigrations, err := database.Migrate(ctx, databaseClient.DB, *migrations.Migrations, config.ServiceLogger)
 
-					time.Sleep(3 * time.Second)
-
-					continue
-				}
-
-				config.ServiceLogger.Info().Msgf("successfully ran migrations %+v", ranMigrations)
-
-				return
+			if err != nil {
+				config.ServiceLogger.Error().Msgf("Error running migrations: %s. Retrying in 3 seconds...", err)
+				time.Sleep(3 * time.Second)
+				continue // Retry the migration
 			}
-		}()
+
+			config.ServiceLogger.Info().Msgf("Successfully ran migrations: %+v", ranMigrations)
+			break // Exit loop on success
+		}
+	} else {
+		config.ServiceLogger.Info().Msg("Database migrations are disabled.")
 	}
 
 	// setup api request router

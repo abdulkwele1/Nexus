@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"nexus-api/api"
 	"nexus-api/clients/database"
 	mqttclient "nexus-api/clients/mqtt"
 	"nexus-api/logging"
 	"nexus-api/sdk"
 	"nexus-api/service"
-
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
 var (
@@ -21,7 +24,6 @@ func main() {
 	// setup logger
 	logLevel := os.Getenv("LOG_LEVEL")
 	serviceLogger, err := logging.New(os.Getenv("LOG_LEVEL"))
-
 	if err != nil {
 		panic(fmt.Errorf("error %s creating serviceLogger with level %s", err, logLevel))
 	}
@@ -37,13 +39,66 @@ func main() {
 		RunDatabaseMigrations: os.Getenv("RUN_DATABASE_MIGRATIONS") == "true",
 		Logger:                &serviceLogger,
 	}
-
 	serviceLogger.Trace().Msgf("loaded databaseClient config %+v", databaseConfig)
 
-	// Check if MQTT is enabled
+	// --- Start API Service First ---
+	apiConfig := service.APIConfig{
+		APIPort:        os.Getenv("API_PORT"),
+		DatabaseConfig: databaseConfig,
+		ServiceLogger:  &serviceLogger,
+	}
+	serviceLogger.Debug().Msgf("loaded api config %+v", apiConfig)
+
+	apiService, err := service.NewAPIService(serviceCtx, apiConfig)
+	if err != nil {
+		panic(fmt.Errorf("failed to create API service: %w", err))
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		serviceLogger.Info().Msg("Starting API server...")
+		err := apiService.Run(serviceCtx)
+		if err != nil {
+			serviceLogger.Error().Err(err).Msg("API service exited with error")
+		} else {
+			serviceLogger.Info().Msg("API service stopped gracefully")
+		}
+	}()
+
+	// --- Wait for API server to be healthy before proceeding ---
+	apiPort := os.Getenv("API_PORT")
+	if apiPort == "" {
+		apiPort = "8080" // Default port if not set
+	}
+	healthCheckURL := fmt.Sprintf("http://localhost:%s/healthcheck", apiPort)
+	maxWait := 30 * time.Second // Max time to wait for health check
+	checkInterval := 200 * time.Millisecond
+	startTime := time.Now()
+
+	serviceLogger.Info().Msgf("Waiting for API server at %s to be healthy...", healthCheckURL)
+	for time.Since(startTime) < maxWait {
+		resp, err := http.Get(healthCheckURL)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			serviceLogger.Info().Msg("API server is healthy.")
+			resp.Body.Close() // Important to close the body
+			break             // Exit loop on success
+		}
+		if resp != nil {
+			resp.Body.Close() // Close body even on non-200 status
+		}
+		if time.Since(startTime)+checkInterval >= maxWait {
+			serviceLogger.Error().Err(err).Int("status", resp.StatusCode).Msgf("API server health check timed out after %v", maxWait)
+			os.Exit(1)
+		}
+		time.Sleep(checkInterval)
+	}
+
+	// --- Initialize SDK and MQTT Clients (if enabled) ---
 	enableMQTT := os.Getenv("ENABLE_MQTT") == "true"
 	var mqttClient *mqttclient.MQTTClient
-	var sdkClient *sdk.NexusClient
 
 	if enableMQTT {
 		// Setup SDK client config from environment
@@ -53,18 +108,28 @@ func main() {
 			Password:         os.Getenv("NEXUS_API_PASSWORD"),
 			Logger:           &serviceLogger,
 		}
-
 		serviceLogger.Trace().Msgf("loaded SDK client config %+v", sdkConfig)
 
 		// Initialize SDK client
-		sdkClient, err = sdk.NewClient(sdkConfig)
+		sdkClient, err := sdk.NewClient(sdkConfig)
 		if err != nil {
-			panic(err)
+			serviceLogger.Error().Err(err).Msg("Failed to initialize SDK client")
+			os.Exit(1)
 		}
 		serviceLogger.Info().Msg("SDK client initialized successfully")
-	}
 
-	if enableMQTT {
+		// Login the SDK client
+		loginParams := api.LoginRequest{
+			Username: sdkConfig.UserName,
+			Password: sdkConfig.Password,
+		}
+		_, err = sdkClient.Login(serviceCtx, loginParams)
+		if err != nil {
+			serviceLogger.Error().Err(err).Msg("Failed to login SDK client")
+			os.Exit(1)
+		}
+		serviceLogger.Info().Msg("SDK client logged in successfully")
+
 		// parse MQTT configuration from the environment
 		mqttConfig := mqttclient.MQTTConfig{
 			BrokerURL:     os.Getenv("MQTT_BROKER_URL"),
@@ -76,11 +141,9 @@ func main() {
 			Logger:        &serviceLogger,
 			SDKClient:     sdkClient,
 		}
-
 		serviceLogger.Trace().Msgf("loaded MQTT client config %+v", mqttConfig)
 
 		// Initialize MQTT client
-		var err error
 		mqttClient, err = mqttclient.NewMQTTClient(mqttConfig)
 		if err != nil {
 			serviceLogger.Error().Err(err).Msg("Failed to initialize MQTT client")
@@ -88,16 +151,13 @@ func main() {
 		}
 		defer mqttClient.Disconnect()
 		serviceLogger.Info().Msg("MQTT client initialized successfully")
-	} else {
-		serviceLogger.Info().Msg("MQTT is disabled, skipping MQTT client initialization")
-	}
 
-	if enableMQTT {
+		// Subscribe to MQTT topics (run in a separate goroutine)
+		wg.Add(1)
 		go func() {
-			// Subscribe to a single MQTT topic
+			defer wg.Done()
 			mqttTopics := os.Getenv("MQTT_TOPICS")
 			if mqttTopics == "" {
-				// Default topic if none specified
 				mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+"
 			}
 			topic := strings.Split(strings.TrimSpace(mqttTopics), ",")[0]
@@ -109,30 +169,17 @@ func main() {
 				} else {
 					serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
 				}
+			} else {
+				serviceLogger.Warn().Msg("No MQTT topic specified to subscribe to.")
 			}
 		}()
+
+	} else {
+		serviceLogger.Info().Msg("MQTT is disabled, skipping MQTT/SDK client initialization")
 	}
 
-	// parse api config from the environment
-	apiConfig := service.APIConfig{
-		APIPort:        os.Getenv("API_PORT"),
-		DatabaseConfig: databaseConfig,
-		ServiceLogger:  &serviceLogger,
-	}
+	serviceLogger.Info().Msg("Initialization complete. Waiting for services to finish...")
+	wg.Wait()
 
-	serviceLogger.Debug().Msgf("loaded api config %+v",
-		apiConfig)
-
-	apiService, err := service.NewAPIService(serviceCtx, apiConfig)
-
-	if err != nil {
-		panic(err)
-	}
-
-	serviceLogger.Debug().Msg("api server starting")
-	err = apiService.Run(serviceCtx)
-
-	if err != nil {
-		serviceLogger.Error().Msgf("service exited with error %s", err)
-	}
+	serviceLogger.Info().Msg("Application shutting down.")
 }

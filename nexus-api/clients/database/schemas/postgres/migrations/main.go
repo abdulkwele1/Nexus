@@ -16,6 +16,7 @@ var SQLMigrations embed.FS
 var Migrations = migrate.NewMigrations()
 
 func init() {
+	// Discover migrations from embedded filesystem
 	if err := Migrations.Discover(SQLMigrations); err != nil {
 		panic(err)
 	}
