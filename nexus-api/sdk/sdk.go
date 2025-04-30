@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"nexus-api/api"
@@ -90,6 +91,13 @@ func (nc *NexusClient) Login(ctx context.Context, params api.LoginRequest) (api.
 
 	defer response.Body.Close()
 	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		// Read and log the response body for more details on the error
+		bodyBytes, readErr := io.ReadAll(response.Body)
+		if readErr != nil {
+			nc.Warn().Err(readErr).Int("status_code", response.StatusCode).Msg("Failed to read response body on error during login")
+		} else {
+			nc.Error().Int("status_code", response.StatusCode).Str("response_body", string(bodyBytes)).Msg("API returned non-2xx status during login")
+		}
 		return api.LoginResponse{}, fmt.Errorf("non 200 level status code %d", response.StatusCode)
 	}
 
