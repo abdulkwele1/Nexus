@@ -108,7 +108,7 @@ func main() {
 			Password:         os.Getenv("NEXUS_API_PASSWORD"),
 			Logger:           &serviceLogger,
 		}
-		serviceLogger.Trace().Msgf("loaded SDK client config %+v", sdkConfig)
+		serviceLogger.Info().Msgf("Initialized SDK client config - Endpoint: %s, Username: %s", sdkConfig.NexusAPIEndpoint, sdkConfig.UserName)
 
 		// Initialize SDK client
 		sdkClient, err := sdk.NewClient(sdkConfig)
@@ -121,62 +121,69 @@ func main() {
 		} else {
 			serviceLogger.Info().Msg("SDK client initialized successfully")
 
-			// Login the SDK client *after* API is healthy
+			// Login the SDK client *after* API is healthy, retrying until successful
 			loginParams := api.LoginRequest{
 				Username: sdkConfig.UserName,
 				Password: sdkConfig.Password,
 			}
-			_, err = sdkClient.Login(serviceCtx, loginParams)
+			loginRetryDelay := 5 * time.Second
+			for { // Retry loop for SDK login
+				_, err = sdkClient.Login(serviceCtx, loginParams)
+				if err == nil {
+					serviceLogger.Info().Msg("SDK client logged in successfully")
+					break // Exit loop on successful login
+				}
+
+				// Log error and wait before retrying
+				serviceLogger.Error().Err(err).Msgf("Failed to login SDK client, retrying in %v...", loginRetryDelay)
+				// Consider adding a maximum retry count or backoff strategy for robustness
+				time.Sleep(loginRetryDelay)
+			}
+			// Continue ONLY after successful login...
+
+			// parse MQTT configuration from the environment
+			mqttConfig := mqttclient.MQTTConfig{
+				BrokerURL:     os.Getenv("MQTT_BROKER_URL"),
+				ClientID:      os.Getenv("MQTT_CLIENT_ID"),
+				Username:      os.Getenv("MQTT_USERNAME"),
+				Password:      os.Getenv("MQTT_PASSWORD"),
+				CleanSession:  os.Getenv("MQTT_CLEAN_SESSION") != "false",
+				AutoReconnect: os.Getenv("MQTT_AUTO_RECONNECT") != "false",
+				Logger:        &serviceLogger,
+				SDKClient:     sdkClient, // Pass the initialized and logged-in SDK client
+			}
+			serviceLogger.Trace().Msgf("loaded MQTT client config %+v", mqttConfig)
+
+			// Initialize MQTT client
+			mqttClient, err = mqttclient.NewMQTTClient(mqttConfig)
 			if err != nil {
-				serviceLogger.Error().Err(err).Msg("Failed to login SDK client")
-				// Consider os.Exit(1) here if login is critical
+				serviceLogger.Error().Err(err).Msg("Failed to initialize MQTT client")
+				// os.Exit(1)
 			} else {
-				serviceLogger.Info().Msg("SDK client logged in successfully")
+				defer mqttClient.Disconnect()
+				serviceLogger.Info().Msg("MQTT client initialized successfully")
 
-				// parse MQTT configuration from the environment
-				mqttConfig := mqttclient.MQTTConfig{
-					BrokerURL:     os.Getenv("MQTT_BROKER_URL"),
-					ClientID:      os.Getenv("MQTT_CLIENT_ID"),
-					Username:      os.Getenv("MQTT_USERNAME"),
-					Password:      os.Getenv("MQTT_PASSWORD"),
-					CleanSession:  os.Getenv("MQTT_CLEAN_SESSION") != "false",
-					AutoReconnect: os.Getenv("MQTT_AUTO_RECONNECT") != "false",
-					Logger:        &serviceLogger,
-					SDKClient:     sdkClient, // Pass the initialized and logged-in SDK client
-				}
-				serviceLogger.Trace().Msgf("loaded MQTT client config %+v", mqttConfig)
-
-				// Initialize MQTT client
-				mqttClient, err = mqttclient.NewMQTTClient(mqttConfig)
-				if err != nil {
-					serviceLogger.Error().Err(err).Msg("Failed to initialize MQTT client")
-					// os.Exit(1)
-				} else {
-					defer mqttClient.Disconnect()
-					serviceLogger.Info().Msg("MQTT client initialized successfully")
-
-					// Subscribe to MQTT topics (run in a separate goroutine)
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						mqttTopics := os.Getenv("MQTT_TOPICS")
-						if mqttTopics == "" {
-							mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+" // Default topic
-						}
-						topic := strings.Split(strings.TrimSpace(mqttTopics), ",")[0]
-						topic = strings.TrimSpace(topic)
-						if topic != "" {
-							err := mqttClient.Subscribe(serviceCtx, topic, 1, mqttClient.HandleMessage)
-							if err != nil {
-								serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
-							} else {
-								serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
-							}
+				// Subscribe to MQTT topics (run in a separate goroutine)
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					mqttTopics := os.Getenv("MQTT_TOPICS")
+					if mqttTopics == "" {
+						mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+" // Default topic
+					}
+					topic := strings.Split(strings.TrimSpace(mqttTopics), ",")[0]
+					topic = strings.TrimSpace(topic)
+					if topic != "" {
+						err := mqttClient.Subscribe(serviceCtx, topic, 1, mqttClient.HandleMessage)
+						if err != nil {
+							serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
 						} else {
-							serviceLogger.Warn().Msg("No MQTT topic specified to subscribe to.")
+							serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
 						}
-					}()
-				}
+					} else {
+						serviceLogger.Warn().Msg("No MQTT topic specified to subscribe to.")
+					}
+				}()
 			}
 >>>>>>> Stashed changes
 		}
