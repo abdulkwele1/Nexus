@@ -140,6 +140,7 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 	ctx := context.Background() // Or derive context from elsewhere if appropriate
 
 	m.logger.Info().Str("topic", topic).Msg("Received message")
+	m.logger.Trace().Str("topic", topic).Str("payload", string(payload)).Msg("Raw MQTT Payload")
 
 	// New expected topic structure: /device_sensor_data/{deviceID}/{sensorID_numeric}/{sensorID_hex?}/{channel?}/{typeCode}/{value?}
 	// Example: /device_sensor_data/444574498032128/2CF7F1C0627000B2/1/vs/4103
