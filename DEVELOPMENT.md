@@ -86,11 +86,3 @@ make reset refresh ready to restart datatabse stuff and wait for the database to
 make it p=TestE2E to run a just a single test
 
 make test- runs all the tests
-
-make-debug-database -lets you run commands for debugging database 
-
-\d+ look at all the table
-
-\d table_name - lets you look at a specific table
-
-make-debug-api

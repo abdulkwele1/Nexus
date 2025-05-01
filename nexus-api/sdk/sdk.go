@@ -469,7 +469,5 @@ func NewClient(config SDKConfig) (*NexusClient, error) {
 		Cookie:        &http.Cookie{},
 	}
 
-	config.Logger.Info().Msgf("Initialized SDK client config - Endpoint: %s, Username: %s", config.NexusAPIEndpoint, config.UserName) // Print config for debugging
-
 	return &client, nil
 }

@@ -1,5 +1,5 @@
 CREATE TABLE sensor_moisture_data (
-    sensor_id BIGINT NOT NULL,
+    sensor_id INTEGER NOT NULL,
     id SERIAL PRIMARY KEY,
     date TIMESTAMP WITH TIME ZONE NOT NULL,
     soil_moisture DECIMAL NOT NULL,
