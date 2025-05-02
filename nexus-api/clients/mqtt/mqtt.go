@@ -183,19 +183,40 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 		m.logger.Info().Int("sensorID", sensorIDInt).Interface("data", tempData).Msg("Successfully processed and sent temperature data")
 
 	case "vs": // Placeholder code for moisture (based on example)
-		var moistureData api.SetSensorMoistureDataResponse
-		err := json.Unmarshal(payload, &moistureData)
+		var reading api.SensorReading
+		err := json.Unmarshal(payload, &reading)
 		if err != nil {
-			m.logger.Error().Err(err).Str("topic", topic).Msg("Failed to unmarshal moisture data")
+			m.logger.Error().Err(err).Str("topic", topic).Msg("Failed to unmarshal sensor reading")
 			return
 		}
-		// Assuming SetSensorMoistureData exists and takes int sensorID and data
-		err = m.sdkClient.SetSensorMoistureData(ctx, sensorIDInt, moistureData)
+
+		// Convert timestamp if needed (e.g., Unix ms to time.Time)
+		ts := time.UnixMilli(reading.Timestamp) // Example conversion
+		moisturePayloadForSDK := api.SensorMoistureData{
+			SensorID:     sensorIDInt,
+			Date:         ts,
+			SoilMoisture: reading.Value,
+			// ID might be set by DB or not needed here
+		}
+
+		// Adapt the SDK call based on what it expects.
+		// Does it expect the single SensorMoistureData struct or the wrapper?
+		// This is just a guess based on previous code:
+		sdkResponseWrapper := api.SetSensorMoistureDataResponse{
+			SensorMoistureData: []api.SensorMoistureData{moisturePayloadForSDK},
+		}
+
+		// The original SDK call used 'moistureData' which was SetSensorMoistureDataResponse
+		// You need to adjust this call based on what m.sdkClient.SetSensorMoistureData actually accepts.
+		// It might need the 'reading' directly, or the 'moisturePayloadForSDK', or the 'sdkResponseWrapper'.
+		// Let's assume it needs the wrapper for now, like the original code did:
+		err = m.sdkClient.SetSensorMoistureData(ctx, sensorIDInt, sdkResponseWrapper) // <-- Pass adapted data
 		if err != nil {
 			m.logger.Error().Err(err).Int("sensorID", sensorIDInt).Msg("Failed to set sensor moisture data via SDK")
 			return
 		}
-		m.logger.Info().Int("sensorID", sensorIDInt).Interface("data", moistureData).Msg("Successfully processed and sent moisture data")
+		// Update the log to show the actual reading received
+		m.logger.Info().Int("sensorID", sensorIDInt).Interface("reading", reading).Msg("Successfully processed and sent moisture data") // <-- Log the 'reading'
 
 	default:
 		m.logger.Warn().Str("topic", topic).Str("typeCode", dataTypeCode).Msg("Received message with unhandled data type code")
