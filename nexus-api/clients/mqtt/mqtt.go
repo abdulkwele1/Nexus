@@ -216,7 +216,7 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 			return
 		}
 		// Update the log to show the actual reading received
-		m.logger.Info().Int("sensorID", sensorIDInt).Interface("reading", reading).Msg("Successfully processed and sent moisture data") // <-- Log the 'reading'
+		m.logger.Info().Int("sensorID", sensorIDInt).Float64("Moisture", reading.Value).Int64("Timestamp", reading.Timestamp).Msg("Successfully processed and sent moisture data")
 
 	default:
 		m.logger.Warn().Str("topic", topic).Str("typeCode", dataTypeCode).Msg("Received message with unhandled data type code")
