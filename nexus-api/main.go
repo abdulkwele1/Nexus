@@ -70,44 +70,12 @@ func main() {
 		}
 	}()
 
-	// --- Wait for API server listener to be healthy ---
-	apiPort := os.Getenv("API_PORT")
-	if apiPort == "" {
-		apiPort = "8080" // Default port if not set
-	}
-	healthCheckURL := fmt.Sprintf("http://localhost:%s/healthcheck", apiPort)
-	maxWait := 30 * time.Second // Max time to wait for health check
-	checkInterval := 500 * time.Millisecond
-	startTime := time.Now()
-
-	serviceLogger.Info().Msgf("Waiting for API server at %s to be healthy...", healthCheckURL)
-	apiHealthy := false
-	for time.Since(startTime) < maxWait {
-		resp, err := http.Get(healthCheckURL)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			serviceLogger.Info().Msg("API server is healthy.")
-			resp.Body.Close() // Important to close the body
-			apiHealthy = true
-			break // Exit loop on success
-		}
-		if resp != nil {
-			resp.Body.Close() // Close body even on non-200 status
-		}
-		time.Sleep(checkInterval)
-	}
-
-	if !apiHealthy {
-		serviceLogger.Error().Msgf("API server health check failed or timed out after %v. Cannot proceed with MQTT/SDK.", maxWait)
-		// We need the API for the SDK, so exit if it's not healthy
-		os.Exit(1)
-	}
-
 	// --- Initialize SDK and MQTT Clients (if enabled and API is healthy) ---
 	enableMQTT := os.Getenv("ENABLE_MQTT") == "true"
 	var mqttClient *mqttclient.MQTTClient
 	// var sdkClient *sdk.NexusClient // sdkClient defined below if needed
 
-	if enableMQTT && apiHealthy {
+	if enableMQTT {
 		serviceLogger.Info().Msg("API is healthy, initializing MQTT and SDK clients...")
 		// Setup SDK client config from environment
 		sdkConfig := sdk.SDKConfig{
@@ -192,8 +160,6 @@ func main() {
 				}()
 			}
 		}
-	} else if enableMQTT && !apiHealthy {
-		serviceLogger.Warn().Msg("MQTT is enabled, but API server is not healthy. Skipping MQTT/SDK initialization.")
 	} else {
 		serviceLogger.Info().Msg("MQTT is disabled, skipping MQTT/SDK client initialization")
 	}
