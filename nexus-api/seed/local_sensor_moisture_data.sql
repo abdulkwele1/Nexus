@@ -1,4 +1,4 @@
-INSERT INTO sensor_moisture_data (date, moisture, sensor_id) VALUES
+INSERT INTO sensor_moisture_data (date, soil_moisture, sensor_id) VALUES
 ('2024-12-20', 100, 1),
 ('2024-12-21', 150, 1),
 ('2024-12-22', 125, 1),
