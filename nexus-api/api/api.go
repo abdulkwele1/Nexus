@@ -91,6 +91,11 @@ type Sensor struct {
 	SensorCoordinates `json:"sensor_coordinates"`
 }
 
+type SensorReading struct {
+	Value     float64 `json:"value"`
+	Timestamp int64   `json:"timestamp"` // Assuming the timestamp is Unix milliseconds
+}
+
 type SensorMoistureData struct {
 	ID           int       `json:"id"`
 	SensorID     int       `json:"sensor_id"`
