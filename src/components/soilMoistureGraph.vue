@@ -17,6 +17,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, defineExpose } from 'vue';
 import * as d3 from 'd3';
+import { useNexusStore } from '@/stores/nexus';
 
 interface DataPoint {
   time: Date;
@@ -51,33 +52,60 @@ const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(
 
 const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 
-//Mock Data
-const mockData: SensorData = {
-  sensor1: Array.from({ length: 24 }, (_, i) => ({
-    time: new Date(2024, 0, 1, i),
-    moisture: Math.random() * 30 + 20 // Random values between 20-50%
-  })),
-  sensor2: Array.from({ length: 24 }, (_, i) => ({
-    time: new Date(2024, 0, 1, i),
-    moisture: Math.random() * 30 + 20
-  })),
-  sensor3: Array.from({ length: 24 }, (_, i) => ({
-    time: new Date(2024, 0, 1, i),
-    moisture: Math.random() * 30 + 20
-  })),
-  sensor4: Array.from({ length: 24 }, (_, i) => ({
-    time: new Date(2024, 0, 1, i),
-    moisture: Math.random() * 30 + 20
-  }))
-};
+// Define SENSOR_CONFIGS (could be props later if more dynamic)
+// Adjusted to match the number of colors and typical sensor setup
+const SENSOR_CONFIGS = [
+  { id: 444574498032128, name: 'Sensor Alpha' },
+  { id: 2, name: 'Sensor 2' },
+  { id: 3, name: 'Sensor 3' },
+  { id: 4, name: 'Sensor 4' },
+];
 
 //possibly where I would put the real data in due time
-const sensors = ref<Sensor[]>([
-  { data: mockData.sensor1, name: 'Sensor 1', visible: true },
-  { data: mockData.sensor2, name: 'Sensor 2', visible: true },
-  { data: mockData.sensor3, name: 'Sensor 3', visible: true },
-  { data: mockData.sensor4, name: 'Sensor 4', visible: true }
-]);
+// const sensors = ref<Sensor[]>([
+//   { data: mockData.sensor1, name: 'Sensor 1', visible: true },
+//   { data: mockData.sensor2, name: 'Sensor 2', visible: true },
+//   { data: mockData.sensor3, name: 'Sensor 3', visible: true },
+//   { data: mockData.sensor4, name: 'Sensor 4', visible: true }
+// ]);
+
+const nexusStore = useNexusStore();
+
+// Initialize sensors ref. It will be populated asynchronously.
+const sensors = ref<Sensor[]>(SENSOR_CONFIGS.map(config => ({
+  data: [], // Start with empty data
+  name: config.name,
+  visible: true, // Default visibility
+})));
+
+async function fetchAllSensorData() {
+  try {
+    const allSensorsDataPromises = SENSOR_CONFIGS.map(async (config, index) => {
+      // Assuming getSensorMoistureData fetches all data if startDate/endDate are undefined.
+      // The API response `responseData.sensor_moisture_data` is an array of raw data points.
+      // Each point should have 'date' and 'soil_moisture'.
+      const rawDataPoints = await nexusStore.user.getSensorMoistureData(config.id);
+
+      if (rawDataPoints && Array.isArray(rawDataPoints)) {
+        const formattedData: DataPoint[] = rawDataPoints.map((point: any) => ({
+          // Assuming point.date from API is a string (e.g., ISO8601) and point.soil_moisture is a number
+          time: new Date(point.date), 
+          moisture: Number(point.soil_moisture), 
+        })).sort((a, b) => a.time.getTime() - b.time.getTime()); // Sort data by time ascending
+        sensors.value[index].data = formattedData;
+      } else {
+        console.warn(`No data returned for sensor ${config.name} (ID: ${config.id}) or data is not an array. API returned:`, rawDataPoints);
+        sensors.value[index].data = []; // Ensure data is an empty array on error/no data
+      }
+    });
+    await Promise.all(allSensorsDataPromises);
+  } catch (error) {
+    console.error("Error fetching sensor data:", error);
+    sensors.value.forEach(sensor => sensor.data = []);
+  } finally {
+    createChart(); // Re-create chart once all data is fetched or after an error
+  }
+}
 
 const formatDate = (date: Date) => {
   return date.toLocaleString('en-US', {
@@ -212,23 +240,35 @@ const createChart = () => {
   const bisect = d3.bisector<DataPoint, Date>(d => d.time).center;
   
   svg.value.on("pointermove", (event) => {
-    if (!tooltip.value) return;
+    if (!tooltip.value || !sensors.value.some(s => s.visible && s.data.length > 0)) return; // Ensure there's data
 
     const pointer = d3.pointer(event);
     const xPos = x.invert(pointer[0]);
     
     // Find the closest data point for each visible sensor
     const tooltipData = sensors.value
-      .filter(sensor => sensor.visible)
+      .filter(sensor => sensor.visible && sensor.data.length > 0) // Ensure sensor has data
       .map((sensor, i) => {
+        const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
+        const color = colors[sensorColorIndex % colors.length]; // Get color safely
+
         const index = bisect(sensor.data, xPos);
+        // Ensure index is within bounds
+        const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
+        if (!dataPoint) return null; // Should not happen if data.length > 0
+
         return {
           name: sensor.name,
-          value: sensor.data[index].moisture,
-          time: sensor.data[index].time,
-          color: colors[i]
+          value: dataPoint.moisture,
+          time: dataPoint.time,
+          color: color
         };
-      });
+      }).filter(item => item !== null); // Remove nulls if any
+
+    if (tooltipData.length === 0) {
+      tooltip.value.style("display", "none");
+      return;
+    }
 
     // Show tooltip
     tooltip.value.style("display", null);
@@ -329,8 +369,9 @@ defineExpose({
   getFilteredData
 });
 
-onMounted(() => {
-  createChart();
+onMounted(async () => {
+  await fetchAllSensorData();
+  // createChart(); // createChart is now called within fetchAllSensorData
 });
 </script>
 
