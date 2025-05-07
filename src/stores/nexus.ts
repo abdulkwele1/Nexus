@@ -132,6 +132,56 @@ class User {
         return response
 }
 
+  async getSensorMoistureData(sensorId: number, startDate?: string, endDate?: string): Promise<any> {
+    // The backend handler CreateGetSensorMoistureDataHandler currently does not process
+    // startDate and endDate query parameters from the request.
+    // The existing client-side filtering in soilMoistureGraph.vue will handle this for now.
+    let url = `${VITE_NEXUS_API_URL}/sensors/${sensorId}/moisture_data`;
+
+    // Example for future backend enhancement:
+    // const params = new URLSearchParams();
+    // if (startDate) params.append('start_date', startDate);
+    // if (endDate) params.append('end_date', endDate);
+    // if (params.toString()) url += `?${params.toString()}`;
+
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      console.error(`Error fetching moisture data for sensor ${sensorId}: ${response.statusText}`);
+      return null; 
+    }
+    // The API returns GetSensorMoistureDataResponse, which has a SensorMoistureData field (an array)
+    const responseData = await response.json(); 
+    return responseData.sensor_moisture_data || []; // Return the array or an empty one if not present
+  }
+
+  async setSensorMoistureData(sensorId: number, moistureData: object): Promise<any> {
+    const url = `${VITE_NEXUS_API_URL}/sensors/${sensorId}/moisture_data`
+
+    let payload = {
+      moisture_data: moistureData
+    }
+
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+
+    return response
+  }
+
+  
+
 
 
    async logPanelData(userName: any, password: any): Promise<any> {
@@ -152,15 +202,13 @@ class User {
       return response
 }
 
-
-
-    // Function to get a cookie by name
-    getCookie(): any {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; session_id=`);
-        if (parts.length === 2) {
-            return parts?.pop()?.split(';')?.shift();
-        }
-        return false
-  }
+  // Function to get a cookie by name
+  getCookie(): any {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; session_id=`);
+      if (parts.length === 2) {
+          return parts?.pop()?.split(';')?.shift();
+      }
+      return false
+}
 }
