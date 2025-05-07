@@ -98,6 +98,11 @@ type SensorMoistureData struct {
 	SoilMoisture float64   `json:"soil_moisture"`
 }
 
+type SensorReading struct {
+	Value     float64 `json:"value"`
+	Timestamp int64   `json:"timestamp"` // Assuming the timestamp is Unix milliseconds
+}
+
 type SensorTemperatureData struct {
 	ID              int       `json:"id"`
 	SensorID        int       `json:"sensor_id"`

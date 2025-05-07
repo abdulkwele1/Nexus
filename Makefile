@@ -122,13 +122,15 @@ debug-database:
 .PHONY: seed-database
 # add seed state to database
 seed-database:
+	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/seed_sensors.sql
+	
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_login_authentication_seed.sql
 
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_panel_yield_data_seed.sql
 
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_panel_consumption_data_seed.sql
 
-	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_sensors_seed.sql
+	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_sensors_data.sql
 
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -d ${POSTGRES_DB} -U ${POSTGRES_USER} -h localhost -f nexus-api/seed/local_sensor_moisture_data.sql
 
