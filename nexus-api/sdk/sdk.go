@@ -102,7 +102,7 @@ func (nc *NexusClient) Login(ctx context.Context, params api.LoginRequest) (api.
 	// save cookie for client
 	nc.Cookie.Value = result.Cookie
 	nc.Cookie.Name = "session_id"
-	nc.Info().Str("cookie_name", nc.Cookie.Name).Str("cookie_value", nc.Cookie.Value).Msg("Login successful, cookie stored in SDK client")
+	nc.Debug().Str("cookie_name", nc.Cookie.Name).Str("cookie_value", nc.Cookie.Value).Msg("Login successful, cookie stored in SDK client")
 
 	return result, nil
 }
