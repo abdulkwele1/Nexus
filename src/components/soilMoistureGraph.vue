@@ -165,9 +165,10 @@ const createChart = () => {
     .y(d => y(d.moisture));
 
   // Add x-axis
+  const timeFormat = d3.timeFormat("%I:%M %p"); // Formats to local time e.g., "01:15 PM"
   svg.value.append("g")
     .attr("transform", `translate(0,${height - marginBottom})`)
-    .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+    .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0).tickFormat(timeFormat));
 
   // Add y-axis
   svg.value.append("g")
@@ -324,18 +325,35 @@ const filterData = (params: Props['queryParams']) => {
   const startDate = new Date(params.startDate);
   const endDate = new Date(params.endDate);
 
-  const filtered = sensors.value.map(sensor => ({
-    ...sensor,
-    data: sensor.data.filter(point => {
-      const date = new Date(point.time);
-      return (
-        date >= startDate &&
-        date <= endDate &&
-        point.moisture >= params.minMoisture &&
-        point.moisture <= params.maxMoisture
+  // Log the filter boundaries
+  console.log('[soilMoistureGraph] Filtering with Start:', startDate, ' (ISO:', startDate.toISOString(), ') End:', endDate, ' (ISO:', endDate.toISOString(), ')');
+  console.log('[soilMoistureGraph] Query Params received:', JSON.stringify(params));
+
+  const filtered = sensors.value.map(sensor => {
+    // Log a few original data points for this sensor before filtering
+    if (sensor.data.length > 0) {
+      console.log(`[soilMoistureGraph] Original data for ${sensor.name} (first 3 points):`, 
+        JSON.stringify(sensor.data.slice(0, 3).map(p => ({ time: p.time.toISOString(), moisture: p.moisture })))
       );
-    })
-  }));
+    }
+
+    const sensorFilteredData = sensor.data.filter(point => {
+      const date = new Date(point.time); // point.time is already a Date object, new Date() here is for consistency or if it were a string
+      const includePoint = date >= startDate && date <= endDate;
+      // Log decision for a few points
+      // if (Math.random() < 0.1) { // Uncomment to log a sample of points and their filter decision
+      //   console.log(`[soilMoistureGraph] Point: ${date.toISOString()}, Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}, Included: ${includePoint}`);
+      // }
+      return includePoint;
+    });
+
+    console.log(`[soilMoistureGraph] Sensor ${sensor.name} - Original points: ${sensor.data.length}, Filtered points: ${sensorFilteredData.length}`);
+
+    return {
+      ...sensor,
+      data: sensorFilteredData
+    };
+  });
 
   // Apply resolution aggregation if needed
   if (params.resolution !== 'raw') {
