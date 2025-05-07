@@ -19,6 +19,10 @@ import { ref, onMounted, watch, defineExpose } from 'vue';
 import * as d3 from 'd3';
 import { useNexusStore } from '@/stores/nexus';
 
+// Capture D3's default multi-scale local time formatter
+const localTimeScale = d3.scaleTime();
+const localTimeFormatter = localTimeScale.tickFormat();
+
 interface DataPoint {
   time: Date;
   moisture: number;
@@ -40,7 +44,7 @@ interface Props {
     endDate: string;
     minMoisture: number;
     maxMoisture: number;
-    resolution: 'raw' | 'hourly' | 'daily' | 'weekly';
+    resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
   }
 }
 
@@ -85,6 +89,9 @@ async function fetchAllSensorData() {
       // The API response `responseData.sensor_moisture_data` is an array of raw data points.
       // Each point should have 'date' and 'soil_moisture'.
       const rawDataPoints = await nexusStore.user.getSensorMoistureData(config.id);
+
+      // Log raw data points here
+      console.log(`[soilMoistureGraph] Raw data for ${config.name} (ID: ${config.id}):`, JSON.parse(JSON.stringify(rawDataPoints)));
 
       if (rawDataPoints && Array.isArray(rawDataPoints)) {
         const formattedData: DataPoint[] = rawDataPoints.map((point: any) => ({
@@ -164,11 +171,27 @@ const createChart = () => {
     .x(d => x(d.time))
     .y(d => y(d.moisture));
 
+  // Determine X-axis tick formatter based on resolution
+  let xAxisTickFormat = localTimeFormatter; // Default for raw/hourly
+  if (props.queryParams.resolution === 'daily' || 
+      props.queryParams.resolution === 'weekly' || 
+      props.queryParams.resolution === 'monthly') {
+    // For daily, weekly, monthly, use a format that emphasizes date
+    // D3's default scaleTime().tickFormat() is adaptive and good for dates too
+    // but we can be more specific if needed, e.g., d3.timeFormat("%Y-%m-%d")
+    // For now, let D3's adaptive localTimeFormatter handle it, it should prioritize date parts for wider spans.
+    // If more specific formatting is needed, we can use d3.timeFormat here.
+    // Example: xAxisTickFormat = d3.timeFormat("%x"); // Locale's date, e.g., 01/15/2024
+  }
+
   // Add x-axis
-  const timeFormat = d3.timeFormat("%I:%M %p"); // Formats to local time e.g., "01:15 PM"
   svg.value.append("g")
     .attr("transform", `translate(0,${height - marginBottom})`)
-    .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0).tickFormat(timeFormat));
+    .call(d3.axisBottom(x) 
+        .ticks(width / 80)
+        .tickSizeOuter(0)
+        .tickFormat(xAxisTickFormat) 
+    );
 
   // Add y-axis
   svg.value.append("g")
@@ -324,9 +347,11 @@ watch(() => props.queryParams, () => {
 const filterData = (params: Props['queryParams']) => {
   const startDate = new Date(params.startDate);
   const endDate = new Date(params.endDate);
+  const minMoisture = params.minMoisture;
+  const maxMoisture = params.maxMoisture;
 
   // Log the filter boundaries
-  console.log('[soilMoistureGraph] Filtering with Start:', startDate, ' (ISO:', startDate.toISOString(), ') End:', endDate, ' (ISO:', endDate.toISOString(), ')');
+  console.log('[soilMoistureGraph] Filtering with Start:', startDate, ' (ISO:', startDate.toISOString(), ') End:', endDate, ' (ISO:', endDate.toISOString(), ') MinM:', minMoisture, 'MaxM:', maxMoisture);
   console.log('[soilMoistureGraph] Query Params received:', JSON.stringify(params));
 
   const filtered = sensors.value.map(sensor => {
@@ -338,11 +363,19 @@ const filterData = (params: Props['queryParams']) => {
     }
 
     const sensorFilteredData = sensor.data.filter(point => {
-      const date = new Date(point.time); // point.time is already a Date object, new Date() here is for consistency or if it were a string
-      const includePoint = date >= startDate && date <= endDate;
-      // Log decision for a few points
-      // if (Math.random() < 0.1) { // Uncomment to log a sample of points and their filter decision
-      //   console.log(`[soilMoistureGraph] Point: ${date.toISOString()}, Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}, Included: ${includePoint}`);
+      const date = point.time; // point.time is already a Date object
+      const moisture = point.moisture;
+      
+      const isAfterStartDate = date >= startDate;
+      const isBeforeEndDate = date <= endDate;
+      const isAboveMinMoisture = moisture >= minMoisture;
+      const isBelowMaxMoisture = moisture <= maxMoisture;
+      
+      const includePoint = isAfterStartDate && isBeforeEndDate && isAboveMinMoisture && isBelowMaxMoisture;
+      
+      // Log decision for a sample of points
+      // if (Math.random() < 0.01) { // Adjust frequency as needed
+      //   console.log(`[soilMoistureGraph] Point: ${date.toISOString()} (${moisture}), Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}, MinM: ${minMoisture}, MaxM: ${maxMoisture}, Included: ${includePoint}`);
       // }
       return includePoint;
     });
@@ -364,10 +397,64 @@ const filterData = (params: Props['queryParams']) => {
 };
 
 // Add data aggregation function
-const aggregateData = (data: Sensor[], resolution: string) => {
-  // Implementation of data aggregation based on resolution
-  // This is a placeholder - implement the actual aggregation logic
-  return data;
+const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'daily' | 'weekly' | 'monthly'): Sensor[] => {
+  return sensorsToAggregate.map(sensor => {
+    if (!sensor.data || sensor.data.length === 0) {
+      return { ...sensor, data: [] };
+    }
+
+    const aggregatedData: DataPoint[] = [];
+    const groups = new Map<string, { sum: number, count: number, time: Date }>();
+
+    sensor.data.forEach(point => {
+      let key = '';
+      const date = new Date(point.time); // Ensure it's a Date object
+
+      switch (resolution) {
+        case 'hourly':
+          key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
+          break;
+        case 'daily':
+          key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+          break;
+        case 'weekly':
+          const weekStartDate = d3.timeWeek.floor(date);
+          key = `${weekStartDate.getFullYear()}-${d3.timeWeek.count(d3.timeYear.floor(weekStartDate), weekStartDate)}`;
+          break;
+        case 'monthly':
+          key = `${date.getFullYear()}-${date.getMonth()}`;
+          break;
+      }
+
+      if (!groups.has(key)) {
+        let groupTime = d3.timeHour.floor(date); // Default
+        if (resolution === 'daily') {
+          groupTime = d3.timeDay.floor(date);
+        } else if (resolution === 'weekly') {
+          groupTime = d3.timeWeek.floor(date);
+        } else if (resolution === 'monthly') {
+          groupTime = d3.timeMonth.floor(date);
+        }
+        groups.set(key, { sum: 0, count: 0, time: groupTime });
+      }
+      
+      const group = groups.get(key)!;
+      group.sum += point.moisture;
+      group.count += 1;
+    });
+
+    groups.forEach(group => {
+      aggregatedData.push({
+        time: group.time,
+        moisture: group.sum / group.count,
+      });
+    });
+
+    // Sort by time, as grouping might change order
+    aggregatedData.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+    return { ...sensor, data: aggregatedData };
+  });
 };
 
 // Modify createChart to accept filtered data

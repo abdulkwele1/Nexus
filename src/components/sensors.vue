@@ -64,6 +64,7 @@
           <option value="hourly">Hourly Average</option>
           <option value="daily">Daily Average</option>
           <option value="weekly">Weekly Average</option>
+          <option value="monthly">Monthly Average</option>
         </select>
       </div>
 
@@ -122,6 +123,16 @@ import { useNexusStore } from '@/stores/nexus';
 const router = useRouter();
 const goTo = (path: string) => {
   router.push(path);
+};
+
+// Helper function to format Date to YYYY-MM-DDTHH:mm local time string
+const toLocalISOStringShort = (date: Date): string => {
+  const YYYY = date.getFullYear();
+  const MM = String(date.getMonth() + 1).padStart(2, '0');
+  const DD = String(date.getDate()).padStart(2, '0');
+  const HH = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${YYYY}-${MM}-${DD}T${HH}:${mm}`;
 };
 
 // Real-time data setup
@@ -198,7 +209,7 @@ interface QueryParams {
   endDate: string;
   minMoisture: number;
   maxMoisture: number;
-  resolution: 'raw' | 'hourly' | 'daily' | 'weekly';
+  resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
 }
 
 const queryParams = ref<QueryParams>({
@@ -228,8 +239,8 @@ const setTimeRange = (range: string) => {
       break;
   }
 
-  queryParams.value.startDate = start.toISOString().slice(0, 16);
-  queryParams.value.endDate = now.toISOString().slice(0, 16);
+  queryParams.value.startDate = toLocalISOStringShort(start);
+  queryParams.value.endDate = toLocalISOStringShort(now);
   updateGraphData();
 };
 
