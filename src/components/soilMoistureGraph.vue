@@ -1,15 +1,5 @@
 <template>
   <div class="soil-moisture-graph">
-    <div class="sensor-toggles">
-      <label v-for="(sensor, index) in sensors" :key="sensor.name" class="toggle-label">
-        <input 
-          type="checkbox" 
-          v-model="sensor.visible" 
-          :style="{ '--sensor-color': colors[index] }"
-        >
-        {{ sensor.name }}
-      </label>
-    </div>
     <div ref="chartContainer"></div>
   </div>
 </template>
@@ -35,7 +25,6 @@ interface SensorData {
 interface Sensor {
   data: DataPoint[];
   name: string;
-  visible: boolean;
 }
 
 interface Props {
@@ -46,6 +35,8 @@ interface Props {
     maxMoisture: number;
     resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
   }
+  sensorVisibility: { [key: string]: boolean };
+  dynamicTimeWindow?: 'none' | 'lastHour' | 'last24Hours' | 'last7Days' | 'last30Days';
 }
 
 const props = defineProps<Props>();
@@ -60,9 +51,9 @@ const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 // Adjusted to match the number of colors and typical sensor setup
 const SENSOR_CONFIGS = [
   { id: 444574498032128, name: 'Sensor Alpha' },
-  { id: 2, name: 'Sensor 2' },
-  { id: 3, name: 'Sensor 3' },
-  { id: 4, name: 'Sensor 4' },
+  // { id: 2, name: 'Sensor 2' }, // Temporarily commented out
+  // { id: 3, name: 'Sensor 3' }, // Temporarily commented out
+  // { id: 4, name: 'Sensor 4' }, // Temporarily commented out
 ];
 
 //possibly where I would put the real data in due time
@@ -75,43 +66,57 @@ const SENSOR_CONFIGS = [
 
 const nexusStore = useNexusStore();
 
-// Initialize sensors ref. It will be populated asynchronously.
-const sensors = ref<Sensor[]>(SENSOR_CONFIGS.map((config, index) => ({
-  data: [], // Start with empty data
+// Initialize sensors ref without internal visibility
+const sensors = ref<Sensor[]>(SENSOR_CONFIGS.map((config) => ({
+  data: [], 
   name: config.name,
-  visible: config.name === 'Sensor Alpha', 
 })));
 
 async function fetchAllSensorData() {
+  let fetchError = false;
   try {
     const allSensorsDataPromises = SENSOR_CONFIGS.map(async (config, index) => {
-      // Assuming getSensorMoistureData fetches all data if startDate/endDate are undefined.
-      // The API response `responseData.sensor_moisture_data` is an array of raw data points.
-      // Each point should have 'date' and 'soil_moisture'.
       const rawDataPoints = await nexusStore.user.getSensorMoistureData(config.id);
-
-      // Log raw data points here
       console.log(`[soilMoistureGraph] Raw data for ${config.name} (ID: ${config.id}):`, JSON.parse(JSON.stringify(rawDataPoints)));
-
       if (rawDataPoints && Array.isArray(rawDataPoints)) {
         const formattedData: DataPoint[] = rawDataPoints.map((point: any) => ({
-          // Assuming point.date from API is a string (e.g., ISO8601) and point.soil_moisture is a number
-          time: new Date(point.date), 
-          moisture: Number(point.soil_moisture), 
-        })).sort((a, b) => a.time.getTime() - b.time.getTime()); // Sort data by time ascending
-        sensors.value[index].data = formattedData;
+          time: new Date(point.date),
+          moisture: Number(point.soil_moisture),
+        })).sort((a, b) => a.time.getTime() - b.time.getTime());
+        // Temporarily update sensors.value with the raw data. 
+        // The subsequent call to updateChart will process it.
+        sensors.value[index].data = formattedData; 
       } else {
         console.warn(`No data returned for sensor ${config.name} (ID: ${config.id}) or data is not an array. API returned:`, rawDataPoints);
-        sensors.value[index].data = []; // Ensure data is an empty array on error/no data
+        sensors.value[index].data = [];
       }
     });
     await Promise.all(allSensorsDataPromises);
   } catch (error) {
     console.error("Error fetching sensor data:", error);
-    sensors.value.forEach(sensor => sensor.data = []);
+    fetchError = true;
+    sensors.value.forEach(sensor => sensor.data = []); // Clear data on error
   } finally {
-    createChart(); // Re-create chart once all data is fetched or after an error
+    if (!fetchError) {
+      // After fetching ALL raw data, trigger the update process which will filter/aggregate
+      console.log('[soilMoistureGraph] fetchAllSensorData completed. Triggering chart update/processing...');
+      // Call the function that handles filtering/aggregation based on current props
+      processAndDrawChart(); 
+    } else {
+      // On error, clear the chart by drawing with the already cleared sensors.value
+      createChart(); 
+    }
+    // REMOVED direct call to createChart() or updateChart() without processing
   }
+}
+
+// Function to process data based on current state and draw
+const processAndDrawChart = () => {
+  console.log(`[soilMoistureGraph] processAndDrawChart: Processing data with current queryParams:`, JSON.stringify(props.queryParams));
+  // Pass the current sensors.value (which holds raw data after fetch, or processed data after filter change) 
+  // to filterData. filterData needs to know it might receive raw data.
+  const processedData = filterData(props.queryParams); // Applies filter/aggregation based on props
+  updateChart(processedData); // Update chart with the processed data
 }
 
 const formatDate = (date: Date) => {
@@ -129,6 +134,10 @@ const formatValue = (value: number) => {
 };
 
 const createChart = () => {
+  // ****** ADDED LOG to check resolution ******
+  console.log('[soilMoistureGraph] createChart called. Current resolution from props:', props.queryParams.resolution);
+  // ****** END ADDED LOG ******
+
   if (!chartContainer.value) return;
 
   // Clear previous chart
@@ -153,9 +162,9 @@ const createChart = () => {
     .style("-webkit-tap-highlight-color", "transparent")
     .style("overflow", "visible");
 
-  // Combine visible sensor data for domain calculation
+  // Combine visible sensor data for domain calculation - USE PROP
   const allData = sensors.value
-    .filter(sensor => sensor.visible)
+    .filter(sensor => props.sensorVisibility[sensor.name]) // USE PROP
     .flatMap(sensor => sensor.data);
 
   let yMinActual = d3.min(allData, d => d.moisture) as number;
@@ -172,7 +181,7 @@ const createChart = () => {
       }
   }
 
-  console.log(`[soilMoistureGraph] Actual Min: ${yMinActual}, Actual Max: ${yMaxActual} (from all visible sensors)`);
+  console.log(`[soilMoistureGraph] Actual Min: ${yMinActual}, Actual Max: ${yMaxActual} (from sensors visible via prop)`);
 
   const dataRange = yMaxActual - yMinActual;
 
@@ -239,7 +248,7 @@ const createChart = () => {
     .range([marginLeft, width - marginRight]);
 
   const y = d3.scaleLinear()
-    .domain([yDomainMinWithPadding, yDomainMaxWithPadding]) // New dynamic domain
+    .domain([yDomainMinWithPadding, yDomainMaxWithPadding]) 
     .range([height - marginBottom, marginTop]);
 
   // Create line generator
@@ -289,14 +298,17 @@ const createChart = () => {
     .attr("class", "tooltip")
     .style("display", "none");
 
-  // Add lines for each visible sensor
+  // Add lines for each visible sensor - USE PROP
   sensors.value.forEach((sensor, i) => {
-    if (!sensor.visible) return;
+    if (!props.sensorVisibility[sensor.name]) return; // USE PROP
+
+    const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
+    const color = colors[sensorColorIndex % colors.length];
 
     const path = svg.value!.append("path")
       .datum(sensor.data)
       .attr("fill", "none")
-      .attr("stroke", colors[i])
+      .attr("stroke", color) // Use mapped color
       .attr("stroke-width", 1.5)
       .attr("d", line);
 
@@ -311,21 +323,24 @@ const createChart = () => {
     });
   });
 
-  // Add legend
+  // Add legend - USE PROP
   const legend = svg.value.append("g")
     .attr("font-family", "sans-serif")
     .attr("font-size", 10)
     .attr("text-anchor", "start")
     .selectAll("g")
-    .data(sensors.value.filter(s => s.visible))
+    .data(sensors.value.filter(s => props.sensorVisibility[s.name])) // USE PROP
     .join("g")
-    .attr("transform", (d, i) => `translate(0,${i * 20})`);
+      .attr("transform", (d, i) => `translate(0,${i * 20})`);
 
   legend.append("rect")
     .attr("x", width - 19)
     .attr("width", 19)
     .attr("height", 19)
-    .attr("fill", (d, i) => colors[i]);
+    .attr("fill", (d) => { // Find color based on filtered data name
+        const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === d.name);
+        return colors[sensorColorIndex % colors.length];
+    });
 
   legend.append("text")
     .attr("x", width - 24)
@@ -336,26 +351,28 @@ const createChart = () => {
   // Add the chart to the container
   chartContainer.value.appendChild(svg.value.node());
 
-  // Add mouse interaction for tooltip
+  // Add mouse interaction for tooltip - USE PROP
   const bisect = d3.bisector<DataPoint, Date>(d => d.time).center;
   
   svg.value.on("pointermove", (event) => {
-    if (!tooltip.value || !sensors.value.some(s => s.visible && s.data.length > 0)) return; // Ensure there's data
+    const visibleSensorsWithData = sensors.value.filter(s => props.sensorVisibility[s.name] && s.data.length > 0);
+    if (!tooltip.value || visibleSensorsWithData.length === 0) { 
+      if (tooltip.value) tooltip.value.style("display", "none"); 
+      return;
+    }
 
     const pointer = d3.pointer(event);
     const xPos = x.invert(pointer[0]);
     
-    // Find the closest data point for each visible sensor
-    const tooltipData = sensors.value
-      .filter(sensor => sensor.visible && sensor.data.length > 0) // Ensure sensor has data
-      .map((sensor, i) => {
+    // Find the closest data point for each visible sensor - USE PROP
+    const tooltipData = visibleSensorsWithData // Use pre-filtered list
+      .map((sensor) => { // Removed index 'i' as it's not reliable here
         const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
-        const color = colors[sensorColorIndex % colors.length]; // Get color safely
+        const color = colors[sensorColorIndex % colors.length]; 
 
         const index = bisect(sensor.data, xPos);
-        // Ensure index is within bounds
         const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
-        if (!dataPoint) return null; // Should not happen if data.length > 0
+        if (!dataPoint) return null; 
 
         // ****** ADDED LOG for Step 2: Tooltip Raw Value ******
         if (sensor.name === 'Sensor Alpha') {
@@ -369,12 +386,7 @@ const createChart = () => {
           time: dataPoint.time,
           color: color
         };
-      }).filter(item => item !== null); // Remove nulls if any
-
-    if (tooltipData.length === 0) {
-      tooltip.value.style("display", "none");
-      return;
-    }
+      }).filter(item => item !== null); 
 
     // Show tooltip
     tooltip.value.style("display", null);
@@ -418,56 +430,112 @@ const createChart = () => {
   });
 };
 
-// Watch for changes in sensor visibility
-watch(() => sensors.value.map(s => s.visible), () => {
-  createChart();
-}, { deep: true });
-
 // Add watch for queryParams
 watch(() => props.queryParams, () => {
-  // Filter and process data based on query params
-  const filteredData = filterData(props.queryParams);
-  updateChart(filteredData);
+  // Query params changed, process the current raw data and redraw
+  console.log('[soilMoistureGraph] Query Params changed. Triggering chart processing...');
+  processAndDrawChart();
 }, { deep: true });
+
+// Add watch for sensorVisibility prop (NEW)
+watch(() => props.sensorVisibility, () => {
+  console.log('[soilMoistureGraph] sensorVisibility prop changed. Triggering createChart...');
+  // Just need to redraw, filtering happens within createChart based on the new prop
+  createChart(); 
+}, { deep: true });
+
+// --- Watch for dynamicTimeWindow prop --- 
+watch(() => props.dynamicTimeWindow, () => {
+  console.log(`[soilMoistureGraph] dynamicTimeWindow prop changed to: ${props.dynamicTimeWindow}. Triggering chart processing...`);
+  processAndDrawChart(); 
+});
+// --- End watch for dynamicTimeWindow prop --- 
 
 // Add data filtering function
 const filterData = (params: Props['queryParams']) => {
-  const startDate = new Date(params.startDate);
-  const endDate = new Date(params.endDate);
+  const now = new Date();
+  let filterRangeStart: Date;
+  let filterRangeEnd: Date;
+  let useInclusiveEnd = false; // For ranges ending 'now' or being precise single points
+
+  if (props.dynamicTimeWindow && props.dynamicTimeWindow !== 'none') {
+    console.log(`[soilMoistureGraph] filterData: Using dynamicTimeWindow = ${props.dynamicTimeWindow}`);
+    filterRangeEnd = now; // Default end for dynamic windows is 'now'
+    useInclusiveEnd = true; // Dynamic windows are typically inclusive of their end time (now)
+
+    switch (props.dynamicTimeWindow) {
+      case 'lastHour':
+        filterRangeStart = new Date(now.getTime() - 1 * 60 * 60 * 1000);
+        break;
+      case 'last24Hours':
+        filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'last7Days':
+        filterRangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'last30Days':
+        filterRangeStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        // This case should ideally not be reached if props.dynamicTimeWindow is valid and not 'none'
+        console.warn(`[soilMoistureGraph] filterData: Unexpected dynamicTimeWindow value: ${props.dynamicTimeWindow}. Falling back to queryParams.`);
+        filterRangeStart = new Date(params.startDate + 'T00:00:00');
+        const tempEndDate = new Date(params.endDate + 'T00:00:00');
+        tempEndDate.setDate(tempEndDate.getDate() + 1);
+        filterRangeEnd = tempEndDate;
+        useInclusiveEnd = false; // Day ranges are exclusive of the end time (start of next day)
+        break;
+    }
+  } else {
+    console.log('[soilMoistureGraph] filterData: Using queryParams for date range.');
+    filterRangeStart = new Date(params.startDate + 'T00:00:00');
+    const tempEndDate = new Date(params.endDate + 'T00:00:00');
+    tempEndDate.setDate(tempEndDate.getDate() + 1); // Start of the next day
+    filterRangeEnd = tempEndDate;
+    useInclusiveEnd = false; // Day ranges are exclusive of the end time (start of next day)
+  }
+
+  console.log(`[soilMoistureGraph] filterData: Effective time range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()} (inclusiveEnd: ${useInclusiveEnd})`);
+
   const minMoisture = params.minMoisture;
   const maxMoisture = params.maxMoisture;
-
-  // Log the filter boundaries
-  console.log('[soilMoistureGraph] Filtering with Start:', startDate, ' (ISO:', startDate.toISOString(), ') End:', endDate, ' (ISO:', endDate.toISOString(), ') MinM:', minMoisture, 'MaxM:', maxMoisture);
-  console.log('[soilMoistureGraph] Query Params received:', JSON.stringify(params));
+  
+  // Log the filter boundaries from params (original date strings)
+  // console.log('[soilMoistureGraph] Filtering with Start Day (Local 00:00): ', startDate, ' (ISO:', startDate.toISOString(), ') End Day (Local 23:59 implicitly by < next day): ', endDateRaw, ' (< ', endOfRangeDate.toISOString(), ') MinM:', minMoisture, 'MaxM:', maxMoisture);
+  // console.log('[soilMoistureGraph] Query Params received (Date strings):', JSON.stringify(params));
 
   const filtered = sensors.value.map(sensor => {
     // Log a few original data points for this sensor before filtering
-    if (sensor.data.length > 0) {
-      console.log(`[soilMoistureGraph] Original data for ${sensor.name} (first 3 points):`, 
-        JSON.stringify(sensor.data.slice(0, 3).map(p => ({ time: p.time.toISOString(), moisture: p.moisture })))
-      );
-    }
+    // if (sensor.data.length > 0) {
+    //   console.log(`[soilMoistureGraph] Original data for ${sensor.name} (first 3 points):`, 
+    //     JSON.stringify(sensor.data.slice(0, 3).map(p => ({ time: p.time.toISOString(), moisture: p.moisture })))
+    //   );
+    // }
 
     const sensorFilteredData = sensor.data.filter(point => {
       const date = point.time; // point.time is already a Date object
       const moisture = point.moisture;
       
-      const isAfterStartDate = date >= startDate;
-      const isBeforeEndDate = date <= endDate;
+      let inTimeRange;
+      if (useInclusiveEnd) {
+        inTimeRange = date >= filterRangeStart && date <= filterRangeEnd;
+      } else {
+        inTimeRange = date >= filterRangeStart && date < filterRangeEnd;
+      }
+      
       const isAboveMinMoisture = moisture >= minMoisture;
       const isBelowMaxMoisture = moisture <= maxMoisture;
       
-      const includePoint = isAfterStartDate && isBeforeEndDate && isAboveMinMoisture && isBelowMaxMoisture;
+      const includePoint = inTimeRange && isAboveMinMoisture && isBelowMaxMoisture;
       
       // Log decision for a sample of points
       // if (Math.random() < 0.01) { // Adjust frequency as needed
-      //   console.log(`[soilMoistureGraph] Point: ${date.toISOString()} (${moisture}), Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}, MinM: ${minMoisture}, MaxM: ${maxMoisture}, Included: ${includePoint}`);
+      //   console.log(`[soilMoistureGraph] Point: ${date.toISOString()} (${moisture}), Start: ${filterRangeStart.toISOString()}, End: ${filterRangeEnd.toISOString()}, MinM: ${minMoisture}, MaxM: ${maxMoisture}, Included: ${includePoint}`);
       // }
       return includePoint;
     });
 
-    console.log(`[soilMoistureGraph] Sensor ${sensor.name} - Original points: ${sensor.data.length}, Filtered points: ${sensorFilteredData.length}`);
+    console.log(`[soilMoistureGraph] Sensor ${sensor.name} - Original points: ${sensor.data.length}, After time/moisture filter: ${sensorFilteredData.length}`);
 
     return {
       ...sensor,
@@ -475,8 +543,15 @@ const filterData = (params: Props['queryParams']) => {
     };
   });
 
+  // ****** ADDED LOG for Aggregation Decision ******
+  console.log(`[soilMoistureGraph] filterData: Checking resolution for aggregation. Current resolution: "${params.resolution}"`);
+  // ****** END ADDED LOG ******
+
   // Apply resolution aggregation if needed
   if (params.resolution !== 'raw') {
+    // ****** ADDED LOG for Calling Aggregation ******
+    console.log(`[soilMoistureGraph] filterData: Resolution is "${params.resolution}", calling aggregateData.`);
+    // ****** END ADDED LOG ******
     return aggregateData(filtered, params.resolution);
   }
 
@@ -486,6 +561,10 @@ const filterData = (params: Props['queryParams']) => {
 // Add data aggregation function
 const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'daily' | 'weekly' | 'monthly'): Sensor[] => {
   return sensorsToAggregate.map(sensor => {
+    // ****** ADDED LOG for Starting Aggregation ******
+    console.log(`[soilMoistureGraph] aggregateData: Starting aggregation for sensor "${sensor.name}" with resolution "${resolution}". Input points: ${sensor.data?.length || 0}`);
+    // ****** END ADDED LOG ******
+
     if (!sensor.data || sensor.data.length === 0) {
       return { ...sensor, data: [] };
     }
@@ -546,31 +625,38 @@ const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'dai
     // Sort by time, as grouping might change order
     aggregatedData.sort((a, b) => a.time.getTime() - b.time.getTime());
 
+    // ****** ADDED LOG for Aggregation Result ******
+    console.log(`[soilMoistureGraph] aggregateData: Finished aggregation for sensor "${sensor.name}". Output points: ${aggregatedData.length}`);
+    // ****** END ADDED LOG ******
+
     return { ...sensor, data: aggregatedData };
   });
 };
 
-// Modify createChart to accept filtered data
-const updateChart = (filteredData: Sensor[]) => {
-  sensors.value = filteredData;
-  createChart();
+// Modify updateChart to accept the processed data to draw
+const updateChart = (dataToDraw: Sensor[]) => {
+  console.log('[soilMoistureGraph] updateChart called with processed data. Points count:', dataToDraw.reduce((sum, s) => sum + s.data.length, 0));
+  // Update the reactive ref that createChart uses with the fully processed data
+  sensors.value = dataToDraw; 
+  createChart(); // Draw the chart with the processed data
 };
 
-// Update the getFilteredData function to return only currently visible data
+// Update the getFilteredData function to return only currently visible data - USE PROP
 const getFilteredData = () => {
   const filteredData = filterData(props.queryParams);
-  // Only return sensors that are currently visible
-  return filteredData.filter(sensor => sensor.visible);
+  // Filter based on the prop
+  return filteredData.filter(sensor => props.sensorVisibility[sensor.name]); 
 };
 
 defineExpose({
   getFilteredData,
-  fetchAllSensorData // Expose the data fetching function
+  fetchAllSensorData, // Expose the data fetching function
+  processAndDrawChart // Expose the processing function
 });
 
 onMounted(async () => {
   await fetchAllSensorData();
-  // createChart(); // createChart is now called within fetchAllSensorData
+  // createChart(); // createChart is now called within fetchAllSensorData -> processAndDrawChart -> updateChart
 });
 </script>
 
@@ -580,44 +666,6 @@ onMounted(async () => {
   max-width: 928px;
   margin: 0 auto;
   padding: 20px;
-}
-
-.sensor-toggles {
-  margin-bottom: 20px;
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.toggle-label input[type="checkbox"] {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--sensor-color);
-  border-radius: 4px;
-  cursor: pointer;
-  position: relative;
-}
-
-.toggle-label input[type="checkbox"]:checked {
-  background-color: var(--sensor-color);
-}
-
-.toggle-label input[type="checkbox"]:checked::after {
-  content: "✓";
-  position: absolute;
-  color: white;
-  font-size: 12px;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
 }
 
 .tooltip {
