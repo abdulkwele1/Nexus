@@ -233,26 +233,18 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	parts := strings.Split(topic, "/")
 
-	// Check format: needs at least 6 parts (due to leading /) and specific prefix
-
-	if len(parts) < 6 || parts[0] != "" || parts[1] != "device_sensor_data" {
-
-		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format")
-
+	// Check format: needs at least 7 parts (due to leading / and new value identifier) and specific prefix
+	if len(parts) < 7 || parts[0] != "" || parts[1] != "device_sensor_data" {
+		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format or insufficient parts")
 		return
-
 	}
 
 	// Assuming the numeric ID (parts[2]) is the one needed by the SDK
-
 	sensorIDStr := parts[2]
-
-	// Assuming the type code (parts[5]) determines the data type
-
-	dataTypeCode := parts[5]
+	// The value identifier (parts[6]) determines the data type (e.g., 4102 for temp, 4103 for moisture)
+	valueIdentifier := parts[6]
 
 	// Convert sensor ID string to integer
-
 	sensorIDInt, err := strconv.Atoi(sensorIDStr)
 
 	if err != nil {
@@ -263,44 +255,42 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	}
 
-	// Process based on the type code from the topic
-
-	// !!! Update these case values ("vt", "vs") to match your actual type codes !!!
-
-	switch dataTypeCode {
-
-	case "vt": // Placeholder code for temperature
-
-		var tempData api.SetSensorTemperatureDataResponse
-
-		err := json.Unmarshal(payload, &tempData)
-
+	// Process based on the value identifier from the topic
+	switch valueIdentifier {
+	case "4102": // Code for temperature
+		var reading api.SensorReading // Use SensorReading for the raw payload
+		err := json.Unmarshal(payload, &reading)
 		if err != nil {
-
-			m.logger.Error().Err(err).Str("topic", topic).Msg("Failed to unmarshal temperature data")
-
+			m.logger.Error().Err(err).Str("topic", topic).Msg("Failed to unmarshal temperature sensor reading")
 			return
-
 		}
 
-		// Assuming SetSensorTemperatureData exists and takes int sensorID and data
+		ts := time.UnixMilli(reading.Timestamp) // Convert timestamp
 
-		err = m.sdkClient.SetSensorTemperatureData(ctx, sensorIDInt, tempData)
+		// Construct the SensorTemperatureData object
+		tempDetail := api.SensorTemperatureData{
+			SensorID:        sensorIDInt,
+			Date:            ts,
+			SoilTemperature: reading.Value,
+			// ID might be set by DB or not needed if SDK handles it
+		}
 
+		// Construct the wrapper object for the SDK
+		sdkPayload := api.SetSensorTemperatureDataResponse{
+			SensorTemperatureData: []api.SensorTemperatureData{tempDetail},
+		}
+
+		// Assuming SetSensorTemperatureData exists and takes int sensorID and the sdkPayload
+		err = m.sdkClient.SetSensorTemperatureData(ctx, sensorIDInt, sdkPayload) // Pass the correctly constructed sdkPayload
 		if err != nil {
-
 			m.logger.Error().Err(err).Int("sensorID", sensorIDInt).Msg("Failed to set sensor temperature data via SDK")
-
 			return
-
 		}
+		// Update the log to show the actual reading received
+		m.logger.Info().Int("sensorID", sensorIDInt).Float64("Temperature", reading.Value).Int64("Timestamp", reading.Timestamp).Msg("Successfully processed and sent temperature data")
 
-		m.logger.Info().Int("sensorID", sensorIDInt).Interface("data", tempData).Msg("Successfully processed and sent temperature data")
-
-	case "vs": // Placeholder code for moisture (based on example)
-
+	case "4103": // Code for moisture
 		var reading api.SensorReading
-
 		err := json.Unmarshal(payload, &reading)
 
 		if err != nil {
@@ -362,7 +352,7 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	default:
 
-		m.logger.Warn().Str("topic", topic).Str("typeCode", dataTypeCode).Msg("Received message with unhandled data type code")
+		m.logger.Warn().Str("topic", topic).Str("valueIdentifier", valueIdentifier).Msg("Received message with unhandled value identifier")
 
 	}
 
