@@ -64,6 +64,7 @@
           <option value="hourly">Hourly Average</option>
           <option value="daily">Daily Average</option>
           <option value="weekly">Weekly Average</option>
+          <option value="monthly">Monthly Average</option>
         </select>
       </div>
 
@@ -88,6 +89,7 @@
 
     <!-- Main Content Area -->
     <div class="sensors-content">
+    <div class="timer">{{ formattedTime }}</div>
       <SoilMoistureGraph 
         ref="graphComponent"
         :queryParams="queryParams" 
@@ -95,31 +97,16 @@
       
       <!-- Real-time data display -->
       <div class="realtime-container">
-        <div class="timer">{{ formattedTime }}</div>
-        
         <div class="sensor-carousel">
-          <button class="carousel-btn prev" @click="prevSensor">&lt;</button>
-          
-          <div class="sensor-card" :style="{ '--sensor-color': colors[currentSensorIndex] }">
-            <h3>{{ currentSensor.name }}</h3>
+          <div class="sensor-card" :style="{ '--sensor-color': colors[0] }">
+            <h3>{{ currentRealtimeSensorData.name }}</h3>
             <div class="sensor-value">
-              {{ currentSensor.moisture.toFixed(1) }}%
+              {{ currentRealtimeSensorData.moisture !== null ? currentRealtimeSensorData.moisture.toFixed(1) + '%' : 'Loading...' }}
             </div>
             <div class="sensor-time">
-              Last updated: {{ new Date().toLocaleTimeString() }}
+              Last updated: {{ currentRealtimeSensorData.lastUpdated }}
             </div>
           </div>
-          
-          <button class="carousel-btn next" @click="nextSensor">&gt;</button>
-        </div>
-        
-        <div class="sensor-dots">
-          <span 
-            v-for="(_, index) in sensors" 
-            :key="index"
-            :class="{ active: index === currentSensorIndex }"
-            @click="currentSensorIndex = index"
-          ></span>
         </div>
       </div>
     </div>
@@ -130,10 +117,21 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import SoilMoistureGraph from './soilMoistureGraph.vue';
+import { useNexusStore } from '@/stores/nexus';
 
 const router = useRouter();
 const goTo = (path: string) => {
   router.push(path);
+};
+
+// Helper function to format Date to YYYY-MM-DDTHH:mm local time string
+const toLocalISOStringShort = (date: Date): string => {
+  const YYYY = date.getFullYear();
+  const MM = String(date.getMonth() + 1).padStart(2, '0');
+  const DD = String(date.getDate()).padStart(2, '0');
+  const HH = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${YYYY}-${MM}-${DD}T${HH}:${mm}`;
 };
 
 // Real-time data setup
@@ -141,39 +139,30 @@ const currentTime = ref(new Date());
 const currentSensorIndex = ref(0);
 const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 
-interface SensorReading {
+const nexusStore = useNexusStore();
+const REALTIME_SENSOR_ID = 444574498032128;
+
+interface RealtimeSensorDisplay {
   name: string;
-  moisture: number;
+  moisture: number | null;
+  lastUpdated: string;
 }
 
-const sensors = ref<SensorReading[]>([
-  { name: 'Sensor 1', moisture: 30 },
-  { name: 'Sensor 2', moisture: 35 },
-  { name: 'Sensor 3', moisture: 25 },
-  { name: 'Sensor 4', moisture: 40 }
-]);
+const currentRealtimeSensorData = ref<RealtimeSensorDisplay>({
+  name: 'Sensor Alpha',
+  moisture: null,
+  lastUpdated: 'N/A',
+});
 
 // Computed properties
 const formattedTime = computed(() => {
   return currentTime.value.toLocaleTimeString();
 });
 
-const currentSensor = computed(() => {
-  return sensors.value[currentSensorIndex.value];
-});
-
-// Navigation methods
-const nextSensor = () => {
-  currentSensorIndex.value = (currentSensorIndex.value + 1) % sensors.value.length;
-};
-
-const prevSensor = () => {
-  currentSensorIndex.value = (currentSensorIndex.value - 1 + sensors.value.length) % sensors.value.length;
-};
-
 // Timer and data update setup
 let timeInterval: number;
 let dataInterval: number;
+let graphRefreshInterval: number; // Interval for refreshing the main graph
 
 onMounted(() => {
   // Update time every second
@@ -181,18 +170,48 @@ onMounted(() => {
     currentTime.value = new Date();
   }, 1000);
 
-  // Update sensor data every 3 seconds
-  dataInterval = setInterval(() => {
-    sensors.value = sensors.value.map(sensor => ({
-      ...sensor,
-      moisture: Math.random() * 30 + 20 // Random value between 20-50
-    }));
-  }, 3000);
+  const fetchAndUpdateRealtimeSensor = async () => {
+    try {
+      // getSensorMoistureData returns: { id, sensor_id, date (string), soil_moisture (number) }[]
+      const moistureDataArray = await nexusStore.user.getSensorMoistureData(REALTIME_SENSOR_ID);
+      if (moistureDataArray && moistureDataArray.length > 0) {
+        // Sort by date descending to get the latest
+        // Ensure date strings are properly converted to Date objects for sorting
+        const sortedData = [...moistureDataArray].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const latestReading = sortedData[0];
+        currentRealtimeSensorData.value = {
+          name: 'Sensor Alpha',
+          moisture: Number(latestReading.soil_moisture),
+          lastUpdated: new Date(latestReading.date).toLocaleTimeString(),
+        };
+      } else {
+        currentRealtimeSensorData.value.moisture = null;
+        currentRealtimeSensorData.value.lastUpdated = new Date().toLocaleTimeString() + ' (No data)';
+      }
+    } catch (error) {
+      console.error('Error fetching real-time sensor data for ID', REALTIME_SENSOR_ID, ':', error);
+      currentRealtimeSensorData.value.moisture = null;
+      currentRealtimeSensorData.value.lastUpdated = new Date().toLocaleTimeString() + ' (Error)';
+    }
+  };
+
+  fetchAndUpdateRealtimeSensor(); // Initial fetch for the small real-time card
+  dataInterval = setInterval(fetchAndUpdateRealtimeSensor, 5000); // Fetch every 5 seconds for the card
+
+  // Periodically tell the graph to re-fetch its data
+  const GRAPH_REFRESH_INTERVAL_MS = 30000; // e.g., refresh every 30 seconds
+  graphRefreshInterval = setInterval(() => {
+    if (graphComponent.value) {
+      console.log('[Sensors.vue] Triggering graph data refresh...');
+      graphComponent.value.fetchAllSensorData();
+    }
+  }, GRAPH_REFRESH_INTERVAL_MS);
 });
 
 onUnmounted(() => {
   clearInterval(timeInterval);
   clearInterval(dataInterval);
+  clearInterval(graphRefreshInterval); // Clear the graph refresh interval
 });
 
 interface QueryParams {
@@ -200,7 +219,7 @@ interface QueryParams {
   endDate: string;
   minMoisture: number;
   maxMoisture: number;
-  resolution: 'raw' | 'hourly' | 'daily' | 'weekly';
+  resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
 }
 
 const queryParams = ref<QueryParams>({
@@ -230,8 +249,8 @@ const setTimeRange = (range: string) => {
       break;
   }
 
-  queryParams.value.startDate = start.toISOString().slice(0, 16);
-  queryParams.value.endDate = now.toISOString().slice(0, 16);
+  queryParams.value.startDate = toLocalISOStringShort(start);
+  queryParams.value.endDate = toLocalISOStringShort(now);
   updateGraphData();
 };
 
@@ -469,20 +488,6 @@ select {
   margin-bottom: 20px;
 }
 
-.carousel-btn {
-  background: transparent;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 10px;
-  color: #666;
-  transition: color 0.3s;
-}
-
-.carousel-btn:hover {
-  color: #333;
-}
-
 .sensor-card {
   background: white;
   padding: 20px;
@@ -507,25 +512,6 @@ select {
 .sensor-time {
   font-size: 0.8rem;
   color: #666;
-}
-
-.sensor-dots {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.sensor-dots span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ddd;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.sensor-dots span.active {
-  background: #666;
 }
 
 /* Responsive adjustments */
