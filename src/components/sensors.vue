@@ -684,6 +684,9 @@ select {
   background: #f8f9fa;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-width: 928px; /* Align with graph */
+  margin-left: auto;   /* Center container */
+  margin-right: auto;  /* Center container */
 }
 
 .timer {
@@ -697,7 +700,8 @@ select {
 .sensor-carousel {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: center; /* This can stay, card is 100% anyway */
+  width: 100%; /* Make carousel fill realtime-container */
   gap: 20px;
   margin-bottom: 20px;
 }
@@ -707,7 +711,9 @@ select {
   padding: 20px;
   border-radius: 8px;
   border-left: 4px solid var(--sensor-color);
-  min-width: 200px;
+  /* min-width: 200px; */ /* Replaced by width */
+  width: 100%; /* Make card fill carousel */
+  box-sizing: border-box; /* Include padding in width calculation */
   text-align: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
