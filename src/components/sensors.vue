@@ -10,6 +10,25 @@
     <!-- Query Side Panel -->
     <div class="query-panel">
       <div class="panel-section">
+        <h3>Selected Sensor</h3>
+        <div class="sensor-slideshow">
+          <button class="slideshow-btn prev" @click="prevSensor">&lt;</button>
+          <span class="slideshow-label sensor-name">{{ currentSensorName }}</span>
+          <button class="slideshow-btn next" @click="nextSensor">&gt;</button>
+        </div>
+      </div>
+      
+      <div class="panel-section">
+        <h3>Quick Filters</h3>
+        <div class="quick-filters">
+          <button @click="setTimeRange('1h')">Last Hour</button>
+          <button @click="setTimeRange('24h')">Last 24 Hours</button>
+          <button @click="setTimeRange('7d')">Last 7 Days</button>
+          <button @click="setTimeRange('30d')">Last 30 Days</button>
+        </div>
+      </div>
+
+      <div class="panel-section">
         <h3>Date Range</h3>
         <div class="date-inputs">
           <div class="input-group">
@@ -30,6 +49,24 @@
               :class="{ 'is-default-date': isEndDateInitialDefault }"
             >
           </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Sensor Types</h3>
+        <div class="sensor-type-slideshow">
+          <button class="slideshow-btn prev" @click="prevSensorType">&lt;</button>
+          <span class="slideshow-label">{{ currentSensorTypeLabel }}</span>
+          <button class="slideshow-btn next" @click="nextSensorType">&gt;</button>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Data Resolution</h3>
+        <div class="resolution-slideshow">
+          <button class="slideshow-btn prev" @click="prevResolution">&lt;</button>
+          <span class="slideshow-label">{{ currentResolutionLabel }}</span>
+          <button class="slideshow-btn next" @click="nextResolution">&gt;</button>
         </div>
       </div>
 
@@ -56,34 +93,6 @@
               @change="updateGraphData"
             >
           </div>
-        </div>
-      </div>
-
-      <div class="panel-section">
-        <h3>Selected Sensor</h3>
-        <div class="sensor-slideshow">
-          <button class="slideshow-btn prev" @click="prevSensor">&lt;</button>
-          <span class="slideshow-label sensor-name">{{ currentSensorName }}</span>
-          <button class="slideshow-btn next" @click="nextSensor">&gt;</button>
-        </div>
-      </div>
-
-      <div class="panel-section">
-        <h3>Data Resolution</h3>
-        <div class="resolution-slideshow">
-          <button class="slideshow-btn prev" @click="prevResolution">&lt;</button>
-          <span class="slideshow-label">{{ currentResolutionLabel }}</span>
-          <button class="slideshow-btn next" @click="nextResolution">&gt;</button>
-        </div>
-      </div>
-
-      <div class="panel-section">
-        <h3>Quick Filters</h3>
-        <div class="quick-filters">
-          <button @click="setTimeRange('1h')">Last Hour</button>
-          <button @click="setTimeRange('24h')">Last 24 Hours</button>
-          <button @click="setTimeRange('7d')">Last 7 Days</button>
-          <button @click="setTimeRange('30d')">Last 30 Days</button>
         </div>
       </div>
 
@@ -307,6 +316,16 @@ const initialResolutionIndex = resolutionOptions.findIndex(opt => opt.value === 
 const resolutionIndex = ref(initialResolutionIndex >= 0 ? initialResolutionIndex : 0); // Slider v-model (0-4)
 // --- End Resolutions for Slider ---
 
+// --- Define Sensor Types for Slider ---
+const sensorTypeOptions = [
+  { value: 'moisture', label: 'Soil Moisture' },
+  { value: 'temperature', label: 'Temperature' },
+];
+const defaultSensorTypeValue = 'moisture'; // Default to moisture graph
+const initialSensorTypeIndex = sensorTypeOptions.findIndex(opt => opt.value === defaultSensorTypeValue);
+const sensorTypeIndex = ref(initialSensorTypeIndex >= 0 ? initialSensorTypeIndex : 0);
+// --- End Sensor Types for Slider ---
+
 const queryParams = ref<QueryParams>({
   startDate: initialDefaultDateString,
   endDate: initialDefaultDateString,
@@ -361,6 +380,27 @@ watch(resolutionIndex, (newIndex) => {
     });
     // --- END ADDED ---
   }
+});
+
+// Watch sensor type index to handle changes
+watch(sensorTypeIndex, (newIndex) => {
+  const selectedType = sensorTypeOptions[newIndex];
+  
+  console.log(`[Sensors.vue] Sensor type changed to: ${selectedType.label} (${selectedType.value})`);
+  
+  // For now, this is just a placeholder for future implementation
+  // When temperature graph is actually implemented, this is where
+  // you would toggle between the different graph types
+  
+  // TODO: Implement temperature graph and switch between graph types
+  // Example logic (commented out until implementation):
+  // if (selectedType.value === 'temperature') {
+  //   showTemperatureGraph.value = true;
+  //   showMoistureGraph.value = false;
+  // } else {
+  //   showTemperatureGraph.value = false;
+  //   showMoistureGraph.value = true;
+  // }
 });
 
 // --- New logic for default date check ---
@@ -490,6 +530,16 @@ const prevResolution = () => {
   resolutionIndex.value = (resolutionIndex.value - 1 + resolutionOptions.length) % resolutionOptions.length;
 };
 
+// --- Methods for Sensor Type Navigation ---
+const nextSensorType = () => {
+  sensorTypeIndex.value = (sensorTypeIndex.value + 1) % sensorTypeOptions.length;
+};
+
+const prevSensorType = () => {
+  sensorTypeIndex.value = (sensorTypeIndex.value - 1 + sensorTypeOptions.length) % sensorTypeOptions.length;
+};
+// --- End Methods for Sensor Type Navigation ---
+
 const nextSensor = () => {
   if (SENSOR_CONFIGS.length > 0) { // Prevent error if array is empty
     activeSensorIndex.value = (activeSensorIndex.value + 1) % SENSOR_CONFIGS.length;
@@ -507,6 +557,11 @@ const currentSensorName = computed(() => {
   return SENSOR_CONFIGS.length > 0 ? SENSOR_CONFIGS[activeSensorIndex.value]?.name : 'No Sensors';
 });
 
+// Computed property for current sensor type label
+const currentSensorTypeLabel = computed(() => {
+  return sensorTypeOptions[sensorTypeIndex.value]?.label || 'N/A';
+});
+
 // Computed property to generate visibility object based on active index
 const sensorVisibility = computed(() => {
   const visibility: { [key: string]: boolean } = {};
@@ -516,8 +571,6 @@ const sensorVisibility = computed(() => {
   console.log("[Sensors.vue] Computed sensorVisibility:", visibility);
   return visibility;
 });
-
-// --- End Computed Properties ---
 
 // Watcher for sensor changes (might be needed later to update graph prop)
 watch(activeSensorIndex, (newIndex) => {
@@ -817,5 +870,16 @@ select {
   text-align: center;
   flex-grow: 1; 
   margin: 0 5px; 
+}
+
+/* Add styles for the sensor type slideshow control */
+.sensor-type-slideshow {
+  display: flex;
+  align-items: center; 
+  justify-content: space-between; 
+  border: 1px solid #dee2e6; 
+  border-radius: 4px;
+  padding: 5px 10px; 
+  background-color: white; 
 }
 </style>
