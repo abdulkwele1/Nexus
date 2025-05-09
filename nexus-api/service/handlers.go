@@ -472,6 +472,7 @@ func CreateGetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 				SoilMoisture: d.SoilMoisture,
 			})
 		}
+		apiService.Debug().Msgf("Sending back %d moisture data records for sensor_id: %d", len(response.SensorMoistureData), sensorID)
 
 		// Send the response
 		w.Header().Set("Content-Type", "application/json")
