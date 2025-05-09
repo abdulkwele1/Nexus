@@ -10,11 +10,22 @@
     <!-- Query Side Panel -->
     <div class="query-panel">
       <div class="panel-section">
-        <h3>Selected Sensor</h3>
-        <div class="sensor-slideshow">
-          <button class="slideshow-btn prev" @click="prevSensor">&lt;</button>
-          <span class="slideshow-label sensor-name">{{ currentSensorName }}</span>
-          <button class="slideshow-btn next" @click="nextSensor">&gt;</button>
+        <h3>Selected Sensors</h3>
+        <div class="sensor-selection">
+          <div 
+            v-for="(sensor, index) in SENSOR_CONFIGS" 
+            :key="sensor.id"
+            class="sensor-checkbox"
+          >
+            <label :style="{ '--sensor-color': colors[index % colors.length] }">
+              <input 
+                type="checkbox" 
+                :checked="sensorVisibility[sensor.name]" 
+                @change="toggleSensor(sensor.name)"
+              >
+              <span class="sensor-name">{{ sensor.name }}</span>
+            </label>
+          </div>
         </div>
       </div>
       
@@ -227,6 +238,12 @@ let dataInterval: number;
 let graphRefreshInterval: number; // Interval for refreshing the main graph
 
 onMounted(() => {
+  // Set initial visibility for all sensors
+  SENSOR_CONFIGS.forEach((sensor, index) => {
+    // Make only the first sensor visible by default
+    sensorVisibility.value[sensor.name] = index === 0;
+  });
+  
   // Update time every second
   timeInterval = setInterval(() => {
     currentTime.value = new Date();
@@ -299,8 +316,10 @@ const SENSOR_CONFIGS = [
   // { id: 3, name: 'Sensor 3' },
   // { id: 4, name: 'Sensor 4' },
 ];
-const activeSensorIndex = ref(0); // Start with the first sensor
-// --- End Sensor Definitions ---
+
+// Changed from activeSensorIndex to a direct sensorVisibility object
+// Initialize with first sensor enabled
+const sensorVisibility = ref<{ [key: string]: boolean }>({});
 
 // --- Define Resolutions for Slider ---
 const resolutionOptions = [
@@ -540,42 +559,47 @@ const prevSensorType = () => {
 };
 // --- End Methods for Sensor Type Navigation ---
 
-const nextSensor = () => {
-  if (SENSOR_CONFIGS.length > 0) { // Prevent error if array is empty
-    activeSensorIndex.value = (activeSensorIndex.value + 1) % SENSOR_CONFIGS.length;
+// Toggle sensor visibility
+const toggleSensor = (sensorName: string) => {
+  // Toggle the current state
+  sensorVisibility.value[sensorName] = !sensorVisibility.value[sensorName];
+  
+  // Ensure at least one sensor is always selected
+  const atLeastOneVisible = Object.values(sensorVisibility.value).some(visible => visible);
+  if (!atLeastOneVisible) {
+    // If no sensors are visible, re-enable the one that was just disabled
+    sensorVisibility.value[sensorName] = true;
   }
+  
+  console.log(`[Sensors.vue] Toggled sensor ${sensorName}, now ${sensorVisibility.value[sensorName] ? 'visible' : 'hidden'}`);
 };
-const prevSensor = () => {
-  if (SENSOR_CONFIGS.length > 0) { // Prevent error if array is empty
-    activeSensorIndex.value = (activeSensorIndex.value - 1 + SENSOR_CONFIGS.length) % SENSOR_CONFIGS.length;
-  }
-};
+
+// --- REMOVED Methods for Slideshow Navigation ---
+// const nextSensor = () => { ... }
+// const prevSensor = () => { ... }
+// --- END REMOVED Methods for Slideshow Navigation ---
+
+// --- REMOVED Computed Properties --- 
+// const currentSensorName = computed(() => { ... });
+// --- END REMOVED Computed Properties ---
+
+// --- REMOVED Computed property to generate visibility object based on active index
+// const sensorVisibility = computed(() => { ... });
+// --- END REMOVED Computed property ---
+
+// --- REMOVED Watcher for sensor changes
+// watch(activeSensorIndex, (newIndex) => { ... });
+// --- END REMOVED Watcher ---
 
 // --- Computed Properties --- 
 const currentSensorName = computed(() => {
   // Make sure SENSOR_CONFIGS is not empty
-  return SENSOR_CONFIGS.length > 0 ? SENSOR_CONFIGS[activeSensorIndex.value]?.name : 'No Sensors';
+  return SENSOR_CONFIGS.length > 0 ? SENSOR_CONFIGS[0]?.name : 'No Sensors';
 });
 
 // Computed property for current sensor type label
 const currentSensorTypeLabel = computed(() => {
   return sensorTypeOptions[sensorTypeIndex.value]?.label || 'N/A';
-});
-
-// Computed property to generate visibility object based on active index
-const sensorVisibility = computed(() => {
-  const visibility: { [key: string]: boolean } = {};
-  SENSOR_CONFIGS.forEach((config, index) => {
-    visibility[config.name] = (index === activeSensorIndex.value);
-  });
-  console.log("[Sensors.vue] Computed sensorVisibility:", visibility);
-  return visibility;
-});
-
-// Watcher for sensor changes (might be needed later to update graph prop)
-watch(activeSensorIndex, (newIndex) => {
-  console.log(`[Sensors.vue] Sensor changed. Index: ${newIndex}, Name: ${currentSensorName.value}`);
-  // TODO: Update graph visibility prop based on this index
 });
 </script>
 
@@ -881,5 +905,39 @@ select {
   border-radius: 4px;
   padding: 5px 10px; 
   background-color: white; 
+}
+
+/* Styles for the sensor selection checkboxes */
+.sensor-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sensor-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  border-left: 4px solid var(--sensor-color);
+  background: white;
+  transition: background-color 0.2s;
+}
+
+.sensor-checkbox label:hover {
+  background: #f0f0f0;
+}
+
+.sensor-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.sensor-checkbox .sensor-name {
+  font-weight: 500;
+  color: var(--sensor-color);
 }
 </style>
