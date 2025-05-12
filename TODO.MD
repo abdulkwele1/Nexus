@@ -14,6 +14,8 @@
 
 -Home page should be a map
 
+-Update the solar panel dashboard
+
 
 
 ## Nice To Have
