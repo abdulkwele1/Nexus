@@ -483,13 +483,16 @@ const filterData = (params: Props['queryParams']) => {
 
     switch (props.dynamicTimeWindow) {
       case 'lastHour':
-        filterRangeStart = new Date(now.getTime() - 1 * 60 * 60 * 1000);
+        // Increase buffer significantly to 30 minutes (total 90 min window)
+        filterRangeStart = new Date(now.getTime() - 90 * 60 * 1000);
+        console.log(`[TEMP_GRAPH] >> lastHour: Calculated filter range (90 min buffer): ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
         break;
       case 'last24Hours':
         filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         break;
       case 'last7Days':
         filterRangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        console.log(`[TEMP_GRAPH] >> last7Days: Calculated filter range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
         break;
       case 'last30Days':
         filterRangeStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -532,16 +535,45 @@ const filterData = (params: Props['queryParams']) => {
       
       return inTimeRange && isAboveMinTemp && isBelowMaxTemp;
     });
+    
+    // Log specifically for last7Days case
+    if (props.dynamicTimeWindow === 'last7Days') {
+        console.log(`[TEMP_GRAPH] >> last7Days: Sensor ${sensor.name} points remaining after time/value filter: ${sensorFilteredData.length}`);
+    }
     console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: ${initialPoints} points -> ${sensorFilteredData.length} points after time/value filtering.`);
+
+    if (initialPoints > 0) {
+        const lastPointTime = sensor.data[initialPoints - 1]?.time;
+        console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${lastPointTime?.toISOString()}`);
+        // Specific check for lastHour
+        if (props.dynamicTimeWindow === 'lastHour' && lastPointTime) {
+            console.log(`[TEMP_GRAPH] >> lastHour: Comparing last point time ${lastPointTime.toISOString()} with start ${filterRangeStart.toISOString()} and end ${filterRangeEnd.toISOString()}`);
+            if (lastPointTime < filterRangeStart) {
+                console.warn(`[TEMP_GRAPH] >> lastHour: WARNING - Latest data point is OLDER than the calculated start time!`);
+            }
+            if (lastPointTime > filterRangeEnd) {
+                console.warn(`[TEMP_GRAPH] >> lastHour: WARNING - Latest data point is NEWER than the calculated end time (browser time)! This might indicate timezone issues.`);
+            }
+        }
+    }
+
     return {
       ...sensor,
       data: sensorFilteredData
     };
   });
 
+  if (params.resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
+      console.log(`[TEMP_GRAPH] >> last7Days: Aggregating ${filtered.reduce((sum, s) => sum + s.data.length, 0)} points with daily resolution.`);
+  }
+
   if (params.resolution !== 'raw') {
     console.log(`[TEMP_GRAPH] Aggregating filtered data with resolution: ${params.resolution}`);
     const aggregated = aggregateData(filtered, params.resolution);
+    if (params.resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
+        const aggPoints = aggregated.reduce((sum, s) => sum + s.data.length, 0);
+        console.log(`[TEMP_GRAPH] >> last7Days: Total points after daily aggregation: ${aggPoints}`);
+    }
     aggregated.forEach(s => console.log(`[TEMP_GRAPH] Sensor ${s.name}: ${s.data.length} points after aggregation.`));
     return aggregated;
   }
@@ -606,6 +638,10 @@ const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'dai
     });
 
     aggregatedData.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+    if (resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
+        console.log(`[TEMP_GRAPH] >> last7Days: Sensor ${sensor.name} formed ${groups.size} daily groups.`);
+    }
 
     return { ...sensor, data: aggregatedData };
   });

@@ -496,6 +496,10 @@ const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'dai
       console.log(`[soilMoistureGraph] Last aggregated point:`, sortedGroups[sortedGroups.length - 1]);
     }
 
+    if (resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
+        console.log(`[soilMoistureGraph] >> last7Days: Sensor ${sensor.name} formed ${groups.size} daily groups.`);
+    }
+
     return { ...sensor, data: sortedGroups };
   });
 };
@@ -507,46 +511,70 @@ const filterData = (params: Props['queryParams']) => {
   let filterRangeEnd: Date;
   let useInclusiveEnd = false;
 
+  console.log(`[soilMoistureGraph] filterData called. Dynamic Window: ${props.dynamicTimeWindow}, Resolution: ${params.resolution}`);
+
   if (props.dynamicTimeWindow && props.dynamicTimeWindow !== 'none') {
     filterRangeEnd = now;
-    useInclusiveEnd = true;
+    useInclusiveEnd = true; // Generally true for "last X" filters
+    console.log(`[soilMoistureGraph] Applying dynamic time window: ${props.dynamicTimeWindow}. Current Time (browser): ${now.toISOString()}`);
 
     switch (props.dynamicTimeWindow) {
       case 'lastHour':
-        filterRangeStart = new Date(now.getTime() - 1 * 60 * 60 * 1000);
+        // Increase buffer significantly to 30 minutes (total 90 min window)
+        filterRangeStart = new Date(now.getTime() - 90 * 60 * 1000); 
+        console.log(`[soilMoistureGraph] >> lastHour: Calculated filter range (90 min buffer): ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
         break;
       case 'last24Hours':
         filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         break;
       case 'last7Days':
         filterRangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        console.log(`[soilMoistureGraph] >> last7Days: Calculated filter range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
         break;
       case 'last30Days':
         filterRangeStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         break;
       default:
+        // This case might not be reached if dynamicTimeWindow is set, but added for safety
         filterRangeStart = new Date(params.startDate + 'T00:00:00');
-        const tempEndDate = new Date(params.endDate + 'T00:00:00');
-        tempEndDate.setDate(tempEndDate.getDate() + 1);
-        filterRangeEnd = tempEndDate;
+        const tempEndDateDef = new Date(params.endDate + 'T00:00:00');
+        tempEndDateDef.setDate(tempEndDateDef.getDate() + 1);
+        filterRangeEnd = tempEndDateDef;
         useInclusiveEnd = false;
         break;
     }
   } else {
+    // Manual date range selection
     filterRangeStart = new Date(params.startDate + 'T00:00:00');
     const tempEndDate = new Date(params.endDate + 'T00:00:00');
-    tempEndDate.setDate(tempEndDate.getDate() + 1);
+    tempEndDate.setDate(tempEndDate.getDate() + 1); // End date is exclusive
     filterRangeEnd = tempEndDate;
     useInclusiveEnd = false;
+     console.log(`[soilMoistureGraph] Using manual date range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
   }
-
-  console.log(`[soilMoistureGraph] Filtering data from ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
-  console.log(`[soilMoistureGraph] Using resolution: ${params.resolution}`);
 
   const minValue = params.minValue;
   const maxValue = params.maxValue;
 
   const filtered = sensors.value.map(sensor => {
+    const initialPoints = sensor.data.length;
+    console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Filtering ${initialPoints} points...`);
+
+    if (initialPoints > 0) {
+        const lastPointTime = sensor.data[initialPoints - 1]?.time;
+        console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${lastPointTime?.toISOString()}`);
+        // Specific check for lastHour
+        if (props.dynamicTimeWindow === 'lastHour' && lastPointTime) {
+            console.log(`[soilMoistureGraph] >> lastHour: Comparing last point time ${lastPointTime.toISOString()} with start ${filterRangeStart.toISOString()} and end ${filterRangeEnd.toISOString()}`);
+            if (lastPointTime < filterRangeStart) {
+                console.warn(`[soilMoistureGraph] >> lastHour: WARNING - Latest data point is OLDER than the calculated start time!`);
+            }
+            if (lastPointTime > filterRangeEnd) {
+                console.warn(`[soilMoistureGraph] >> lastHour: WARNING - Latest data point is NEWER than the calculated end time (browser time)! This might indicate timezone issues.`);
+            }
+        }
+    }
+
     const sensorFilteredData = sensor.data.filter(point => {
       const date = point.time;
       const value = point.moisture;
@@ -564,16 +592,31 @@ const filterData = (params: Props['queryParams']) => {
       return inTimeRange && isAboveMin && isBelowMax;
     });
 
+    // Log specifically for last7Days case
+    if (props.dynamicTimeWindow === 'last7Days') {
+        console.log(`[soilMoistureGraph] >> last7Days: Sensor ${sensor.name} points remaining after time/value filter: ${sensorFilteredData.length}`);
+    }
+
     return {
       ...sensor,
       data: sensorFilteredData
     };
   });
 
+  if (params.resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
+      console.log(`[soilMoistureGraph] >> last7Days: Aggregating ${filtered.reduce((sum, s) => sum + s.data.length, 0)} points with daily resolution.`);
+  }
+  
   if (params.resolution !== 'raw') {
     const aggregated = aggregateData(filtered, params.resolution);
-    console.log(`[soilMoistureGraph] After aggregation, total points:`, 
-      aggregated.reduce((sum, s) => sum + s.data.length, 0));
+    if (props.dynamicTimeWindow === 'lastHour') {
+        const aggPoints = aggregated.reduce((sum, s) => sum + s.data.length, 0);
+        console.log(`[soilMoistureGraph] >> lastHour: Total points after aggregation: ${aggPoints}`);
+    }
+    if (params.resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
+        const aggPoints = aggregated.reduce((sum, s) => sum + s.data.length, 0);
+        console.log(`[soilMoistureGraph] >> last7Days: Total points after daily aggregation: ${aggPoints}`);
+    }
     return aggregated;
   }
 
