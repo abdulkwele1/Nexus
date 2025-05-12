@@ -12,6 +12,8 @@
 
 - auto log out when token has expired
 
+-Home page should be a map
+
 
 
 ## Nice To Have

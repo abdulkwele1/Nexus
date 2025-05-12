@@ -118,7 +118,22 @@
       <div class="realtime-container">
         <div class="sensor-carousel">
           <div class="sensor-card" :style="{ '--sensor-color': colors[0] }">
-            <h3>{{ currentRealtimeSensorData.name }}</h3>
+            <!-- Sensor Name and Trend Indicator -->
+            <div class="sensor-card-header">
+              <h3>{{ currentRealtimeSensorData.name }}</h3>
+              <!-- Add the SVG trend indicator here -->
+              <svg class="trend-indicator" width="40" height="20" viewBox="0 0 40 20">
+                <path 
+                  :d="trendPathData" 
+                  fill="none" 
+                  :stroke="colors[0]" 
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <!-- Sensor Value -->
             <div class="sensor-value">
               {{ 
                 currentRealtimeSensorData.value !== null 
@@ -130,6 +145,7 @@
                   : 'Loading...' 
               }}
             </div>
+             <!-- Last Updated Time -->
             <div class="sensor-time">
               Last updated: {{ currentRealtimeSensorData.lastUpdated }}
             </div>
@@ -222,6 +238,35 @@ const currentRealtimeSensorData = ref<RealtimeSensorDisplay>({
   lastUpdated: 'N/A',
 });
 
+// --- Add ref to store the previous value --- 
+const previousRealtimeSensorValue = ref<number | null>(null);
+
+// --- Computed property for the trend --- 
+const realtimeTrend = computed((): 'up' | 'down' | 'stable' => {
+  if (currentRealtimeSensorData.value.value === null || previousRealtimeSensorValue.value === null) {
+    return 'stable'; // Default to stable if no data or no previous data
+  }
+  if (currentRealtimeSensorData.value.value > previousRealtimeSensorValue.value) {
+    return 'up';
+  }
+  if (currentRealtimeSensorData.value.value < previousRealtimeSensorValue.value) {
+    return 'down';
+  }
+  return 'stable';
+});
+
+// --- Computed property for the SVG path data based on trend --- 
+const trendPathData = computed(() => {
+  switch (realtimeTrend.value) {
+    case 'up':
+      return 'M5,15 L20,5 L35,15'; // Simple upward arrow/line
+    case 'down':
+      return 'M5,5 L20,15 L35,5'; // Simple downward arrow/line
+    default:
+      return 'M5,10 L35,10'; // Simple horizontal line
+  }
+});
+
 // Computed properties
 const formattedTime = computed(() => {
   const now = currentTime.value; // Use the reactive currentTime ref
@@ -285,26 +330,42 @@ onMounted(() => {
       if (data && data.length > 0) {
         const sortedData = [...data].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const latestReading = sortedData[0];
-        currentRealtimeSensorData.value = {
-          name: 'Sensor Alpha',
-          value: currentSensorType.value === 'moisture' 
+        const newValue = currentSensorType.value === 'moisture' 
             ? Number(latestReading.soil_moisture)
-            : Number(latestReading.soil_temperature),
+            : Number(latestReading.soil_temperature);
+
+        // --- Store the current value as the previous one BEFORE updating --- 
+        previousRealtimeSensorValue.value = currentRealtimeSensorData.value.value; 
+
+        // --- Update the current data --- 
+        currentRealtimeSensorData.value = {
+          name: 'Sensor Alpha', 
+          value: newValue,
           lastUpdated: new Date(latestReading.date).toLocaleTimeString(),
         };
+
+        // --- Handle initial case where previous value was null --- 
+        if (previousRealtimeSensorValue.value === null) {
+          previousRealtimeSensorValue.value = newValue; // Set initial previous value
+        }
+
       } else {
+        // --- Store null as previous if no data --- 
+        previousRealtimeSensorValue.value = currentRealtimeSensorData.value.value;
         currentRealtimeSensorData.value.value = null;
         currentRealtimeSensorData.value.lastUpdated = new Date().toLocaleTimeString() + ' (No data)';
       }
     } catch (error) {
       console.error('Error fetching real-time sensor data for ID', REALTIME_SENSOR_ID, ':', error);
+       // --- Store null as previous on error --- 
+      previousRealtimeSensorValue.value = currentRealtimeSensorData.value.value;
       currentRealtimeSensorData.value.value = null;
       currentRealtimeSensorData.value.lastUpdated = new Date().toLocaleTimeString() + ' (Error)';
     }
   };
 
-  fetchAndUpdateRealtimeSensor(); // Initial fetch for the small real-time card
-  dataInterval = setInterval(fetchAndUpdateRealtimeSensor, 5000); // Fetch every 5 seconds for the card
+  fetchAndUpdateRealtimeSensor(); // Initial fetch
+  dataInterval = setInterval(fetchAndUpdateRealtimeSensor, 5000); // Fetch every 5 seconds
 
   // Periodically tell the graph to re-fetch its data
   const GRAPH_REFRESH_INTERVAL_MS = 1000;
@@ -1051,5 +1112,20 @@ select {
 .sensor-checkbox .sensor-name {
   font-weight: 500;
   color: var(--sensor-color);
+}
+
+.sensor-card-header {
+  display: flex;
+  justify-content: space-between; /* Pushes h3 and svg apart */
+  align-items: center; /* Vertically aligns items */
+  margin-bottom: 10px; /* Add space below header */
+}
+
+.sensor-card-header h3 {
+  margin: 0; /* Remove default margin from h3 */
+}
+
+.trend-indicator path {
+  transition: d 0.4s ease-in-out; /* Animate the path data change */
 }
 </style>
