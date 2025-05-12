@@ -120,9 +120,15 @@
           <div class="sensor-card" :style="{ '--sensor-color': colors[0] }">
             <h3>{{ currentRealtimeSensorData.name }}</h3>
             <div class="sensor-value">
-              {{ currentRealtimeSensorData.value !== null 
-                ? currentRealtimeSensorData.value.toFixed(1) + (currentSensorType === 'moisture' ? '%' : '°C') 
-                : 'Loading...' }}
+              {{ 
+                currentRealtimeSensorData.value !== null 
+                  ? (
+                      currentSensorType === 'temperature' 
+                      ? celsiusToFahrenheit(currentRealtimeSensorData.value)?.toFixed(1) + '°F' 
+                      : currentRealtimeSensorData.value.toFixed(1) + '%'
+                    )
+                  : 'Loading...' 
+              }}
             </div>
             <div class="sensor-time">
               Last updated: {{ currentRealtimeSensorData.lastUpdated }}
@@ -157,6 +163,12 @@ import { useRouter } from 'vue-router';
 import SoilMoistureGraph from './soilMoistureGraph.vue';
 import SoilTemperatureGraph from './soilTemperatureGraph.vue';
 import { useNexusStore } from '@/stores/nexus';
+
+// Add conversion function
+const celsiusToFahrenheit = (celsius: number | null): number | null => {
+  if (celsius === null) return null;
+  return (celsius * 9/5) + 32;
+};
 
 const router = useRouter();
 const goTo = (path: string) => {
@@ -501,50 +513,69 @@ const isEndDateInitialDefault = computed(() => {
 
 const setTimeRange = (range: string) => {
   const now = new Date();
-  let start = new Date(); // Will be used to set queryParams.startDate
-  let end = new Date();   // Will be used to set queryParams.endDate
+  let start = new Date(); 
+  let end = new Date();   
+  let newResolution: QueryParams['resolution'] = queryParams.value.resolution; // Default to current
 
   switch (range) {
     case '1h':
       dynamicTimeWindow.value = 'lastHour';
-      start = now; // Date picker shows today
-      end = now;   // Date picker shows today
+      start = now; 
+      end = now;   
+      newResolution = 'hourly'; // Or 'raw' if preferred for last hour
       break;
     case '24h':
       dynamicTimeWindow.value = 'last24Hours';
-      start = new Date(now.getTime() - 24 * 60 * 60 * 1000); // e.g. yesterday 10am if now is today 10am
-      end = now; // Date picker end is today
+      start = new Date(now.getTime() - 24 * 60 * 60 * 1000); 
+      end = now; 
+      newResolution = 'hourly';
       break;
     case '7d':
       dynamicTimeWindow.value = 'last7Days';
-      start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000); // 6 days ago to include today in picker
+      start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000); 
       end = now;
+      newResolution = 'daily';
       break;
     case '30d':
       dynamicTimeWindow.value = 'last30Days';
-      start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000); // 29 days ago to include today in picker
+      start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000); 
       end = now;
+      newResolution = 'daily';
       break;
   }
 
-  queryParams.value.startDate = toLocalDateString(start);
-  queryParams.value.endDate = toLocalDateString(end);
-  // No need to call updateGraphData() here as queryParams watcher in graph + dynamicTimeWindow watcher will handle it.
-  // However, to ensure reactivity if only queryParams changes without dynamicTimeWindow changing *from a non-'none'* state,
-  // we might still need to ensure queryParams object itself is new if we weren't relying on dynamicTimeWindow.
-  // Let's explicitly assign a new object for queryParams to be safe and consistent.
-  queryParams.value = { ...queryParams.value };
+  // Update queryParams in a way that triggers reactivity
+  const newQueryParams: QueryParams = {
+    ...queryParams.value, // Spread existing values first
+    startDate: toLocalDateString(start),
+    endDate: toLocalDateString(end),
+    resolution: newResolution,
+  };
 
-  // If the graph component needs to be explicitly told to process after these changes:
+  // Update the correct reactive ref based on current sensor type
+  if (currentSensorType.value === 'moisture') {
+    moistureQueryParams.value = newQueryParams;
+  } else {
+    temperatureQueryParams.value = newQueryParams;
+  }
+  
+  // Update the resolutionIndex ref to match the newResolution
+  const newResolutionIndex = resolutionOptions.findIndex(opt => opt.value === newResolution);
+  if (newResolutionIndex !== -1 && resolutionIndex.value !== newResolutionIndex) {
+    resolutionIndex.value = newResolutionIndex;
+  }
+
+  // The watchers for queryParams (implicitly via moistureQueryParams/temperatureQueryParams) 
+  // and dynamicTimeWindow in the graph components should handle refreshing the chart.
+  console.log('[Sensors.vue] setTimeRange updated queryParams, dynamicTimeWindow, and resolution:', newQueryParams, dynamicTimeWindow.value);
+
+  // Explicitly trigger graph data fetching if needed, though watchers should handle it.
   nextTick(() => {
-    if (currentSensorType.value === 'moisture' && moistureGraphComponent.value) {
-      // The graph will react to queryParams and dynamicTimeWindow prop changes.
-      // A direct call to processAndDrawChart might be redundant if watchers are correctly set up in child.
-      // For now, relying on prop reactivity.
-      // moistureGraphComponent.value.processAndDrawChart(); 
-      console.log('[Sensors.vue] setTimeRange updated queryParams and dynamicTimeWindow.');
-    } else if (currentSensorType.value === 'temperature' && temperatureGraphComponent.value) {
-      console.log('[Sensors.vue] setTimeRange updated queryParams and dynamicTimeWindow.');
+    const currentGraph = currentSensorType.value === 'moisture' 
+      ? moistureGraphComponent.value 
+      : temperatureGraphComponent.value;
+    if (currentGraph) {
+      // currentGraph.fetchAllSensorData(); // Watchers in graph components should trigger this.
     }
   });
 };

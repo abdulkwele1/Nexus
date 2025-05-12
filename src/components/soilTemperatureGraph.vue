@@ -251,35 +251,46 @@ const createChart = () => {
   let xAxis = d3.axisBottom(x);
   let tickFormat: (date: Date) => string;
 
-  switch (props.queryParams.resolution) {
-    case 'monthly':
-      xAxis.ticks(d3.timeMonth.every(1));
-      tickFormat = d3.timeFormat("%b %Y"); // e.g., "Jan 2023"
-      xAxis.tickFormat(tickFormat as any);
-      break;
-    case 'weekly':
-      xAxis.ticks(d3.timeWeek.every(1));
-      tickFormat = d3.timeFormat("%b %d"); // e.g., "Jan 15" (start of week)
-      xAxis.tickFormat(tickFormat as any);
-      break;
-    case 'daily':
-      const daysInRange = Math.ceil(timeRange / (24 * 60 * 60 * 1000));
-      xAxis.ticks(Math.min(7, daysInRange > 0 ? daysInRange : 1)); // Limit to 7 ticks for daily
-      tickFormat = d3.timeFormat("%b %d");
-      xAxis.tickFormat(tickFormat as any);
-      break;
-    case 'hourly':
-      const hoursInRange = Math.ceil(timeRange / (60 * 60 * 1000));
-      xAxis.ticks(Math.min(24, hoursInRange > 0 ? hoursInRange : 1)); // Max 24 ticks for hourly
-      tickFormat = d3.timeFormat("%I:%M %p");
-      xAxis.tickFormat(tickFormat as any);
-      break;
-    default: // 'raw'
-      xAxis.ticks(width / 80); // Default tick count for raw data
-      tickFormat = isWithin24Hours ? 
-        d3.timeFormat("%I:%M %p") : 
-        d3.timeFormat("%b %d");
-      xAxis.tickFormat(tickFormat as any);
+  // --- Specific handling for last24Hours --- 
+  if (props.dynamicTimeWindow === 'last24Hours') {
+    xAxis.ticks(d3.timeHour.every(3)); // Ticks every 3 hours
+    tickFormat = d3.timeFormat("%I %p"); // Format like "02 PM"
+    xAxis.tickFormat(tickFormat as any);
+    console.log("[TEMP_GRAPH] Applying specific x-axis formatting for last24Hours.");
+  } else {
+  // --- Fallback to resolution-based formatting --- 
+    switch (props.queryParams.resolution) {
+      case 'monthly':
+        xAxis.ticks(d3.timeMonth.every(1));
+        tickFormat = d3.timeFormat("%b %Y"); // e.g., "Jan 2023"
+        xAxis.tickFormat(tickFormat as any);
+        break;
+      case 'weekly':
+        xAxis.ticks(d3.timeWeek.every(1));
+        tickFormat = d3.timeFormat("%b %d"); // e.g., "Jan 15" (start of week)
+        xAxis.tickFormat(tickFormat as any);
+        break;
+      case 'daily':
+        const daysInRange = Math.ceil(timeRange / (24 * 60 * 60 * 1000));
+        xAxis.ticks(Math.min(7, daysInRange > 0 ? daysInRange : 1)); // Limit to 7 ticks for daily
+        tickFormat = d3.timeFormat("%b %d");
+        xAxis.tickFormat(tickFormat as any);
+        break;
+      case 'hourly':
+        // Apply 3-hour ticks for general hourly if not last24h? Or keep more granular?
+        // Let's try keeping it more granular for the general 'hourly' setting
+        const hoursInRange = Math.ceil(timeRange / (60 * 60 * 1000));
+        xAxis.ticks(Math.min(12, hoursInRange > 0 ? hoursInRange : 1)); // Adjust tick count for hourly
+        tickFormat = d3.timeFormat("%I:%M %p");
+        xAxis.tickFormat(tickFormat as any);
+        break;
+      default: // 'raw'
+        xAxis.ticks(width / 80); // Default tick count for raw data
+        tickFormat = isWithin24Hours ? 
+          d3.timeFormat("%I:%M %p") : 
+          d3.timeFormat("%b %d");
+        xAxis.tickFormat(tickFormat as any);
+    }
   }
   xAxisGroup.call(xAxis);
 
