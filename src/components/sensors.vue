@@ -114,14 +114,6 @@
 
     <!-- Main Content Area -->
     <div class="sensors-content">
-    <div class="timer">{{ formattedTime }}</div>
-      <SoilMoistureGraph 
-        ref="graphComponent"
-        :queryParams="queryParams" 
-        :sensorVisibility="sensorVisibility" 
-        :dynamicTimeWindow="dynamicTimeWindow"
-      />
-      
       <!-- Real-time data display -->
       <div class="realtime-container">
         <div class="sensor-carousel">
@@ -136,6 +128,13 @@
           </div>
         </div>
       </div>
+
+      <SoilMoistureGraph 
+        ref="graphComponent"
+        :queryParams="queryParams" 
+        :sensorVisibility="sensorVisibility" 
+        :dynamicTimeWindow="dynamicTimeWindow"
+      />
     </div>
   </div>
 </template>
@@ -753,10 +752,12 @@ select {
   margin-left: 300px; /* Match query-panel width */
   flex-grow: 1;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .realtime-container {
-  margin-top: 40px;
   padding: 20px;
   background: #f8f9fa;
   border-radius: 12px;
@@ -764,14 +765,11 @@ select {
   max-width: 928px; /* Align with graph */
   margin-left: auto;   /* Center container */
   margin-right: auto;  /* Center container */
+  width: 100%;
 }
 
 .timer {
-  text-align: center;
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin-bottom: 20px;
-  color: #333;
+  display: none;
 }
 
 .sensor-carousel {
