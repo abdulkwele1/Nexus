@@ -256,14 +256,17 @@ const createChart = () => {
     .x(d => x(d.time))
     .y(d => y(d.moisture));
 
-  // Determine X-axis tick formatter based on resolution
+  // Determine X-axis tick formatter based on resolution and time window
   let xAxisTickFormat: (date: Date) => string;
   
-  if (props.queryParams.resolution === 'raw' || props.queryParams.resolution === 'hourly') {
-    // For raw and hourly data, show time in addition to date
+  // Check if we're in a dynamic time window that's longer than 24 hours
+  const isLongTimeWindow = props.dynamicTimeWindow === 'last7Days' || props.dynamicTimeWindow === 'last30Days';
+  
+  if ((props.queryParams.resolution === 'raw' || props.queryParams.resolution === 'hourly') && !isLongTimeWindow) {
+    // For raw and hourly data within 24 hours, show time in addition to date
     xAxisTickFormat = localTimeFormatter;
   } else {
-    // For daily, weekly, monthly, only show the date without time
+    // For daily, weekly, monthly, or any data beyond 24 hours, only show the date
     xAxisTickFormat = d3.timeFormat("%b %d"); // Format like "Jan 15"
   }
 
