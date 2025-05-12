@@ -257,16 +257,14 @@ const createChart = () => {
     .y(d => y(d.moisture));
 
   // Determine X-axis tick formatter based on resolution
-  let xAxisTickFormat = localTimeFormatter; // Default for raw/hourly
-  if (props.queryParams.resolution === 'daily' || 
-      props.queryParams.resolution === 'weekly' || 
-      props.queryParams.resolution === 'monthly') {
-    // For daily, weekly, monthly, use a format that emphasizes date
-    // D3's default scaleTime().tickFormat() is adaptive and good for dates too
-    // but we can be more specific if needed, e.g., d3.timeFormat("%Y-%m-%d")
-    // For now, let D3's adaptive localTimeFormatter handle it, it should prioritize date parts for wider spans.
-    // If more specific formatting is needed, we can use d3.timeFormat here.
-    // Example: xAxisTickFormat = d3.timeFormat("%x"); // Locale's date, e.g., 01/15/2024
+  let xAxisTickFormat: (date: Date) => string;
+  
+  if (props.queryParams.resolution === 'raw' || props.queryParams.resolution === 'hourly') {
+    // For raw and hourly data, show time in addition to date
+    xAxisTickFormat = localTimeFormatter;
+  } else {
+    // For daily, weekly, monthly, only show the date without time
+    xAxisTickFormat = d3.timeFormat("%b %d"); // Format like "Jan 15"
   }
 
   // Add x-axis
@@ -275,7 +273,7 @@ const createChart = () => {
     .call(d3.axisBottom(x) 
         .ticks(width / 80)
         .tickSizeOuter(0)
-        .tickFormat(xAxisTickFormat) 
+        .tickFormat(xAxisTickFormat as any) 
     );
 
   // Add y-axis

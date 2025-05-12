@@ -16,6 +16,8 @@
 
 - auto log out when token has expired
 
+- move real time container to the top
+
 ## Nice To Have
 
 - changing color theme
