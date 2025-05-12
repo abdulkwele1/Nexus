@@ -16,7 +16,7 @@
 
 - auto log out when token has expired
 
-- move real time container to the top
+
 
 ## Nice To Have
 
@@ -24,4 +24,3 @@
 
 - font changes
 
-- rearange the side navigation bar, refactoring priority options on top
