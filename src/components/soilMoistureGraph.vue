@@ -76,6 +76,7 @@ const sensors = ref<Sensor[]>(SENSOR_CONFIGS.map((config) => ({
 async function fetchAllSensorData() {
   let fetchError = false;
   try {
+    console.log(`[soilMoistureGraph] Fetching data with resolution: ${props.queryParams.resolution}`);
     const allSensorsDataPromises = SENSOR_CONFIGS.map(async (config, index) => {
       let rawDataPoints;
       if (props.dataType === 'moisture') {
@@ -91,6 +92,7 @@ async function fetchAllSensorData() {
         })).sort((a, b) => a.time.getTime() - b.time.getTime());
         
         sensors.value[index].data = formattedData;
+        console.log(`[soilMoistureGraph] Fetched ${formattedData.length} points for sensor ${config.name}`);
       } else {
         console.warn(`No data for sensor ${config.name}`);
         sensors.value[index].data = [];
@@ -112,11 +114,11 @@ async function fetchAllSensorData() {
 
 // Function to process data based on current state and draw
 const processAndDrawChart = () => {
-  console.log(`[soilMoistureGraph] processAndDrawChart: Processing data with current queryParams:`, JSON.stringify(props.queryParams));
-  // Pass the current sensors.value (which holds raw data after fetch, or processed data after filter change) 
-  // to filterData. filterData needs to know it might receive raw data.
-  const processedData = filterData(props.queryParams); // Applies filter/aggregation based on props
-  updateChart(processedData); // Update chart with the processed data
+  console.log(`[soilMoistureGraph] Processing data with resolution: ${props.queryParams.resolution}`);
+  const processedData = filterData(props.queryParams);
+  console.log(`[soilMoistureGraph] Processed data points:`, 
+    processedData.reduce((sum, s) => sum + s.data.length, 0));
+  updateChart(processedData);
 }
 
 const formatDate = (date: Date) => {
@@ -178,8 +180,31 @@ const createChart = () => {
 
   // Create scales
   const x = d3.scaleUtc()
-    .domain(d3.extent(allData, d => d.time) as [Date, Date])
     .range([marginLeft, width - marginRight]);
+
+  let currentXDomain = d3.extent(allData, d => d.time) as [Date, Date];
+  if (!currentXDomain[0] || !currentXDomain[1]) { // No data after filtering
+    const today = new Date();
+    if (props.queryParams.resolution === 'weekly') {
+      currentXDomain = [d3.timeWeek.floor(today), d3.timeWeek.offset(d3.timeWeek.floor(today), 1)];
+    } else if (props.queryParams.resolution === 'monthly') {
+      currentXDomain = [d3.timeMonth.floor(today), d3.timeMonth.offset(d3.timeMonth.floor(today), 1)];
+    } else {
+      currentXDomain = [today, d3.timeDay.offset(today, 1)];
+    }
+  } else if (currentXDomain[0].getTime() === currentXDomain[1].getTime()) { // Single data point
+    const singleDate = currentXDomain[0];
+    if (props.queryParams.resolution === 'weekly') {
+      currentXDomain = [d3.timeWeek.floor(singleDate), d3.timeWeek.offset(d3.timeWeek.floor(singleDate), 1)];
+    } else if (props.queryParams.resolution === 'monthly') {
+      currentXDomain = [d3.timeMonth.floor(singleDate), d3.timeMonth.offset(d3.timeMonth.floor(singleDate), 1)];
+    } else if (props.queryParams.resolution === 'daily') {
+      currentXDomain = [d3.timeDay.floor(singleDate), d3.timeDay.offset(d3.timeDay.floor(singleDate), 1)];
+    } else { // hourly or raw, expand by a few hours
+      currentXDomain = [d3.timeHour.offset(singleDate, -1), d3.timeHour.offset(singleDate, 1)];
+    }
+  }
+  x.domain(currentXDomain);
 
   const y = d3.scaleLinear()
     .domain([yDomainMinWithPadding, yDomainMaxWithPadding])
@@ -190,21 +215,48 @@ const createChart = () => {
     .x(d => x(d.time))
     .y(d => y(d.moisture));
 
-  // Determine if we should show time based on data range
+  // Determine if we should show time based on data range and resolution
   const timeRange = x.domain()[1].getTime() - x.domain()[0].getTime();
   const isWithin24Hours = timeRange <= 24 * 60 * 60 * 1000;
 
-  // Add x-axis with conditional formatting
-  svg.value.append("g")
-    .attr("transform", `translate(0,${height - marginBottom})`)
-    .call(d3.axisBottom(x)
-      .ticks(width / 80)
-      .tickSizeOuter(0)
-      .tickFormat(isWithin24Hours ? 
-        d3.timeFormat("%H:%M") as any : 
-        d3.timeFormat("%b %d") as any
-      )
-    );
+  // Add x-axis
+  const xAxisGroup = svg.value.append("g")
+    .attr("transform", `translate(0,${height - marginBottom})`);
+  
+  let xAxis = d3.axisBottom(x);
+  let tickFormat: (date: Date) => string;
+
+  switch (props.queryParams.resolution) {
+    case 'monthly':
+      xAxis.ticks(d3.timeMonth.every(1));
+      tickFormat = d3.timeFormat("%b %Y"); // e.g., "Jan 2023"
+      xAxis.tickFormat(tickFormat as any);
+      break;
+    case 'weekly':
+      xAxis.ticks(d3.timeWeek.every(1));
+      tickFormat = d3.timeFormat("%b %d"); // e.g., "Jan 15" (start of week)
+      xAxis.tickFormat(tickFormat as any);
+      break;
+    case 'daily':
+      const daysInRange = Math.ceil(timeRange / (24 * 60 * 60 * 1000));
+      xAxis.ticks(Math.min(7, daysInRange > 0 ? daysInRange : 1)); // Limit to 7 ticks for daily
+      tickFormat = d3.timeFormat("%b %d");
+      xAxis.tickFormat(tickFormat as any);
+      break;
+    case 'hourly':
+      const hoursInRange = Math.ceil(timeRange / (60 * 60 * 1000));
+      xAxis.ticks(Math.min(24, hoursInRange > 0 ? hoursInRange : 1)); // Max 24 ticks for hourly
+      tickFormat = d3.timeFormat("%I:%M %p");
+      xAxis.tickFormat(tickFormat as any);
+      break;
+    default: // 'raw'
+      xAxis.ticks(width / 80); // Default tick count for raw data
+      tickFormat = isWithin24Hours ? 
+        d3.timeFormat("%I:%M %p") : 
+        d3.timeFormat("%b %d");
+      xAxis.tickFormat(tickFormat as any);
+  }
+  xAxisGroup.call(xAxis);
 
   // Add y-axis
   svg.value.append("g")
@@ -220,6 +272,11 @@ const createChart = () => {
       .attr("fill", "currentColor")
       .attr("text-anchor", "start")
       .text("↑ Soil Moisture (%)"));
+
+  // Create tooltip container
+  tooltip.value = svg.value.append("g")
+    .attr("class", "tooltip")
+    .style("display", "none");
 
   // Add lines for each visible sensor
   sensors.value.forEach((sensor, i) => {
@@ -246,14 +303,109 @@ const createChart = () => {
     });
   });
 
+  // Add legend
+  const legend = svg.value.append("g")
+    .attr("font-family", "sans-serif")
+    .attr("font-size", 10)
+    .attr("text-anchor", "start")
+    .selectAll("g")
+    .data(sensors.value.filter(s => props.sensorVisibility[s.name]))
+    .join("g")
+    .attr("transform", (d, i) => `translate(0,${i * 20})`);
+
+  legend.append("rect")
+    .attr("x", width - 19)
+    .attr("width", 19)
+    .attr("height", 19)
+    .attr("fill", (d) => {
+      const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === d.name);
+      return colors[sensorColorIndex % colors.length];
+    });
+
+  legend.append("text")
+    .attr("x", width - 24)
+    .attr("y", 9.5)
+    .attr("dy", "0.32em")
+    .text(d => d.name);
+
   // Add the chart to the container
   chartContainer.value.appendChild(svg.value.node());
+
+  // Add mouse interaction for tooltip
+  const bisect = d3.bisector<DataPoint, Date>(d => d.time).center;
+  
+  svg.value.on("pointermove", (event) => {
+    const visibleSensorsWithData = sensors.value.filter(s => props.sensorVisibility[s.name] && s.data.length > 0);
+    if (!tooltip.value || visibleSensorsWithData.length === 0) {
+      if (tooltip.value) tooltip.value.style("display", "none");
+      return;
+    }
+
+    const pointer = d3.pointer(event);
+    const xPos = x.invert(pointer[0]);
+    
+    const tooltipData = visibleSensorsWithData
+      .map((sensor) => {
+        const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
+        const color = colors[sensorColorIndex % colors.length];
+
+        const index = bisect(sensor.data, xPos);
+        const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
+        if (!dataPoint) return null;
+
+        return {
+          name: sensor.name,
+          value: dataPoint.moisture,
+          time: dataPoint.time,
+          color: color
+        };
+      }).filter(item => item !== null);
+
+    // Show tooltip
+    tooltip.value.style("display", null);
+    tooltip.value.attr("transform", `translate(${pointer[0]},${pointer[1]})`);
+
+    // Update tooltip content
+    const tooltipContent = tooltip.value.selectAll("g")
+      .data(tooltipData)
+      .join("g")
+      .attr("transform", (d, i) => `translate(0,${i * 20})`);
+
+    tooltipContent.selectAll("rect")
+      .data(d => [d])
+      .join("rect")
+      .attr("x", -60)
+      .attr("y", -15)
+      .attr("width", 120)
+      .attr("height", 20)
+      .attr("fill", "white")
+      .attr("stroke", "black")
+      .attr("stroke-width", 0.5);
+
+    tooltipContent.selectAll("text")
+      .data(d => [d])
+      .join("text")
+      .attr("fill", d => d.color)
+      .selectAll("tspan")
+      .data(d_text => [
+        `${d_text.name}: ${formatValue(d_text.value)}`,
+        formatDate(d_text.time)
+      ])
+      .join("tspan")
+      .attr("x", -55)
+      .attr("dy", (d_tspan, i_tspan) => i_tspan === 0 ? "-0.1em" : "1.2em")
+      .text(d_tspan => d_tspan);
+  })
+  .on("pointerleave", () => {
+    if (tooltip.value) {
+      tooltip.value.style("display", "none");
+    }
+  });
 };
 
 // Add watch for queryParams
-watch(() => props.queryParams, () => {
-  // Query params changed, process the current raw data and redraw
-  console.log('[soilMoistureGraph] Query Params changed. Triggering chart processing...');
+watch(() => props.queryParams, (newParams) => {
+  console.log(`[soilMoistureGraph] Query params changed. New resolution: ${newParams.resolution}`);
   processAndDrawChart();
 }, { deep: true });
 
@@ -270,6 +422,72 @@ watch(() => props.dynamicTimeWindow, () => {
   processAndDrawChart(); 
 });
 // --- End watch for dynamicTimeWindow prop --- 
+
+// Add data aggregation function
+const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'daily' | 'weekly' | 'monthly'): Sensor[] => {
+  console.log(`[soilMoistureGraph] Aggregating data with resolution: ${resolution}`);
+  
+  return sensorsToAggregate.map(sensor => {
+    if (!sensor.data || sensor.data.length === 0) {
+      console.log(`[soilMoistureGraph] No data to aggregate for sensor ${sensor.name}`);
+      return { ...sensor, data: [] };
+    }
+
+    console.log(`[soilMoistureGraph] Processing ${sensor.data.length} points for sensor ${sensor.name}`);
+    const aggregatedData: DataPoint[] = [];
+    const groups = new Map<string, { sum: number, count: number, time: Date }>();
+
+    sensor.data.forEach(point => {
+      const date = new Date(point.time);
+      let key: string;
+      let groupTime: Date;
+
+      switch (resolution) {
+        case 'hourly':
+          groupTime = d3.timeHour.floor(date);
+          key = groupTime.toISOString();
+          break;
+        case 'daily':
+          groupTime = d3.timeDay.floor(date);
+          key = groupTime.toISOString();
+          break;
+        case 'weekly':
+          // Use d3's timeWeek to get the start of the week
+          groupTime = d3.timeWeek.floor(date);
+          key = groupTime.toISOString();
+          break;
+        case 'monthly':
+          groupTime = new Date(date.getFullYear(), date.getMonth(), 1);
+          key = `${groupTime.getFullYear()}-${groupTime.getMonth()}`;
+          break;
+      }
+
+      if (!groups.has(key)) {
+        groups.set(key, { sum: 0, count: 0, time: groupTime });
+      }
+      
+      const group = groups.get(key)!;
+      group.sum += point.moisture;
+      group.count += 1;
+    });
+
+    // Convert groups to array and sort by time
+    const sortedGroups = Array.from(groups.entries())
+      .map(([_, group]) => ({
+        time: group.time,
+        moisture: group.sum / group.count
+      }))
+      .sort((a, b) => a.time.getTime() - b.time.getTime());
+
+    console.log(`[soilMoistureGraph] Aggregated ${sensor.data.length} points into ${sortedGroups.length} points for sensor ${sensor.name}`);
+    if (sortedGroups.length > 0) {
+      console.log(`[soilMoistureGraph] First aggregated point:`, sortedGroups[0]);
+      console.log(`[soilMoistureGraph] Last aggregated point:`, sortedGroups[sortedGroups.length - 1]);
+    }
+
+    return { ...sensor, data: sortedGroups };
+  });
+};
 
 // Add data filtering function
 const filterData = (params: Props['queryParams']) => {
@@ -311,6 +529,9 @@ const filterData = (params: Props['queryParams']) => {
     useInclusiveEnd = false;
   }
 
+  console.log(`[soilMoistureGraph] Filtering data from ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+  console.log(`[soilMoistureGraph] Using resolution: ${params.resolution}`);
+
   const minValue = params.minValue;
   const maxValue = params.maxValue;
 
@@ -339,76 +560,19 @@ const filterData = (params: Props['queryParams']) => {
   });
 
   if (params.resolution !== 'raw') {
-    return aggregateData(filtered, params.resolution);
+    const aggregated = aggregateData(filtered, params.resolution);
+    console.log(`[soilMoistureGraph] After aggregation, total points:`, 
+      aggregated.reduce((sum, s) => sum + s.data.length, 0));
+    return aggregated;
   }
 
   return filtered;
 };
 
-// Add data aggregation function
-const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'daily' | 'weekly' | 'monthly'): Sensor[] => {
-  return sensorsToAggregate.map(sensor => {
-    if (!sensor.data || sensor.data.length === 0) {
-      return { ...sensor, data: [] };
-    }
-
-    const aggregatedData: DataPoint[] = [];
-    const groups = new Map<string, { sum: number, count: number, time: Date }>();
-
-    sensor.data.forEach(point => {
-      let key = '';
-      const date = new Date(point.time);
-
-      switch (resolution) {
-        case 'hourly':
-          key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
-          break;
-        case 'daily':
-          key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-          break;
-        case 'weekly':
-          const weekStartDate = d3.timeWeek.floor(date);
-          key = `${weekStartDate.getFullYear()}-${d3.timeWeek.count(d3.timeYear.floor(weekStartDate), weekStartDate)}`;
-          break;
-        case 'monthly':
-          key = `${date.getFullYear()}-${date.getMonth()}`;
-          break;
-      }
-
-      if (!groups.has(key)) {
-        let groupTime = d3.timeHour.floor(date);
-        if (resolution === 'daily') {
-          groupTime = d3.timeDay.floor(date);
-        } else if (resolution === 'weekly') {
-          groupTime = d3.timeWeek.floor(date);
-        } else if (resolution === 'monthly') {
-          groupTime = d3.timeMonth.floor(date);
-        }
-        groups.set(key, { sum: 0, count: 0, time: groupTime });
-      }
-      
-      const group = groups.get(key)!;
-      group.sum += point.moisture;
-      group.count += 1;
-    });
-
-    groups.forEach(group => {
-      const averageValue = group.sum / group.count;
-      aggregatedData.push({
-        time: group.time,
-        moisture: averageValue,
-      });
-    });
-
-    aggregatedData.sort((a, b) => a.time.getTime() - b.time.getTime());
-
-    return { ...sensor, data: aggregatedData };
-  });
-};
-
 // Modify updateChart to accept the processed data to draw
 const updateChart = (dataToDraw: Sensor[]) => {
   console.log('[soilMoistureGraph] updateChart called with processed data. Points count:', dataToDraw.reduce((sum, s) => sum + s.data.length, 0));
+  console.log('[soilMoistureGraph] Current resolution:', props.queryParams.resolution);
   // Update the reactive ref that createChart uses with the fully processed data
   sensors.value = dataToDraw; 
   createChart(); // Draw the chart with the processed data

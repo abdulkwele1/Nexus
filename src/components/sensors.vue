@@ -145,6 +145,7 @@
         :queryParams="temperatureQueryParams"
         :sensorVisibility="sensorVisibility"
         :dynamicTimeWindow="dynamicTimeWindow"
+        :dataType="currentSensorType"
       />
     </div>
   </div>
@@ -301,7 +302,10 @@ onMounted(() => {
       : temperatureGraphComponent.value;
     
     if (currentGraph) {
-      currentGraph.fetchAllSensorData();
+      // Only refresh if we're in raw or hourly resolution
+      if (queryParams.value.resolution === 'raw' || queryParams.value.resolution === 'hourly') {
+        currentGraph.fetchAllSensorData();
+      }
     }
   }, GRAPH_REFRESH_INTERVAL_MS);
 
@@ -395,7 +399,7 @@ const currentResolutionLabel = computed(() => {
 watch(resolutionIndex, (newIndex) => {
   const selectedOption = resolutionOptions[newIndex];
   if (selectedOption && queryParams.value.resolution !== selectedOption.value) {
-    console.log(`[Sensors.vue] Slideshow changed. Index: ${newIndex}, New Resolution: ${selectedOption.value}`);
+    console.log(`[Sensors.vue] Resolution changed to: ${selectedOption.value}`);
     
     const newResolution = selectedOption.value as QueryParams['resolution'];
     let newStartDate = queryParams.value.startDate;
@@ -405,34 +409,61 @@ watch(resolutionIndex, (newIndex) => {
     if (newResolution === 'raw' || newResolution === 'hourly') {
       const todayStr = toLocalDateString(new Date());
       if (newStartDate !== todayStr || newEndDate !== todayStr) {
-         console.log('[Sensors.vue] Resetting date range to Today for Raw/Hourly resolution.');
-         newStartDate = todayStr;
-         newEndDate = todayStr;
+        console.log('[Sensors.vue] Resetting date range to Today for Raw/Hourly resolution.');
+        newStartDate = todayStr;
+        newEndDate = todayStr;
       }
     }
 
-    // Assign a completely new object to ensure reactivity
-    queryParams.value = {
+    // For daily/weekly/monthly, ensure we have enough data
+    if (newResolution === 'daily' || newResolution === 'weekly' || newResolution === 'monthly') {
+      const startDate = new Date(newStartDate);
+      const endDate = new Date(newEndDate);
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      console.log(`[Sensors.vue] Date range spans ${daysDiff} days for ${newResolution} resolution`);
+      
+      // Ensure we have enough data points for the selected resolution
+      if (newResolution === 'daily' && daysDiff < 2) {
+        console.log('[Sensors.vue] Extending date range for daily resolution');
+        newStartDate = toLocalDateString(new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000));
+      } else if (newResolution === 'weekly' && daysDiff < 7) {
+        console.log('[Sensors.vue] Extending date range for weekly resolution');
+        newStartDate = toLocalDateString(new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000));
+      } else if (newResolution === 'monthly' && daysDiff < 30) {
+        console.log('[Sensors.vue] Extending date range for monthly resolution');
+        newStartDate = toLocalDateString(new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000));
+      }
+    }
+
+    // Create new query params object
+    const newQueryParams = {
       ...queryParams.value,
       resolution: newResolution,
       startDate: newStartDate,
       endDate: newEndDate
     };
 
-    // --- ADDED: Explicitly trigger child update ---
-    nextTick(() => { // Wait for DOM update cycle / state propagation
-      console.log('[Sensors.vue] Inside nextTick. Attempting to call processAndDrawChart...');
-      if (currentSensorType.value === 'moisture' && moistureGraphComponent.value) {
-        console.log('[Sensors.vue] Directly triggering processAndDrawChart on moisture graph component...');
-        moistureGraphComponent.value.processAndDrawChart(); 
-      } else if (currentSensorType.value === 'temperature' && temperatureGraphComponent.value) {
-        console.log('[Sensors.vue] Directly triggering processAndDrawChart on temperature graph component...');
-        temperatureGraphComponent.value.processAndDrawChart(); 
-      } else {
-         console.warn('[Sensors.vue] Could not find graphComponent ref inside nextTick to trigger update.');
+    console.log('[Sensors.vue] Updated queryParams:', newQueryParams);
+
+    // Update the appropriate query params based on sensor type
+    if (currentSensorType.value === 'moisture') {
+      moistureQueryParams.value = newQueryParams;
+    } else {
+      temperatureQueryParams.value = newQueryParams;
+    }
+
+    // Force a data refresh with the new resolution
+    nextTick(() => {
+      const currentGraph = currentSensorType.value === 'moisture' 
+        ? moistureGraphComponent.value 
+        : temperatureGraphComponent.value;
+      
+      if (currentGraph) {
+        console.log('[Sensors.vue] Triggering data refresh with new resolution');
+        currentGraph.fetchAllSensorData();
       }
     });
-    // --- END ADDED ---
   }
 });
 
