@@ -7,6 +7,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, defineExpose } from 'vue';
 import * as d3 from 'd3';
+import type { Selection } from 'd3';
 import { useNexusStore } from '@/stores/nexus';
 
 // Capture D3's default multi-scale local time formatter
@@ -158,15 +159,17 @@ const createChart = () => {
     .attr("height", height)
     .attr("style", "max-width: 100%; height: auto; height: intrinsic; font: 10px sans-serif;")
     .style("-webkit-tap-highlight-color", "transparent")
-    .style("overflow", "visible");
+    .style("overflow", "visible") as Selection<SVGSVGElement, unknown, null, undefined>;
+
+  if (!svg.value) return;
 
   // Combine visible sensor data for domain calculation
   const allData = sensors.value
     .filter(sensor => props.sensorVisibility[sensor.name])
     .flatMap(sensor => sensor.data);
 
-  let yMinActual = d3.min(allData, d => d.moisture) as number;
-  let yMaxActual = d3.max(allData, d => d.moisture) as number;
+  let yMinActual = d3.min(allData, (d: DataPoint) => d.moisture) as number;
+  let yMaxActual = d3.max(allData, (d: DataPoint) => d.moisture) as number;
 
   // Handle cases where there's no data or min/max are undefined
   if (allData.length === 0 || yMinActual === undefined || yMaxActual === undefined) {
@@ -182,7 +185,7 @@ const createChart = () => {
   const x = d3.scaleUtc()
     .range([marginLeft, width - marginRight]);
 
-  let currentXDomain = d3.extent(allData, d => d.time) as [Date, Date];
+  let currentXDomain = d3.extent(allData, (d: DataPoint) => d.time) as [Date, Date];
   if (!currentXDomain[0] || !currentXDomain[1]) { // No data after filtering
     const today = new Date();
     if (props.queryParams.resolution === 'weekly') {
@@ -212,8 +215,8 @@ const createChart = () => {
 
   // Create line generator
   const line = d3.line<DataPoint>()
-    .x(d => x(d.time))
-    .y(d => y(d.moisture));
+    .x((d: DataPoint) => x(d.time))
+    .y((d: DataPoint) => y(d.moisture));
 
   // Determine if we should show time based on data range and resolution
   const timeRange = x.domain()[1].getTime() - x.domain()[0].getTime();
@@ -273,11 +276,11 @@ const createChart = () => {
   svg.value.append("g")
     .attr("transform", `translate(${marginLeft},0)`)
     .call(d3.axisLeft(y).ticks(height / 40))
-    .call(g => g.select(".domain").remove())
-    .call(g => g.selectAll(".tick line").clone()
+    .call((g: Selection<SVGGElement, unknown, null, undefined>) => g.select(".domain").remove())
+    .call((g: Selection<SVGGElement, unknown, null, undefined>) => g.selectAll(".tick line").clone()
       .attr("x2", width - marginLeft - marginRight)
       .attr("stroke-opacity", 0.1))
-    .call(g => g.append("text")
+    .call((g: Selection<SVGGElement, unknown, null, undefined>) => g.append("text")
       .attr("x", -marginLeft)
       .attr("y", 10)
       .attr("fill", "currentColor")
@@ -304,11 +307,11 @@ const createChart = () => {
       .attr("d", line);
 
     // Add hover effect
-    path.on("mouseover", function() {
+    path.on("mouseover", function(this: SVGPathElement) {
       d3.select(this)
         .attr("stroke-width", 2.5);
     })
-    .on("mouseout", function() {
+    .on("mouseout", function(this: SVGPathElement) {
       d3.select(this)
         .attr("stroke-width", 1.5);
     });
@@ -322,13 +325,13 @@ const createChart = () => {
     .selectAll("g")
     .data(sensors.value.filter(s => props.sensorVisibility[s.name]))
     .join("g")
-    .attr("transform", (d, i) => `translate(0,${i * 20})`);
+    .attr("transform", (d: Sensor, i: number) => `translate(0,${i * 20})`);
 
   legend.append("rect")
     .attr("x", width - 19)
     .attr("width", 19)
     .attr("height", 19)
-    .attr("fill", (d) => {
+    .attr("fill", (d: Sensor) => {
       const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === d.name);
       return colors[sensorColorIndex % colors.length];
     });
@@ -337,15 +340,17 @@ const createChart = () => {
     .attr("x", width - 24)
     .attr("y", 9.5)
     .attr("dy", "0.32em")
-    .text(d => d.name);
+    .text((d: Sensor) => d.name);
 
   // Add the chart to the container
-  chartContainer.value.appendChild(svg.value.node());
+  if (chartContainer.value && svg.value.node()) {
+    chartContainer.value.appendChild(svg.value.node()!);
+  }
 
   // Add mouse interaction for tooltip
-  const bisect = d3.bisector<DataPoint, Date>(d => d.time).center;
+  const bisect = d3.bisector<DataPoint, Date>((d: DataPoint) => d.time).center;
   
-  svg.value.on("pointermove", (event) => {
+  svg.value.on("pointermove", (event: PointerEvent) => {
     const visibleSensorsWithData = sensors.value.filter(s => props.sensorVisibility[s.name] && s.data.length > 0);
     if (!tooltip.value || visibleSensorsWithData.length === 0) {
       if (tooltip.value) tooltip.value.style("display", "none");
@@ -380,32 +385,32 @@ const createChart = () => {
     const tooltipContent = tooltip.value.selectAll("g")
       .data(tooltipData)
       .join("g")
-      .attr("transform", (d, i) => `translate(0,${i * 20})`);
+      .attr("transform", (d: { name: string; value: number; time: Date; color: string }, i: number) => `translate(0,${i * 20})`);
 
     tooltipContent.selectAll("rect")
-      .data(d => [d])
+      .data((d: { name: string; value: number; time: Date; color: string }) => [d])
       .join("rect")
       .attr("x", -60)
       .attr("y", -15)
       .attr("width", 120)
       .attr("height", 20)
-      .attr("fill", "white")
+      .attr("fill", (d: { name: string; value: number; time: Date; color: string }) => d.color)
       .attr("stroke", "black")
       .attr("stroke-width", 0.5);
 
     tooltipContent.selectAll("text")
-      .data(d => [d])
+      .data((d_text: { name: string; value: number; time: Date; color: string }) => [d_text])
       .join("text")
-      .attr("fill", d => d.color)
+      .attr("fill", (d_text: { name: string; value: number; time: Date; color: string }) => d_text.color)
       .selectAll("tspan")
-      .data(d_text => [
+      .data((d_text: { name: string; value: number; time: Date; color: string }) => [
         `${d_text.name}: ${formatValue(d_text.value)}`,
         formatDate(d_text.time)
       ])
       .join("tspan")
       .attr("x", -55)
-      .attr("dy", (d_tspan, i_tspan) => i_tspan === 0 ? "-0.1em" : "1.2em")
-      .text(d_tspan => d_tspan);
+      .attr("dy", (d_tspan: string, i_tspan: number) => i_tspan === 0 ? "-0.1em" : "1.2em")
+      .text((d_tspan: string) => d_tspan);
   })
   .on("pointerleave", () => {
     if (tooltip.value) {
@@ -496,10 +501,6 @@ const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'dai
       console.log(`[soilMoistureGraph] Last aggregated point:`, sortedGroups[sortedGroups.length - 1]);
     }
 
-    if (resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
-        console.log(`[soilMoistureGraph] >> last7Days: Sensor ${sensor.name} formed ${groups.size} daily groups.`);
-    }
-
     return { ...sensor, data: sortedGroups };
   });
 };
@@ -520,19 +521,24 @@ const filterData = (params: Props['queryParams']) => {
 
     switch (props.dynamicTimeWindow) {
       case 'lastHour':
-        // Increase buffer significantly to 30 minutes (total 90 min window)
-        filterRangeStart = new Date(now.getTime() - 90 * 60 * 1000); 
-        console.log(`[soilMoistureGraph] >> lastHour: Calculated filter range (90 min buffer): ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+        // Add a 5-minute buffer to account for potential data delay
+        filterRangeStart = new Date(now.getTime() - 65 * 60 * 1000); 
+        console.log(`[soilMoistureGraph] >> lastHour: Calculated filter range (with buffer): ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
         break;
-      case 'last24Hours':
+      case 'last24Hours': // Remains a rolling 24-hour window
         filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         break;
       case 'last7Days':
-        filterRangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        console.log(`[soilMoistureGraph] >> last7Days: Calculated filter range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+        const start7Days = new Date(now);
+        start7Days.setDate(now.getDate() - 6); // Start of the 7th day ago (e.g., if today is 7th, then 1st)
+        start7Days.setHours(0, 0, 0, 0);    // Set to midnight
+        filterRangeStart = start7Days;
         break;
       case 'last30Days':
-        filterRangeStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const start30Days = new Date(now);
+        start30Days.setDate(now.getDate() - 29); // Start of the 30th day ago
+        start30Days.setHours(0, 0, 0, 0);     // Set to midnight
+        filterRangeStart = start30Days;
         break;
       default:
         // This case might not be reached if dynamicTimeWindow is set, but added for safety
@@ -560,19 +566,9 @@ const filterData = (params: Props['queryParams']) => {
     const initialPoints = sensor.data.length;
     console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Filtering ${initialPoints} points...`);
 
+    // Log first/last points BEFORE filtering to check timestamps
     if (initialPoints > 0) {
-        const lastPointTime = sensor.data[initialPoints - 1]?.time;
-        console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${lastPointTime?.toISOString()}`);
-        // Specific check for lastHour
-        if (props.dynamicTimeWindow === 'lastHour' && lastPointTime) {
-            console.log(`[soilMoistureGraph] >> lastHour: Comparing last point time ${lastPointTime.toISOString()} with start ${filterRangeStart.toISOString()} and end ${filterRangeEnd.toISOString()}`);
-            if (lastPointTime < filterRangeStart) {
-                console.warn(`[soilMoistureGraph] >> lastHour: WARNING - Latest data point is OLDER than the calculated start time!`);
-            }
-            if (lastPointTime > filterRangeEnd) {
-                console.warn(`[soilMoistureGraph] >> lastHour: WARNING - Latest data point is NEWER than the calculated end time (browser time)! This might indicate timezone issues.`);
-            }
-        }
+        console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${sensor.data[initialPoints - 1]?.time.toISOString()}`);
     }
 
     const sensorFilteredData = sensor.data.filter(point => {
@@ -592,9 +588,9 @@ const filterData = (params: Props['queryParams']) => {
       return inTimeRange && isAboveMin && isBelowMax;
     });
 
-    // Log specifically for last7Days case
-    if (props.dynamicTimeWindow === 'last7Days') {
-        console.log(`[soilMoistureGraph] >> last7Days: Sensor ${sensor.name} points remaining after time/value filter: ${sensorFilteredData.length}`);
+    // Log specifically for lastHour case
+    if (props.dynamicTimeWindow === 'lastHour') {
+        console.log(`[soilMoistureGraph] >> lastHour: Sensor ${sensor.name} points remaining after time/value filter: ${sensorFilteredData.length}`);
     }
 
     return {
@@ -603,19 +599,12 @@ const filterData = (params: Props['queryParams']) => {
     };
   });
 
-  if (params.resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
-      console.log(`[soilMoistureGraph] >> last7Days: Aggregating ${filtered.reduce((sum, s) => sum + s.data.length, 0)} points with daily resolution.`);
-  }
-  
+  // Aggregation logic remains the same...
   if (params.resolution !== 'raw') {
     const aggregated = aggregateData(filtered, params.resolution);
     if (props.dynamicTimeWindow === 'lastHour') {
         const aggPoints = aggregated.reduce((sum, s) => sum + s.data.length, 0);
         console.log(`[soilMoistureGraph] >> lastHour: Total points after aggregation: ${aggPoints}`);
-    }
-    if (params.resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
-        const aggPoints = aggregated.reduce((sum, s) => sum + s.data.length, 0);
-        console.log(`[soilMoistureGraph] >> last7Days: Total points after daily aggregation: ${aggPoints}`);
     }
     return aggregated;
   }
