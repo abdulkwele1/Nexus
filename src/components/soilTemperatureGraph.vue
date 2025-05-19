@@ -174,7 +174,9 @@ const createChart = () => {
     .attr("height", height)
     .attr("style", "max-width: 100%; height: auto; height: intrinsic; font: 10px sans-serif;")
     .style("-webkit-tap-highlight-color", "transparent")
-    .style("overflow", "visible");
+    .style("overflow", "visible") as d3.Selection<SVGSVGElement, unknown, null, undefined>;
+
+  if (!svg.value) return;
 
   // Combine visible sensor data for domain calculation
   const allData = sensors.value
@@ -245,7 +247,7 @@ const createChart = () => {
   const isWithin24Hours = timeRange <= 24 * 60 * 60 * 1000;
 
   // Add x-axis
-  const xAxisGroup = svg.value.append("g")
+  const xAxisGroup = svg.value!.append("g")
     .attr("transform", `translate(0,${height - marginBottom})`);
 
   let xAxis = d3.axisBottom(x);
@@ -295,7 +297,7 @@ const createChart = () => {
   xAxisGroup.call(xAxis);
 
   // Add y-axis with Fahrenheit values
-  svg.value.append("g")
+  svg.value!.append("g")
     .attr("transform", `translate(${marginLeft},0)`)
     .call(d3.axisLeft(y).ticks(height / 40))
     .call(g => g.select(".domain").remove())
@@ -310,7 +312,7 @@ const createChart = () => {
       .text("↑ Soil Temperature (°F)"));
 
   // Create tooltip container
-  tooltip.value = svg.value.append("g")
+  tooltip.value = svg.value!.append("g")
     .attr("class", "tooltip")
     .style("display", "none");
 
@@ -348,7 +350,7 @@ const createChart = () => {
   });
 
   // Add legend
-  const legend = svg.value.append("g")
+  const legend = svg.value!.append("g")
     .attr("font-family", "sans-serif")
     .attr("font-size", 10)
     .attr("text-anchor", "start")
@@ -373,12 +375,12 @@ const createChart = () => {
     .text(d => d.name);
 
   // Add the chart to the container
-  chartContainer.value.appendChild(svg.value.node());
+  chartContainer.value.appendChild(svg.value!.node()!);
 
   // Add mouse interaction for tooltip
   const bisect = d3.bisector<DataPoint, Date>(d => d.time).center;
   
-  svg.value.on("pointermove", (event) => {
+  svg.value!.on("pointermove", (event) => {
     const visibleSensorsWithData = sensors.value.filter(s => props.sensorVisibility[s.name] && s.data.length > 0);
     if (!tooltip.value || visibleSensorsWithData.length === 0) {
       if (tooltip.value) tooltip.value.style("display", "none");
@@ -483,16 +485,15 @@ const filterData = (params: Props['queryParams']) => {
 
     switch (props.dynamicTimeWindow) {
       case 'lastHour':
-        // Increase buffer significantly to 30 minutes (total 90 min window)
-        filterRangeStart = new Date(now.getTime() - 90 * 60 * 1000);
-        console.log(`[TEMP_GRAPH] >> lastHour: Calculated filter range (90 min buffer): ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+        // Add a 5-minute buffer to account for potential data delay
+        filterRangeStart = new Date(now.getTime() - 65 * 60 * 1000);
+        console.log(`[TEMP_GRAPH] >> lastHour: Calculated filter range (with buffer): ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
         break;
       case 'last24Hours':
         filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         break;
       case 'last7Days':
         filterRangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        console.log(`[TEMP_GRAPH] >> last7Days: Calculated filter range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
         break;
       case 'last30Days':
         filterRangeStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -535,45 +536,16 @@ const filterData = (params: Props['queryParams']) => {
       
       return inTimeRange && isAboveMinTemp && isBelowMaxTemp;
     });
-    
-    // Log specifically for last7Days case
-    if (props.dynamicTimeWindow === 'last7Days') {
-        console.log(`[TEMP_GRAPH] >> last7Days: Sensor ${sensor.name} points remaining after time/value filter: ${sensorFilteredData.length}`);
-    }
     console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: ${initialPoints} points -> ${sensorFilteredData.length} points after time/value filtering.`);
-
-    if (initialPoints > 0) {
-        const lastPointTime = sensor.data[initialPoints - 1]?.time;
-        console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${lastPointTime?.toISOString()}`);
-        // Specific check for lastHour
-        if (props.dynamicTimeWindow === 'lastHour' && lastPointTime) {
-            console.log(`[TEMP_GRAPH] >> lastHour: Comparing last point time ${lastPointTime.toISOString()} with start ${filterRangeStart.toISOString()} and end ${filterRangeEnd.toISOString()}`);
-            if (lastPointTime < filterRangeStart) {
-                console.warn(`[TEMP_GRAPH] >> lastHour: WARNING - Latest data point is OLDER than the calculated start time!`);
-            }
-            if (lastPointTime > filterRangeEnd) {
-                console.warn(`[TEMP_GRAPH] >> lastHour: WARNING - Latest data point is NEWER than the calculated end time (browser time)! This might indicate timezone issues.`);
-            }
-        }
-    }
-
     return {
       ...sensor,
       data: sensorFilteredData
     };
   });
 
-  if (params.resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
-      console.log(`[TEMP_GRAPH] >> last7Days: Aggregating ${filtered.reduce((sum, s) => sum + s.data.length, 0)} points with daily resolution.`);
-  }
-
   if (params.resolution !== 'raw') {
     console.log(`[TEMP_GRAPH] Aggregating filtered data with resolution: ${params.resolution}`);
     const aggregated = aggregateData(filtered, params.resolution);
-    if (params.resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
-        const aggPoints = aggregated.reduce((sum, s) => sum + s.data.length, 0);
-        console.log(`[TEMP_GRAPH] >> last7Days: Total points after daily aggregation: ${aggPoints}`);
-    }
     aggregated.forEach(s => console.log(`[TEMP_GRAPH] Sensor ${s.name}: ${s.data.length} points after aggregation.`));
     return aggregated;
   }
@@ -638,10 +610,6 @@ const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'dai
     });
 
     aggregatedData.sort((a, b) => a.time.getTime() - b.time.getTime());
-
-    if (resolution === 'daily' && props.dynamicTimeWindow === 'last7Days') {
-        console.log(`[TEMP_GRAPH] >> last7Days: Sensor ${sensor.name} formed ${groups.size} daily groups.`);
-    }
 
     return { ...sensor, data: aggregatedData };
   });
