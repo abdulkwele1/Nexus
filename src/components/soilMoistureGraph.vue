@@ -1,6 +1,16 @@
 <template>
   <div class="soil-moisture-graph">
     <div ref="chartContainer"></div>
+    <div 
+      v-if="activeTooltip" 
+      class="tooltip-container"
+      :style="tooltipStyle"
+    >
+      <div class="tooltip-content">
+        <div class="tooltip-date">{{ tooltipData.date }}</div>
+        <div class="tooltip-value">{{ tooltipData.value }}</div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -74,6 +84,14 @@ const sensors = ref<Sensor[]>(SENSOR_CONFIGS.map((config) => ({
   name: config.name,
 })));
 
+// Add new refs for tooltip
+const activeTooltip = ref(false);
+const tooltipData = ref({ date: '', value: '' });
+const tooltipStyle = ref({
+  left: '0px',
+  top: '0px'
+});
+
 async function fetchAllSensorData() {
   let fetchError = false;
   try {
@@ -129,7 +147,7 @@ const formatDate = (date: Date) => {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
-  }).replace(' ', ', ');
+  });
 };
 
 const formatValue = (value: number) => {
@@ -290,7 +308,8 @@ const createChart = () => {
   // Create tooltip container
   tooltip.value = svg.value.append("g")
     .attr("class", "tooltip")
-    .style("display", "none");
+    .style("display", "none")
+    .style("pointer-events", "none"); // Prevent tooltip from interfering with mouse events
 
   // Add lines for each visible sensor
   sensors.value.forEach((sensor, i) => {
@@ -299,6 +318,7 @@ const createChart = () => {
     const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
     const color = colors[sensorColorIndex % colors.length];
 
+    // Add the line
     const path = svg.value!.append("path")
       .datum(sensor.data)
       .attr("fill", "none")
@@ -306,7 +326,48 @@ const createChart = () => {
       .attr("stroke-width", 1.5)
       .attr("d", line);
 
-    // Add hover effect
+    // Add points for each data point
+    const points = svg.value!.append("g")
+      .attr("class", "points")
+      .selectAll("circle")
+      .data(sensor.data)
+      .join("circle")
+      .attr("cx", (d: DataPoint) => x(d.time))
+      .attr("cy", (d: DataPoint) => y(d.moisture))
+      .attr("r", 3)
+      .attr("fill", color)
+      .attr("stroke", "white")
+      .attr("stroke-width", 1)
+      .style("cursor", "pointer")
+      .style("pointer-events", "all");
+
+    // Add hover effects for points
+    points.on("mouseenter", function(event: MouseEvent, d: DataPoint) {
+      const point = d3.select(this);
+      point.attr("r", 5).attr("stroke-width", 2);
+
+      // Update tooltip data
+      tooltipData.value = {
+        date: formatDate(d.time),
+        value: formatValue(d.moisture)
+      };
+
+      // Position tooltip
+      const rect = chartContainer.value!.getBoundingClientRect();
+      tooltipStyle.value = {
+        left: `${event.clientX - rect.left + 10}px`,
+        top: `${event.clientY - rect.top - 10}px`
+      };
+
+      activeTooltip.value = true;
+    })
+    .on("mouseleave", function() {
+      const point = d3.select(this);
+      point.attr("r", 3).attr("stroke-width", 1);
+      activeTooltip.value = false;
+    });
+
+    // Add hover effect for the line
     path.on("mouseover", function(this: SVGPathElement) {
       d3.select(this)
         .attr("stroke-width", 2.5);
@@ -346,77 +407,6 @@ const createChart = () => {
   if (chartContainer.value && svg.value.node()) {
     chartContainer.value.appendChild(svg.value.node()!);
   }
-
-  // Add mouse interaction for tooltip
-  const bisect = d3.bisector<DataPoint, Date>((d: DataPoint) => d.time).center;
-  
-  svg.value.on("pointermove", (event: PointerEvent) => {
-    const visibleSensorsWithData = sensors.value.filter(s => props.sensorVisibility[s.name] && s.data.length > 0);
-    if (!tooltip.value || visibleSensorsWithData.length === 0) {
-      if (tooltip.value) tooltip.value.style("display", "none");
-      return;
-    }
-
-    const pointer = d3.pointer(event);
-    const xPos = x.invert(pointer[0]);
-    
-    const tooltipData = visibleSensorsWithData
-      .map((sensor) => {
-        const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
-        const color = colors[sensorColorIndex % colors.length];
-
-        const index = bisect(sensor.data, xPos);
-        const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
-        if (!dataPoint) return null;
-
-        return {
-          name: sensor.name,
-          value: dataPoint.moisture,
-          time: dataPoint.time,
-          color: color
-        };
-      }).filter(item => item !== null);
-
-    // Show tooltip
-    tooltip.value.style("display", null);
-    tooltip.value.attr("transform", `translate(${pointer[0]},${pointer[1]})`);
-
-    // Update tooltip content
-    const tooltipContent = tooltip.value.selectAll("g")
-      .data(tooltipData)
-      .join("g")
-      .attr("transform", (d: { name: string; value: number; time: Date; color: string }, i: number) => `translate(0,${i * 20})`);
-
-    tooltipContent.selectAll("rect")
-      .data((d: { name: string; value: number; time: Date; color: string }) => [d])
-      .join("rect")
-      .attr("x", -60)
-      .attr("y", -15)
-      .attr("width", 120)
-      .attr("height", 20)
-      .attr("fill", (d: { name: string; value: number; time: Date; color: string }) => d.color)
-      .attr("stroke", "black")
-      .attr("stroke-width", 0.5);
-
-    tooltipContent.selectAll("text")
-      .data((d_text: { name: string; value: number; time: Date; color: string }) => [d_text])
-      .join("text")
-      .attr("fill", (d_text: { name: string; value: number; time: Date; color: string }) => d_text.color)
-      .selectAll("tspan")
-      .data((d_text: { name: string; value: number; time: Date; color: string }) => [
-        `${d_text.name}: ${formatValue(d_text.value)}`,
-        formatDate(d_text.time)
-      ])
-      .join("tspan")
-      .attr("x", -55)
-      .attr("dy", (d_tspan: string, i_tspan: number) => i_tspan === 0 ? "-0.1em" : "1.2em")
-      .text((d_tspan: string) => d_tspan);
-  })
-  .on("pointerleave", () => {
-    if (tooltip.value) {
-      tooltip.value.style("display", "none");
-    }
-  });
 };
 
 // Add watch for queryParams
@@ -652,9 +642,37 @@ onMounted(async () => {
   max-width: 928px;
   margin: 0 auto;
   padding: 20px;
+  position: relative;
 }
 
-.tooltip {
+.tooltip-container {
+  position: absolute;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   pointer-events: none;
+  z-index: 1000;
+  min-width: 120px;
+}
+
+.tooltip-content {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tooltip-date {
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.tooltip-value {
+  color: #333;
+  font-weight: 500;
+}
+
+.points circle {
+  transition: r 0.2s, stroke-width 0.2s;
 }
 </style>
