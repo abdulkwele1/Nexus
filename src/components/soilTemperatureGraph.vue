@@ -653,13 +653,25 @@ const filterData = (params: Props['queryParams']) => {
         break;
       case 'last7Days':
         const start7Days = new Date(now);
-        start7Days.setDate(now.getDate() - 6);
+        // If using monthly resolution, extend the range to 3 months
+        if (params.resolution === 'monthly') {
+          start7Days.setMonth(now.getMonth() - 2);
+          start7Days.setDate(1); // Start from the beginning of the month
+        } else {
+          start7Days.setDate(now.getDate() - 6);
+        }
         start7Days.setHours(0, 0, 0, 0);
         filterRangeStart = start7Days;
         break;
       case 'last30Days':
         const start30Days = new Date(now);
-        start30Days.setDate(now.getDate() - 29);
+        // If using monthly resolution, extend the range to 3 months
+        if (params.resolution === 'monthly') {
+          start30Days.setMonth(now.getMonth() - 2);
+          start30Days.setDate(1); // Start from the beginning of the month
+        } else {
+          start30Days.setDate(now.getDate() - 29);
+        }
         start30Days.setHours(0, 0, 0, 0);
         filterRangeStart = start30Days;
         break;

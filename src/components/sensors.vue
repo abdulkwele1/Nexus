@@ -180,6 +180,12 @@ import SoilMoistureGraph from './soilMoistureGraph.vue';
 import SoilTemperatureGraph from './soilTemperatureGraph.vue';
 import { useNexusStore } from '@/stores/nexus';
 
+interface DataPoint {
+  time: Date;
+  moisture?: number;
+  temperature?: number;
+}
+
 // Add conversion function
 const celsiusToFahrenheit = (celsius: number | null): number | null => {
   if (celsius === null) return null;
@@ -643,8 +649,12 @@ const setTimeRange = (range: string) => {
 
 const updateGraphData = () => {
   dynamicTimeWindow.value = 'none'; // Reset dynamic window when manually changing dates/filters
-  // This will trigger the graph update through props
-  queryParams.value = { ...queryParams.value };
+  // Update the appropriate query params based on sensor type
+  if (currentSensorType.value === 'moisture') {
+    moistureQueryParams.value = { ...moistureQueryParams.value };
+  } else {
+    temperatureQueryParams.value = { ...temperatureQueryParams.value };
+  }
   // Similar to setTimeRange, relying on prop reactivity in the child.
   nextTick(() => {
     if (currentSensorType.value === 'moisture' && moistureGraphComponent.value) {
@@ -677,14 +687,14 @@ const exportToCSV = () => {
   const csvRows = [headers];
 
   data.forEach(sensor => {
-    if (sensor.visible) {
-      sensor.data.forEach(point => {
+    if (sensorVisibility.value[sensor.name]) {
+      sensor.data.forEach((point: DataPoint) => {
         csvRows.push([
           new Date(point.time).toISOString(),
           sensor.name,
           currentSensorType.value === 'moisture' 
-            ? point.moisture.toFixed(1)
-            : point.temperature.toFixed(1)
+            ? (point.moisture?.toFixed(1) ?? 'N/A')
+            : (point.temperature?.toFixed(1) ?? 'N/A')
         ]);
       });
     }
