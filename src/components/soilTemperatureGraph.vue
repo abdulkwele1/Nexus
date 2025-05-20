@@ -1,6 +1,16 @@
 <template>
   <div class="soil-temperature-graph">
     <div ref="chartContainer"></div>
+    <div 
+      v-if="activeTooltip" 
+      class="tooltip-container"
+      :style="tooltipStyle"
+    >
+      <div class="tooltip-content">
+        <div class="tooltip-date">{{ tooltipData.date }}</div>
+        <div class="tooltip-value">{{ tooltipData.value }}</div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -46,6 +56,14 @@ const chartContainer = ref<HTMLElement | null>(null);
 const svg = ref<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
 const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
 
+// Add new refs for tooltip
+const activeTooltip = ref(false);
+const tooltipData = ref({ date: '', value: '' });
+const tooltipStyle = ref({
+  left: '0px',
+  top: '0px'
+});
+
 const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 
 // Define SENSOR_CONFIGS (could be props later if more dynamic)
@@ -65,41 +83,68 @@ async function fetchAllSensorData() {
   let fetchError = false;
   sensors.value.forEach(sensor => sensor.data = []); // Clear data before fetch
   console.log(`[TEMP_GRAPH] fetchAllSensorData called. DataType: ${props.dataType}, Resolution: ${props.queryParams.resolution}`);
+  
   try {
     const allSensorsDataPromises = SENSOR_CONFIGS.map(async (config, index) => {
       let rawDataPoints;
       // Ensure we only fetch temperature data here
       if (props.dataType === 'temperature') { 
         console.log(`[TEMP_GRAPH] Fetching temperature for sensor ${config.name} (ID: ${config.id})`);
-        rawDataPoints = await nexusStore.user.getSensorTemperatureData(config.id);
-        console.log(`[TEMP_GRAPH] Raw data received for ${config.name}:`, rawDataPoints);
+        try {
+          rawDataPoints = await nexusStore.user.getSensorTemperatureData(config.id);
+          console.log(`[TEMP_GRAPH] Raw temperature data received for ${config.name}:`, rawDataPoints);
+        } catch (error) {
+          console.error(`[TEMP_GRAPH] Error fetching temperature data for sensor ${config.name}:`, error);
+          return;
+        }
+        
+        if (!rawDataPoints || !Array.isArray(rawDataPoints)) {
+          console.error(`[TEMP_GRAPH] Invalid data received for sensor ${config.name}:`, rawDataPoints);
+          return;
+        }
+        
+        if (rawDataPoints.length === 0) {
+          console.warn(`[TEMP_GRAPH] No temperature data points received for sensor ${config.name}`);
+          return;
+        }
+        
+        // Format temperature data
+        const formattedTemperatureData: DataPoint[] = rawDataPoints
+          .filter((point: any) => {
+            const isValid = point && 
+                          typeof point.date === 'string' && 
+                          typeof point.soil_temperature === 'number' && 
+                          !isNaN(point.soil_temperature);
+            if (!isValid) {
+              console.warn(`[TEMP_GRAPH] Invalid data point for ${config.name}:`, point);
+            }
+            return isValid;
+          })
+          .map((point: any) => ({
+            time: new Date(point.date),
+            temperature: Number(point.soil_temperature),
+          }))
+          .sort((a, b) => a.time.getTime() - b.time.getTime());
+        
+        console.log(`[TEMP_GRAPH] Formatted ${formattedTemperatureData.length} valid points for sensor ${config.name}`);
+        if (formattedTemperatureData.length > 0) {
+          console.log(`[TEMP_GRAPH] First point:`, formattedTemperatureData[0]);
+          console.log(`[TEMP_GRAPH] Last point:`, formattedTemperatureData[formattedTemperatureData.length - 1]);
+        }
+        
+        sensors.value[index].data = formattedTemperatureData;
       } else {
         console.warn(`[TEMP_GRAPH] Incorrect dataType prop received: ${props.dataType}. Expected 'temperature'.`);
-        rawDataPoints = []; // Avoid errors later
-      }
-      
-      if (rawDataPoints && Array.isArray(rawDataPoints) && rawDataPoints.length > 0) {
-        // Renamed variable for clarity
-        const formattedTemperatureData: DataPoint[] = rawDataPoints.map((point: any) => ({
-          time: new Date(point.date),
-          // Ensure we are using the correct field 'soil_temperature'
-          temperature: Number(point.soil_temperature), 
-        })).sort((a, b) => a.time.getTime() - b.time.getTime());
-        
-        // Check for invalid data points (NaN temperature)
-        const validDataPoints = formattedTemperatureData.filter(p => !isNaN(p.temperature));
-        if (validDataPoints.length !== formattedTemperatureData.length) {
-            console.warn(`[TEMP_GRAPH] Filtered out ${formattedTemperatureData.length - validDataPoints.length} invalid data points for ${config.name}`);
-        }
-
-        sensors.value[index].data = validDataPoints;
-        console.log(`[TEMP_GRAPH] Formatted ${validDataPoints.length} valid points for sensor ${config.name}. First point:`, validDataPoints[0]);
-      } else {
-        console.warn(`[TEMP_GRAPH] No valid array data received for sensor ${config.name}`);
-        sensors.value[index].data = [];
       }
     });
+    
     await Promise.all(allSensorsDataPromises);
+    
+    // Log final state of sensors data
+    sensors.value.forEach((sensor, index) => {
+      console.log(`[TEMP_GRAPH] Final data state for sensor ${sensor.name}: ${sensor.data.length} points`);
+    });
+    
   } catch (error) {
     console.error("[TEMP_GRAPH] Error fetching sensor data:", error);
     fetchError = true;
@@ -109,7 +154,6 @@ async function fetchAllSensorData() {
     if (!fetchError) {
       processAndDrawChart();
     } else {
-      // Still call createChart to render empty axes if fetch failed
       console.log("[TEMP_GRAPH] Calling createChart after fetch error to draw empty state.");
       createChart(); 
     }
@@ -118,14 +162,29 @@ async function fetchAllSensorData() {
 
 const processAndDrawChart = () => {
   console.log(`[TEMP_GRAPH] processAndDrawChart called. QueryParams:`, JSON.parse(JSON.stringify(props.queryParams)));
+  
+  // Log initial state of sensors data
+  sensors.value.forEach((sensor, index) => {
+    console.log(`[TEMP_GRAPH] Initial data for sensor ${sensor.name}: ${sensor.data.length} points`);
+    if (sensor.data.length > 0) {
+      console.log(`[TEMP_GRAPH] First point:`, sensor.data[0]);
+      console.log(`[TEMP_GRAPH] Last point:`, sensor.data[sensor.data.length - 1]);
+    }
+  });
+  
   const processedData = filterData(props.queryParams);
   const totalPoints = processedData.reduce((sum, s) => sum + s.data.length, 0);
   console.log(`[TEMP_GRAPH] After filter/aggregation, total points to draw: ${totalPoints}`);
+  
   if (totalPoints > 0) {
-      console.log('[TEMP_GRAPH] First sensor data after processing:', processedData[0]?.data[0]);
+    console.log('[TEMP_GRAPH] First sensor data after processing:', processedData[0]?.data[0]);
+    console.log('[TEMP_GRAPH] Last sensor data after processing:', processedData[0]?.data[processedData[0].data.length - 1]);
+  } else {
+    console.warn('[TEMP_GRAPH] No data points to draw after processing');
   }
+  
   updateChart(processedData);
-}
+};
 
 const formatDate = (date: Date) => {
   return date.toLocaleString('en-US', {
@@ -147,13 +206,15 @@ const formatValue = (value: number) => {
   return `${fahrenheit.toFixed(1)}°F`;
 };
 
+// Update the createChart function to handle empty data better
 const createChart = () => {
   if (!chartContainer.value) {
-      console.error("[TEMP_GRAPH] chartContainer ref is not available.");
-      return;
+    console.error("[TEMP_GRAPH] chartContainer ref is not available.");
+    return;
   }
 
   console.log("[TEMP_GRAPH] createChart called.");
+  
   // Clear previous chart
   if (svg.value) {
     svg.value.remove();
@@ -184,6 +245,13 @@ const createChart = () => {
     .flatMap(sensor => sensor.data);
     
   console.log(`[TEMP_GRAPH] createChart: Processing ${allData.length} total visible data points for domains.`);
+
+  if (allData.length === 0) {
+    console.warn("[TEMP_GRAPH] No data points available for chart creation");
+    // Add a message to the chart container
+    chartContainer.value.innerHTML = '<div style="text-align: center; padding: 20px;">No temperature data available for the selected time period</div>';
+    return;
+  }
 
   // Convert Celsius to Fahrenheit for display
   const fahrenheitData = allData.map(d => ({
@@ -253,47 +321,37 @@ const createChart = () => {
   let xAxis = d3.axisBottom(x);
   let tickFormat: (date: Date) => string;
 
-  // --- Specific handling for last24Hours --- 
+  // Update x-axis formatting based on resolution
   if (props.dynamicTimeWindow === 'last24Hours') {
-    xAxis.ticks(d3.timeHour.every(3)); // Ticks every 3 hours
-    tickFormat = d3.timeFormat("%I %p"); // Format like "02 PM"
-    xAxis.tickFormat(tickFormat as any);
-    console.log("[TEMP_GRAPH] Applying specific x-axis formatting for last24Hours.");
+    xAxis.ticks(d3.timeHour.every(3));
+    tickFormat = d3.timeFormat("%I %p");
   } else {
-  // --- Fallback to resolution-based formatting --- 
     switch (props.queryParams.resolution) {
-      case 'monthly':
-        xAxis.ticks(d3.timeMonth.every(1));
-        tickFormat = d3.timeFormat("%b %Y"); // e.g., "Jan 2023"
-        xAxis.tickFormat(tickFormat as any);
+      case 'raw':
+        // For raw data, show more detailed time format
+        xAxis.ticks(width / 80);
+        tickFormat = d3.timeFormat("%I:%M %p");
+        break;
+      case 'hourly':
+        // For hourly data, show hour format
+        xAxis.ticks(d3.timeHour.every(3));
+        tickFormat = d3.timeFormat("%I %p");
+        break;
+      case 'daily':
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%b %d");
         break;
       case 'weekly':
         xAxis.ticks(d3.timeWeek.every(1));
-        tickFormat = d3.timeFormat("%b %d"); // e.g., "Jan 15" (start of week)
-        xAxis.tickFormat(tickFormat as any);
-        break;
-      case 'daily':
-        const daysInRange = Math.ceil(timeRange / (24 * 60 * 60 * 1000));
-        xAxis.ticks(Math.min(7, daysInRange > 0 ? daysInRange : 1)); // Limit to 7 ticks for daily
         tickFormat = d3.timeFormat("%b %d");
-        xAxis.tickFormat(tickFormat as any);
         break;
-      case 'hourly':
-        // Apply 3-hour ticks for general hourly if not last24h? Or keep more granular?
-        // Let's try keeping it more granular for the general 'hourly' setting
-        const hoursInRange = Math.ceil(timeRange / (60 * 60 * 1000));
-        xAxis.ticks(Math.min(12, hoursInRange > 0 ? hoursInRange : 1)); // Adjust tick count for hourly
-        tickFormat = d3.timeFormat("%I:%M %p");
-        xAxis.tickFormat(tickFormat as any);
+      case 'monthly':
+        xAxis.ticks(d3.timeMonth.every(1));
+        tickFormat = d3.timeFormat("%b %Y");
         break;
-      default: // 'raw'
-        xAxis.ticks(width / 80); // Default tick count for raw data
-        tickFormat = isWithin24Hours ? 
-          d3.timeFormat("%I:%M %p") : 
-          d3.timeFormat("%b %d");
-        xAxis.tickFormat(tickFormat as any);
     }
   }
+  xAxis.tickFormat(tickFormat as any);
   xAxisGroup.call(xAxis);
 
   // Add y-axis with Fahrenheit values
@@ -338,12 +396,53 @@ const createChart = () => {
       .attr("stroke-width", 1.5)
       .attr("d", line);
 
-    // Add hover effect
-    path.on("mouseover", function() {
+    // Add points for each data point
+    const points = svg.value!.append("g")
+      .attr("class", "points")
+      .selectAll("circle")
+      .data(sensor.data)
+      .join("circle")
+      .attr("cx", d => x(d.time))
+      .attr("cy", d => y(celsiusToFahrenheit(d.temperature)))
+      .attr("r", 3)
+      .attr("fill", color)
+      .attr("stroke", "white")
+      .attr("stroke-width", 1)
+      .style("cursor", "pointer")
+      .style("pointer-events", "all");
+
+    // Add hover effects for points
+    points.on("mouseenter", function(event: MouseEvent, d: DataPoint) {
+      const point = d3.select(this);
+      point.attr("r", 5).attr("stroke-width", 2);
+
+      // Update tooltip data
+      tooltipData.value = {
+        date: formatDate(d.time),
+        value: formatValue(d.temperature)
+      };
+
+      // Position tooltip
+      const rect = chartContainer.value!.getBoundingClientRect();
+      tooltipStyle.value = {
+        left: `${event.clientX - rect.left + 10}px`,
+        top: `${event.clientY - rect.top - 10}px`
+      };
+
+      activeTooltip.value = true;
+    })
+    .on("mouseleave", function() {
+      const point = d3.select(this);
+      point.attr("r", 3).attr("stroke-width", 1);
+      activeTooltip.value = false;
+    });
+
+    // Add hover effect for the line
+    path.on("mouseover", function(this: SVGPathElement) {
       d3.select(this)
         .attr("stroke-width", 2.5);
     })
-    .on("mouseout", function() {
+    .on("mouseout", function(this: SVGPathElement) {
       d3.select(this)
         .attr("stroke-width", 1.5);
     });
@@ -467,42 +566,110 @@ watch(() => props.dynamicTimeWindow, () => {
   processAndDrawChart();
 });
 
-// Add data filtering function
-const filterData = (params: Props['queryParams']) => {
-  console.log(`[TEMP_GRAPH] filterData called. Date range: ${params.startDate} to ${params.endDate}. Value range: ${params.minValue}°C to ${params.maxValue}°C.`);
-  if (props.dynamicTimeWindow && props.dynamicTimeWindow !== 'none') {
-      console.log(`[TEMP_GRAPH] Applying dynamic time window: ${props.dynamicTimeWindow}`);
-  }
+// Add data aggregation function
+const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'daily' | 'weekly' | 'monthly'): Sensor[] => {
+  console.log(`[TEMP_GRAPH] Aggregating data with resolution: ${resolution}`);
+  
+  return sensorsToAggregate.map(sensor => {
+    if (!sensor.data || sensor.data.length === 0) {
+      console.log(`[TEMP_GRAPH] No data to aggregate for sensor ${sensor.name}`);
+      return { ...sensor, data: [] };
+    }
 
+    console.log(`[TEMP_GRAPH] Processing ${sensor.data.length} points for sensor ${sensor.name}`);
+    const groups = new Map<string, { sum: number, count: number, time: Date }>();
+
+    sensor.data.forEach(point => {
+      const date = new Date(point.time);
+      let groupTime: Date;
+      let key: string;
+
+      switch (resolution) {
+        case 'hourly':
+          // For hourly, use the exact hour
+          groupTime = new Date(date);
+          groupTime.setMinutes(0, 0, 0);
+          key = groupTime.toISOString();
+          break;
+        case 'daily':
+          groupTime = d3.timeDay.floor(date);
+          key = groupTime.toISOString();
+          break;
+        case 'weekly':
+          groupTime = d3.timeWeek.floor(date);
+          key = groupTime.toISOString();
+          break;
+        case 'monthly':
+          groupTime = new Date(date.getFullYear(), date.getMonth(), 1);
+          key = `${groupTime.getFullYear()}-${groupTime.getMonth()}`;
+          break;
+      }
+
+      if (!groups.has(key)) {
+        groups.set(key, { sum: 0, count: 0, time: groupTime });
+      }
+      
+      const group = groups.get(key)!;
+      group.sum += point.temperature;
+      group.count += 1;
+    });
+
+    // Convert groups to array and sort by time
+    const sortedGroups = Array.from(groups.entries())
+      .map(([_, group]) => ({
+        time: group.time,
+        temperature: group.sum / group.count
+      }))
+      .sort((a, b) => a.time.getTime() - b.time.getTime());
+
+    console.log(`[TEMP_GRAPH] Aggregated ${sensor.data.length} points into ${sortedGroups.length} points for sensor ${sensor.name}`);
+    if (sortedGroups.length > 0) {
+      console.log(`[TEMP_GRAPH] First aggregated point:`, sortedGroups[0]);
+      console.log(`[TEMP_GRAPH] Last aggregated point:`, sortedGroups[sortedGroups.length - 1]);
+    }
+
+    return { ...sensor, data: sortedGroups };
+  });
+};
+
+// Update the filterData function to handle time windows better
+const filterData = (params: Props['queryParams']) => {
   const now = new Date();
   let filterRangeStart: Date;
   let filterRangeEnd: Date;
   let useInclusiveEnd = false;
 
+  console.log(`[TEMP_GRAPH] filterData called. Dynamic Window: ${props.dynamicTimeWindow}, Resolution: ${params.resolution}`);
+
   if (props.dynamicTimeWindow && props.dynamicTimeWindow !== 'none') {
     filterRangeEnd = now;
     useInclusiveEnd = true;
+    console.log(`[TEMP_GRAPH] Applying dynamic time window: ${props.dynamicTimeWindow}. Current Time (browser): ${now.toISOString()}`);
 
     switch (props.dynamicTimeWindow) {
       case 'lastHour':
-        // Add a 5-minute buffer to account for potential data delay
-        filterRangeStart = new Date(now.getTime() - 65 * 60 * 1000);
-        console.log(`[TEMP_GRAPH] >> lastHour: Calculated filter range (with buffer): ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+        filterRangeStart = new Date(now.getTime() - 65 * 60 * 1000); // Add 5-minute buffer
         break;
       case 'last24Hours':
         filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         break;
       case 'last7Days':
-        filterRangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const start7Days = new Date(now);
+        start7Days.setDate(now.getDate() - 6);
+        start7Days.setHours(0, 0, 0, 0);
+        filterRangeStart = start7Days;
         break;
       case 'last30Days':
-        filterRangeStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const start30Days = new Date(now);
+        start30Days.setDate(now.getDate() - 29);
+        start30Days.setHours(0, 0, 0, 0);
+        filterRangeStart = start30Days;
         break;
       default:
         filterRangeStart = new Date(params.startDate + 'T00:00:00');
-        const tempEndDate = new Date(params.endDate + 'T00:00:00');
-        tempEndDate.setDate(tempEndDate.getDate() + 1);
-        filterRangeEnd = tempEndDate;
+        const tempEndDateDef = new Date(params.endDate + 'T00:00:00');
+        tempEndDateDef.setDate(tempEndDateDef.getDate() + 1);
+        filterRangeEnd = tempEndDateDef;
         useInclusiveEnd = false;
         break;
     }
@@ -512,17 +679,19 @@ const filterData = (params: Props['queryParams']) => {
     tempEndDate.setDate(tempEndDate.getDate() + 1);
     filterRangeEnd = tempEndDate;
     useInclusiveEnd = false;
+    console.log(`[TEMP_GRAPH] Using manual date range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
   }
-   console.log(`[TEMP_GRAPH] Filtering time from ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}. Inclusive end: ${useInclusiveEnd}`);
 
   const minTemperature = params.minValue;
   const maxTemperature = params.maxValue;
 
   const filtered = sensors.value.map(sensor => {
     const initialPoints = sensor.data.length;
+    console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: Filtering ${initialPoints} points...`);
+
     const sensorFilteredData = sensor.data.filter(point => {
       const date = point.time;
-      const temperature = point.temperature; // Already in Celsius here
+      const temperature = point.temperature;
       
       let inTimeRange;
       if (useInclusiveEnd) {
@@ -536,83 +705,25 @@ const filterData = (params: Props['queryParams']) => {
       
       return inTimeRange && isAboveMinTemp && isBelowMaxTemp;
     });
-    console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: ${initialPoints} points -> ${sensorFilteredData.length} points after time/value filtering.`);
+
+    console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: ${initialPoints} points -> ${sensorFilteredData.length} points after filtering`);
     return {
       ...sensor,
       data: sensorFilteredData
     };
   });
 
-  if (params.resolution !== 'raw') {
-    console.log(`[TEMP_GRAPH] Aggregating filtered data with resolution: ${params.resolution}`);
-    const aggregated = aggregateData(filtered, params.resolution);
-    aggregated.forEach(s => console.log(`[TEMP_GRAPH] Sensor ${s.name}: ${s.data.length} points after aggregation.`));
-    return aggregated;
+  // For raw data, return filtered data without aggregation
+  if (params.resolution === 'raw') {
+    console.log(`[TEMP_GRAPH] Returning raw data without aggregation`);
+    return filtered;
   }
-  return filtered;
-};
 
-// Add data aggregation function
-const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'daily' | 'weekly' | 'monthly'): Sensor[] => {
-  return sensorsToAggregate.map(sensor => {
-    if (!sensor.data || sensor.data.length === 0) {
-      return { ...sensor, data: [] };
-    }
-
-    const aggregatedData: DataPoint[] = [];
-    const groups = new Map<string, { sum: number, count: number, time: Date }>();
-
-    sensor.data.forEach(point => {
-      let key = '';
-      const date = new Date(point.time);
-
-      switch (resolution) {
-        case 'hourly':
-          key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
-          break;
-        case 'daily':
-          key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-          break;
-        case 'weekly':
-          // Use d3's timeWeek to get the start of the week
-          const weekStartDate = d3.timeWeek.floor(date);
-          key = weekStartDate.toISOString();
-          break;
-        case 'monthly':
-          const monthStartDate = new Date(date.getFullYear(), date.getMonth(), 1);
-          key = `${monthStartDate.getFullYear()}-${monthStartDate.getMonth()}`;
-          break;
-      }
-
-      if (!groups.has(key)) {
-        let groupTime = d3.timeHour.floor(date);
-        if (resolution === 'daily') {
-          groupTime = d3.timeDay.floor(date);
-        } else if (resolution === 'weekly') {
-          groupTime = d3.timeWeek.floor(date);
-        } else if (resolution === 'monthly') {
-          groupTime = new Date(date.getFullYear(), date.getMonth(), 1);
-        }
-        groups.set(key, { sum: 0, count: 0, time: groupTime });
-      }
-      
-      const group = groups.get(key)!;
-      group.sum += point.temperature;
-      group.count += 1;
-    });
-
-    groups.forEach(group => {
-      const averageTemperature = group.sum / group.count;
-      aggregatedData.push({
-        time: group.time,
-        temperature: averageTemperature,
-      });
-    });
-
-    aggregatedData.sort((a, b) => a.time.getTime() - b.time.getTime());
-
-    return { ...sensor, data: aggregatedData };
-  });
+  // Apply aggregation for other resolutions
+  console.log(`[TEMP_GRAPH] Aggregating filtered data with resolution: ${params.resolution}`);
+  const aggregated = aggregateData(filtered, params.resolution);
+  aggregated.forEach(s => console.log(`[TEMP_GRAPH] Sensor ${s.name}: ${s.data.length} points after aggregation`));
+  return aggregated;
 };
 
 const updateChart = (dataToDraw: Sensor[]) => {
@@ -625,14 +736,36 @@ const getFilteredData = () => {
   return filteredData.filter(sensor => props.sensorVisibility[sensor.name]);
 };
 
+// Add watch for dataType prop
+watch(() => props.dataType, (newDataType) => {
+  console.log(`[TEMP_GRAPH] dataType changed to: ${newDataType}`);
+  if (newDataType === 'temperature') {
+    console.log('[TEMP_GRAPH] Refetching data for temperature view');
+    fetchAllSensorData();
+  }
+}, { immediate: true });
+
+// Add watch for dynamicTimeWindow prop
+watch(() => props.dynamicTimeWindow, (newWindow) => {
+  console.log(`[TEMP_GRAPH] dynamicTimeWindow changed to: ${newWindow}`);
+  if (props.dataType === 'temperature') {
+    console.log('[TEMP_GRAPH] Refetching data for new time window');
+    fetchAllSensorData();
+  }
+});
+
+// Update onMounted to ensure data is fetched
+onMounted(async () => {
+  console.log('[TEMP_GRAPH] Component mounted, fetching initial data');
+  if (props.dataType === 'temperature') {
+    await fetchAllSensorData();
+  }
+});
+
 defineExpose({
   getFilteredData,
   fetchAllSensorData,
   processAndDrawChart
-});
-
-onMounted(async () => {
-  await fetchAllSensorData();
 });
 </script>
 
@@ -642,9 +775,37 @@ onMounted(async () => {
   max-width: 928px;
   margin: 0 auto;
   padding: 20px;
+  position: relative;
 }
 
-.tooltip {
+.tooltip-container {
+  position: absolute;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   pointer-events: none;
+  z-index: 1000;
+  min-width: 120px;
+}
+
+.tooltip-content {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tooltip-date {
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.tooltip-value {
+  color: #333;
+  font-weight: 500;
+}
+
+.points circle {
+  transition: r 0.2s, stroke-width 0.2s;
 }
 </style> 
