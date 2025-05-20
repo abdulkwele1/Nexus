@@ -91,13 +91,13 @@ async function fetchAllSensorData() {
       if (props.dataType === 'temperature') { 
         console.log(`[TEMP_GRAPH] Fetching temperature for sensor ${config.name} (ID: ${config.id})`);
         try {
-          rawDataPoints = await nexusStore.user.getSensorTemperatureData(config.id);
+        rawDataPoints = await nexusStore.user.getSensorTemperatureData(config.id);
           console.log(`[TEMP_GRAPH] Raw temperature data received for ${config.name}:`, rawDataPoints);
         } catch (error) {
           console.error(`[TEMP_GRAPH] Error fetching temperature data for sensor ${config.name}:`, error);
           return;
-        }
-        
+      }
+      
         if (!rawDataPoints || !Array.isArray(rawDataPoints)) {
           console.error(`[TEMP_GRAPH] Invalid data received for sensor ${config.name}:`, rawDataPoints);
           return;
@@ -121,8 +121,8 @@ async function fetchAllSensorData() {
             return isValid;
           })
           .map((point: any) => ({
-            time: new Date(point.date),
-            temperature: Number(point.soil_temperature),
+          time: new Date(point.date),
+          temperature: Number(point.soil_temperature), 
           }))
           .sort((a, b) => a.time.getTime() - b.time.getTime());
         
@@ -131,7 +131,7 @@ async function fetchAllSensorData() {
           console.log(`[TEMP_GRAPH] First point:`, formattedTemperatureData[0]);
           console.log(`[TEMP_GRAPH] Last point:`, formattedTemperatureData[formattedTemperatureData.length - 1]);
         }
-        
+
         sensors.value[index].data = formattedTemperatureData;
       } else {
         console.warn(`[TEMP_GRAPH] Incorrect dataType prop received: ${props.dataType}. Expected 'temperature'.`);
@@ -177,7 +177,7 @@ const processAndDrawChart = () => {
   console.log(`[TEMP_GRAPH] After filter/aggregation, total points to draw: ${totalPoints}`);
   
   if (totalPoints > 0) {
-    console.log('[TEMP_GRAPH] First sensor data after processing:', processedData[0]?.data[0]);
+      console.log('[TEMP_GRAPH] First sensor data after processing:', processedData[0]?.data[0]);
     console.log('[TEMP_GRAPH] Last sensor data after processing:', processedData[0]?.data[processedData[0].data.length - 1]);
   } else {
     console.warn('[TEMP_GRAPH] No data points to draw after processing');
@@ -209,8 +209,8 @@ const formatValue = (value: number) => {
 // Update the createChart function to handle empty data better
 const createChart = () => {
   if (!chartContainer.value) {
-    console.error("[TEMP_GRAPH] chartContainer ref is not available.");
-    return;
+      console.error("[TEMP_GRAPH] chartContainer ref is not available.");
+      return;
   }
 
   console.log("[TEMP_GRAPH] createChart called.");
@@ -248,8 +248,6 @@ const createChart = () => {
 
   if (allData.length === 0) {
     console.warn("[TEMP_GRAPH] No data points available for chart creation");
-    // Add a message to the chart container
-    chartContainer.value.innerHTML = '<div style="text-align: center; padding: 20px;">No temperature data available for the selected time period</div>';
     return;
   }
 
@@ -351,7 +349,7 @@ const createChart = () => {
         break;
     }
   }
-  xAxis.tickFormat(tickFormat as any);
+        xAxis.tickFormat(tickFormat as any);
   xAxisGroup.call(xAxis);
 
   // Add y-axis with Fahrenheit values
@@ -720,10 +718,10 @@ const filterData = (params: Props['queryParams']) => {
   }
 
   // Apply aggregation for other resolutions
-  console.log(`[TEMP_GRAPH] Aggregating filtered data with resolution: ${params.resolution}`);
-  const aggregated = aggregateData(filtered, params.resolution);
+    console.log(`[TEMP_GRAPH] Aggregating filtered data with resolution: ${params.resolution}`);
+    const aggregated = aggregateData(filtered, params.resolution);
   aggregated.forEach(s => console.log(`[TEMP_GRAPH] Sensor ${s.name}: ${s.data.length} points after aggregation`));
-  return aggregated;
+    return aggregated;
 };
 
 const updateChart = (dataToDraw: Sensor[]) => {

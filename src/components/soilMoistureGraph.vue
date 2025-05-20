@@ -188,7 +188,6 @@ const createChart = () => {
 
   if (allData.length === 0) {
     console.warn("[soilMoistureGraph] No data points available for chart creation");
-    chartContainer.value.innerHTML = '<div style="text-align: center; padding: 20px;">No data available for the selected time period</div>';
     return;
   }
 
@@ -412,7 +411,7 @@ const createChart = () => {
   // Add the chart to the container
   if (chartContainer.value && svg.value.node()) {
     chartContainer.value.appendChild(svg.value.node()!);
-  }
+    }
 };
 
 // Add watch for queryParams
@@ -550,7 +549,7 @@ const filterData = (params: Props['queryParams']) => {
     tempEndDate.setDate(tempEndDate.getDate() + 1);
     filterRangeEnd = tempEndDate;
     useInclusiveEnd = false;
-    console.log(`[soilMoistureGraph] Using manual date range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+     console.log(`[soilMoistureGraph] Using manual date range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
   }
 
   const minValue = params.minValue;
@@ -562,7 +561,7 @@ const filterData = (params: Props['queryParams']) => {
 
     // Log first/last points BEFORE filtering
     if (initialPoints > 0) {
-      console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${sensor.data[initialPoints - 1]?.time.toISOString()}`);
+        console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${sensor.data[initialPoints - 1]?.time.toISOString()}`);
     }
 
     const sensorFilteredData = sensor.data.filter(point => {
