@@ -36,6 +36,7 @@
           <button @click="setTimeRange('24h')">Last 24 Hours</button>
           <button @click="setTimeRange('7d')">Last 7 Days</button>
           <button @click="setTimeRange('30d')">Last 30 Days</button>
+          <button @click="resetToDefault" class="reset-btn">Reset to Default</button>
         </div>
       </div>
 
@@ -785,6 +786,48 @@ const currentSensorTypeLabel = computed(() => {
 const currentSensorType = computed(() => {
   return sensorTypeOptions[sensorTypeIndex.value].value as 'moisture' | 'temperature';
 });
+
+// Add the resetToDefault function in the script section
+const resetToDefault = () => {
+  const now = new Date();
+  const todayStr = toLocalDateString(now);
+  
+  // Reset to default state
+  dynamicTimeWindow.value = 'none';
+  
+  // Reset query params to default values
+  const defaultQueryParams: QueryParams = {
+    startDate: todayStr,
+    endDate: todayStr,
+    minValue: currentSensorType.value === 'moisture' ? 0 : -10,
+    maxValue: currentSensorType.value === 'moisture' ? 100 : 50,
+    resolution: 'hourly' as const // Default to hourly resolution
+  };
+
+  // Update the appropriate query params based on sensor type
+  if (currentSensorType.value === 'moisture') {
+    moistureQueryParams.value = defaultQueryParams;
+  } else {
+    temperatureQueryParams.value = defaultQueryParams;
+  }
+
+  // Reset resolution index to hourly
+  const hourlyIndex = resolutionOptions.findIndex(opt => opt.value === 'hourly');
+  if (hourlyIndex !== -1) {
+    resolutionIndex.value = hourlyIndex;
+  }
+
+  // Trigger graph update
+  nextTick(() => {
+    const currentGraph = currentSensorType.value === 'moisture' 
+      ? moistureGraphComponent.value 
+      : temperatureGraphComponent.value;
+    
+    if (currentGraph) {
+      currentGraph.fetchAllSensorData();
+    }
+  });
+};
 </script>
 
 <style>
@@ -1137,5 +1180,18 @@ select {
 
 .trend-indicator path {
   transition: d 0.4s ease-in-out; /* Animate the path data change */
+}
+
+.reset-btn {
+  grid-column: 1 / -1; /* Make reset button span full width */
+  background: #f8f9fa !important;
+  border-color: #dc3545 !important;
+  color: #dc3545;
+  font-weight: 500;
+}
+
+.reset-btn:hover {
+  background: #dc3545 !important;
+  color: white !important;
 }
 </style>

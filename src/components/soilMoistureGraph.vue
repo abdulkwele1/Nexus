@@ -252,47 +252,78 @@ const createChart = () => {
   let xAxis = d3.axisBottom(x);
   let tickFormat: (date: Date) => string;
 
-  // --- Specific handling for last24Hours --- 
+  // Update x-axis formatting based on resolution and time window
   if (props.dynamicTimeWindow === 'last24Hours') {
-    xAxis.ticks(d3.timeHour.every(3)); // Ticks every 3 hours
-    tickFormat = d3.timeFormat("%I %p"); // Format like "02 PM"
-    xAxis.tickFormat(tickFormat as any);
-    console.log("[soilMoistureGraph] Applying specific x-axis formatting for last24Hours.");
+    if (props.queryParams.resolution === 'weekly') {
+      // For weekly view of last 24 hours, show day names
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a"); // Shows day names (Mon, Tue, etc.)
+    } else if (props.queryParams.resolution === 'monthly') {
+      // For monthly view of last 24 hours, show dates
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15" format
+    } else {
+      // For hourly/raw data in last 24 hours
+      xAxis.ticks(d3.timeHour.every(3));
+      tickFormat = d3.timeFormat("%I %p"); // Shows "2 PM" format
+    }
+  } else if (props.dynamicTimeWindow === 'last7Days') {
+    if (props.queryParams.resolution === 'hourly') {
+      // For hourly data in last 7 days, show fewer ticks
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a %I %p"); // Shows "Mon 2 PM" format
+    } else if (props.queryParams.resolution === 'weekly') {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a"); // Shows day names
+    } else if (props.queryParams.resolution === 'monthly') {
+      // For monthly data in last 7 days, show one tick per month
+      xAxis.ticks(d3.timeMonth.every(1));
+      tickFormat = d3.timeFormat("%b %Y"); // Shows "Jan 2024" format
+    } else {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a"); // Shows day names
+    }
+  } else if (props.dynamicTimeWindow === 'last30Days') {
+    if (props.queryParams.resolution === 'hourly') {
+      // For hourly data in last 30 days, show one tick per day
+      xAxis.ticks(d3.timeDay.every(2)); // Show every other day to reduce clutter
+      tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15" format
+    } else if (props.queryParams.resolution === 'weekly') {
+      xAxis.ticks(d3.timeWeek.every(1));
+      tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15" format
+    } else if (props.queryParams.resolution === 'monthly') {
+      xAxis.ticks(d3.timeMonth.every(1));
+      tickFormat = d3.timeFormat("%b %Y"); // Shows "Jan 2024" format
+    } else {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15" format
+    }
   } else {
-  // --- Fallback to resolution-based formatting --- 
     switch (props.queryParams.resolution) {
       case 'monthly':
         xAxis.ticks(d3.timeMonth.every(1));
-        tickFormat = d3.timeFormat("%b %Y"); // e.g., "Jan 2023"
-        xAxis.tickFormat(tickFormat as any);
+        tickFormat = d3.timeFormat("%b %Y"); // Shows "Jan 2024"
         break;
       case 'weekly':
         xAxis.ticks(d3.timeWeek.every(1));
-        tickFormat = d3.timeFormat("%b %d"); // e.g., "Jan 15" (start of week)
-        xAxis.tickFormat(tickFormat as any);
+        tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15"
         break;
       case 'daily':
-        const daysInRange = Math.ceil(timeRange / (24 * 60 * 60 * 1000));
-        xAxis.ticks(Math.min(7, daysInRange > 0 ? daysInRange : 1)); // Limit to 7 ticks for daily
-        tickFormat = d3.timeFormat("%b %d");
-        xAxis.tickFormat(tickFormat as any);
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15"
         break;
       case 'hourly':
-        // Apply 3-hour ticks for general hourly if not last24h? Or keep more granular?
-        // Let's try keeping it more granular for the general 'hourly' setting
-        const hoursInRange = Math.ceil(timeRange / (60 * 60 * 1000));
-        xAxis.ticks(Math.min(12, hoursInRange > 0 ? hoursInRange : 1)); // Adjust tick count for hourly
-        tickFormat = d3.timeFormat("%I:%M %p");
-        xAxis.tickFormat(tickFormat as any);
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%a %I %p"); // Shows "Mon 2 PM"
         break;
       default: // 'raw'
-        xAxis.ticks(width / 80); // Default tick count for raw data
+        xAxis.ticks(width / 80);
         tickFormat = isWithin24Hours ? 
-          d3.timeFormat("%I:%M %p") : 
-          d3.timeFormat("%b %d");
-        xAxis.tickFormat(tickFormat as any);
+          d3.timeFormat("%I:%M %p") : // Shows "2:30 PM"
+          d3.timeFormat("%b %d"); // Shows "Jan 15"
     }
   }
+  xAxis.tickFormat(tickFormat as any);
   xAxisGroup.call(xAxis);
 
   // Add y-axis
@@ -519,7 +550,14 @@ const filterData = (params: Props['queryParams']) => {
         filterRangeStart = new Date(now.getTime() - 60 * 60 * 1000);
         break;
       case 'last24Hours':
-        filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        // If using weekly/monthly resolution, extend the range
+        if (params.resolution === 'weekly') {
+          filterRangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        } else if (params.resolution === 'monthly') {
+          filterRangeStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        } else {
+          filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        }
         break;
       case 'last7Days':
         const start7Days = new Date(now);
@@ -559,7 +597,7 @@ const filterData = (params: Props['queryParams']) => {
     tempEndDate.setDate(tempEndDate.getDate() + 1);
     filterRangeEnd = tempEndDate;
     useInclusiveEnd = false;
-     console.log(`[soilMoistureGraph] Using manual date range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+    console.log(`[soilMoistureGraph] Using manual date range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
   }
 
   const minValue = params.minValue;
@@ -571,7 +609,7 @@ const filterData = (params: Props['queryParams']) => {
 
     // Log first/last points BEFORE filtering
     if (initialPoints > 0) {
-        console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${sensor.data[initialPoints - 1]?.time.toISOString()}`);
+      console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Raw first point time: ${sensor.data[0]?.time.toISOString()}, Raw last point time: ${sensor.data[initialPoints - 1]?.time.toISOString()}`);
     }
 
     const sensorFilteredData = sensor.data.filter(point => {
@@ -606,9 +644,12 @@ const filterData = (params: Props['queryParams']) => {
     };
   });
 
-  // For last hour, we want to show raw data without aggregation
+  // For last hour, we want to show data with the selected resolution
   if (props.dynamicTimeWindow === 'lastHour') {
-    console.log(`[soilMoistureGraph] Last hour view - returning raw data without aggregation`);
+    console.log(`[soilMoistureGraph] Last hour view - applying selected resolution: ${params.resolution}`);
+    if (params.resolution !== 'raw') {
+      return aggregateData(filtered, params.resolution);
+    }
     return filtered;
   }
 

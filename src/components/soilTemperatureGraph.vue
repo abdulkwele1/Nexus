@@ -319,37 +319,78 @@ const createChart = () => {
   let xAxis = d3.axisBottom(x);
   let tickFormat: (date: Date) => string;
 
-  // Update x-axis formatting based on resolution
+  // Update x-axis formatting based on resolution and time window
   if (props.dynamicTimeWindow === 'last24Hours') {
-    xAxis.ticks(d3.timeHour.every(3));
-    tickFormat = d3.timeFormat("%I %p");
+    if (props.queryParams.resolution === 'weekly') {
+      // For weekly view of last 24 hours, show day names
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a"); // Shows day names (Mon, Tue, etc.)
+    } else if (props.queryParams.resolution === 'monthly') {
+      // For monthly view of last 24 hours, show dates
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15" format
+    } else {
+      // For hourly/raw data in last 24 hours
+      xAxis.ticks(d3.timeHour.every(3));
+      tickFormat = d3.timeFormat("%I %p"); // Shows "2 PM" format
+    }
+  } else if (props.dynamicTimeWindow === 'last7Days') {
+    if (props.queryParams.resolution === 'hourly') {
+      // For hourly data in last 7 days, show fewer ticks
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a %I %p"); // Shows "Mon 2 PM" format
+    } else if (props.queryParams.resolution === 'weekly') {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a"); // Shows day names
+    } else if (props.queryParams.resolution === 'monthly') {
+      // For monthly data in last 7 days, show one tick per month
+      xAxis.ticks(d3.timeMonth.every(1));
+      tickFormat = d3.timeFormat("%b %Y"); // Shows "Jan 2024" format
+    } else {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a"); // Shows day names
+    }
+  } else if (props.dynamicTimeWindow === 'last30Days') {
+    if (props.queryParams.resolution === 'hourly') {
+      // For hourly data in last 30 days, show one tick per day
+      xAxis.ticks(d3.timeDay.every(2)); // Show every other day to reduce clutter
+      tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15" format
+    } else if (props.queryParams.resolution === 'weekly') {
+      xAxis.ticks(d3.timeWeek.every(1));
+      tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15" format
+    } else if (props.queryParams.resolution === 'monthly') {
+      xAxis.ticks(d3.timeMonth.every(1));
+      tickFormat = d3.timeFormat("%b %Y"); // Shows "Jan 2024" format
+    } else {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15" format
+    }
   } else {
     switch (props.queryParams.resolution) {
-      case 'raw':
-        // For raw data, show more detailed time format
-        xAxis.ticks(width / 80);
-        tickFormat = d3.timeFormat("%I:%M %p");
-        break;
-      case 'hourly':
-        // For hourly data, show hour format
-        xAxis.ticks(d3.timeHour.every(3));
-        tickFormat = d3.timeFormat("%I %p");
-        break;
-      case 'daily':
-        xAxis.ticks(d3.timeDay.every(1));
-        tickFormat = d3.timeFormat("%b %d");
+      case 'monthly':
+        xAxis.ticks(d3.timeMonth.every(1));
+        tickFormat = d3.timeFormat("%b %Y"); // Shows "Jan 2024"
         break;
       case 'weekly':
         xAxis.ticks(d3.timeWeek.every(1));
-        tickFormat = d3.timeFormat("%b %d");
+        tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15"
         break;
-      case 'monthly':
-        xAxis.ticks(d3.timeMonth.every(1));
-        tickFormat = d3.timeFormat("%b %Y");
+      case 'daily':
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%b %d"); // Shows "Jan 15"
         break;
+      case 'hourly':
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%a %I %p"); // Shows "Mon 2 PM"
+        break;
+      default: // 'raw'
+        xAxis.ticks(width / 80);
+        tickFormat = isWithin24Hours ? 
+          d3.timeFormat("%I:%M %p") : // Shows "2:30 PM"
+          d3.timeFormat("%b %d"); // Shows "Jan 15"
     }
   }
-        xAxis.tickFormat(tickFormat as any);
+  xAxis.tickFormat(tickFormat as any);
   xAxisGroup.call(xAxis);
 
   // Add y-axis with Fahrenheit values
@@ -649,7 +690,14 @@ const filterData = (params: Props['queryParams']) => {
         filterRangeStart = new Date(now.getTime() - 65 * 60 * 1000); // Add 5-minute buffer
         break;
       case 'last24Hours':
-        filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        // If using weekly/monthly resolution, extend the range
+        if (params.resolution === 'weekly') {
+          filterRangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        } else if (params.resolution === 'monthly') {
+          filterRangeStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        } else {
+          filterRangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        }
         break;
       case 'last7Days':
         const start7Days = new Date(now);
