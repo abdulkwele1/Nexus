@@ -424,6 +424,44 @@ const createChart = () => {
     .join("g")
     .attr("transform", (d: Sensor, i: number) => `translate(0,${i * 20})`);
 
+  // Add current filter information
+  const filterInfo = svg.value.append("g")
+    .attr("transform", `translate(${width - 200}, 20)`);
+
+  // Add time window info
+  filterInfo.append("text")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("fill", "#666")
+    .text("Time Window:")
+    .append("tspan")
+    .attr("x", 0)
+    .attr("y", 15)
+    .attr("fill", "#333")
+    .attr("font-weight", "bold")
+    .text(props.dynamicTimeWindow === 'none' ? 'Custom Range' : 
+          props.dynamicTimeWindow === 'lastHour' ? 'Last Hour' :
+          props.dynamicTimeWindow === 'last24Hours' ? 'Last 24 Hours' :
+          props.dynamicTimeWindow === 'last7Days' ? 'Last 7 Days' :
+          props.dynamicTimeWindow === 'last30Days' ? 'Last 30 Days' : 'Custom Range');
+
+  // Add resolution info
+  filterInfo.append("text")
+    .attr("x", 0)
+    .attr("y", 35)
+    .attr("fill", "#666")
+    .text("Resolution:")
+    .append("tspan")
+    .attr("x", 0)
+    .attr("y", 50)
+    .attr("fill", "#333")
+    .attr("font-weight", "bold")
+    .text(props.queryParams.resolution === 'raw' ? 'Raw Data' :
+          props.queryParams.resolution === 'hourly' ? 'Hourly Average' :
+          props.queryParams.resolution === 'daily' ? 'Daily Average' :
+          props.queryParams.resolution === 'weekly' ? 'Weekly Average' :
+          'Monthly Average');
+
   legend.append("rect")
     .attr("x", width - 19)
     .attr("width", 19)
