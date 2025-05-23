@@ -10,6 +10,37 @@
     <!-- Query Side Panel -->
     <div class="query-panel">
       <div class="panel-section">
+        <h3>Selected Sensors</h3>
+        <div class="sensor-selection">
+          <div 
+            v-for="(sensor, index) in SENSOR_CONFIGS" 
+            :key="sensor.id"
+            class="sensor-checkbox"
+          >
+            <label :style="{ '--sensor-color': colors[index % colors.length] }">
+              <input 
+                type="checkbox" 
+                :checked="sensorVisibility[sensor.name]" 
+                @change="toggleSensor(sensor.name)"
+              >
+              <span class="sensor-name">{{ sensor.name }}</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="panel-section">
+        <h3>Quick Filters</h3>
+        <div class="quick-filters">
+          <button @click="setTimeRange('1h')">Last Hour</button>
+          <button @click="setTimeRange('24h')">Last 24 Hours</button>
+          <button @click="setTimeRange('7d')">Last 7 Days</button>
+          <button @click="setTimeRange('30d')">Last 30 Days</button>
+          <button @click="resetToDefault" class="reset-btn">Reset to Default</button>
+        </div>
+      </div>
+
+      <div class="panel-section">
         <h3>Date Range</h3>
         <div class="date-inputs">
           <div class="input-group">
@@ -34,37 +65,11 @@
       </div>
 
       <div class="panel-section">
-        <h3>Data Range</h3>
-        <div class="range-inputs">
-          <div class="input-group">
-            <label>Min Moisture (%)</label>
-            <input 
-              type="number" 
-              v-model="queryParams.minMoisture"
-              min="0"
-              max="100"
-              @change="updateGraphData"
-            >
-          </div>
-          <div class="input-group">
-            <label>Max Moisture (%)</label>
-            <input 
-              type="number" 
-              v-model="queryParams.maxMoisture"
-              min="0"
-              max="100"
-              @change="updateGraphData"
-            >
-          </div>
-        </div>
-      </div>
-
-      <div class="panel-section">
-        <h3>Selected Sensor</h3>
-        <div class="sensor-slideshow">
-          <button class="slideshow-btn prev" @click="prevSensor">&lt;</button>
-          <span class="slideshow-label sensor-name">{{ currentSensorName }}</span>
-          <button class="slideshow-btn next" @click="nextSensor">&gt;</button>
+        <h3>Sensor Types</h3>
+        <div class="sensor-type-slideshow">
+          <button class="slideshow-btn prev" @click="prevSensorType">&lt;</button>
+          <span class="slideshow-label">{{ currentSensorTypeLabel }}</span>
+          <button class="slideshow-btn next" @click="nextSensorType">&gt;</button>
         </div>
       </div>
 
@@ -78,12 +83,28 @@
       </div>
 
       <div class="panel-section">
-        <h3>Quick Filters</h3>
-        <div class="quick-filters">
-          <button @click="setTimeRange('1h')">Last Hour</button>
-          <button @click="setTimeRange('24h')">Last 24 Hours</button>
-          <button @click="setTimeRange('7d')">Last 7 Days</button>
-          <button @click="setTimeRange('30d')">Last 30 Days</button>
+        <h3>Data Range</h3>
+        <div class="range-inputs">
+          <div class="input-group">
+            <label>{{ currentSensorType === 'moisture' ? 'Min Moisture (%)' : 'Min Temperature (°C)' }}</label>
+            <input 
+              type="number" 
+              v-model="queryParams.minValue"
+              :min="currentSensorType === 'moisture' ? 0 : -10"
+              :max="currentSensorType === 'moisture' ? 100 : 50"
+              @change="updateGraphData"
+            >
+          </div>
+          <div class="input-group">
+            <label>{{ currentSensorType === 'moisture' ? 'Max Moisture (%)' : 'Max Temperature (°C)' }}</label>
+            <input 
+              type="number" 
+              v-model="queryParams.maxValue"
+              :min="currentSensorType === 'moisture' ? 0 : -10"
+              :max="currentSensorType === 'moisture' ? 100 : 50"
+              @change="updateGraphData"
+            >
+          </div>
         </div>
       </div>
 
@@ -94,28 +115,61 @@
 
     <!-- Main Content Area -->
     <div class="sensors-content">
-    <div class="timer">{{ formattedTime }}</div>
-      <SoilMoistureGraph 
-        ref="graphComponent"
-        :queryParams="queryParams" 
-        :sensorVisibility="sensorVisibility" 
-        :dynamicTimeWindow="dynamicTimeWindow"
-      />
-      
       <!-- Real-time data display -->
       <div class="realtime-container">
         <div class="sensor-carousel">
           <div class="sensor-card" :style="{ '--sensor-color': colors[0] }">
-            <h3>{{ currentRealtimeSensorData.name }}</h3>
-            <div class="sensor-value">
-              {{ currentRealtimeSensorData.moisture !== null ? currentRealtimeSensorData.moisture.toFixed(1) + '%' : 'Loading...' }}
+            <!-- Sensor Name and Trend Indicator -->
+            <div class="sensor-card-header">
+              <h3>{{ currentRealtimeSensorData.name }}</h3>
+              <!-- Add the SVG trend indicator here -->
+              <svg class="trend-indicator" width="40" height="20" viewBox="0 0 40 20">
+                <path 
+                  :d="trendPathData" 
+                  fill="none" 
+                  :stroke="colors[0]" 
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </div>
+            <!-- Sensor Value -->
+            <div class="sensor-value">
+              {{ 
+                currentRealtimeSensorData.value !== null 
+                  ? (
+                      currentSensorType === 'temperature' 
+                      ? celsiusToFahrenheit(currentRealtimeSensorData.value)?.toFixed(1) + '°F' 
+                      : currentRealtimeSensorData.value.toFixed(1) + '%'
+                    )
+                  : 'Loading...' 
+              }}
+            </div>
+             <!-- Last Updated Time -->
             <div class="sensor-time">
               Last updated: {{ currentRealtimeSensorData.lastUpdated }}
             </div>
           </div>
         </div>
       </div>
+
+      <SoilMoistureGraph 
+        v-if="currentSensorType === 'moisture'"
+        ref="moistureGraphComponent"
+        :queryParams="moistureQueryParams" 
+        :sensorVisibility="sensorVisibility" 
+        :dynamicTimeWindow="dynamicTimeWindow"
+        :dataType="currentSensorType"
+      />
+      <SoilTemperatureGraph
+        v-else
+        ref="temperatureGraphComponent"
+        :queryParams="temperatureQueryParams"
+        :sensorVisibility="sensorVisibility"
+        :dynamicTimeWindow="dynamicTimeWindow"
+        :dataType="currentSensorType"
+      />
     </div>
   </div>
 </template>
@@ -124,7 +178,20 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import SoilMoistureGraph from './soilMoistureGraph.vue';
+import SoilTemperatureGraph from './soilTemperatureGraph.vue';
 import { useNexusStore } from '@/stores/nexus';
+
+interface DataPoint {
+  time: Date;
+  moisture?: number;
+  temperature?: number;
+}
+
+// Add conversion function
+const celsiusToFahrenheit = (celsius: number | null): number | null => {
+  if (celsius === null) return null;
+  return (celsius * 9/5) + 32;
+};
 
 const router = useRouter();
 const goTo = (path: string) => {
@@ -168,14 +235,43 @@ const REALTIME_SENSOR_ID = 444574498032128;
 
 interface RealtimeSensorDisplay {
   name: string;
-  moisture: number | null;
+  value: number | null;
   lastUpdated: string;
 }
 
 const currentRealtimeSensorData = ref<RealtimeSensorDisplay>({
   name: 'Sensor Alpha',
-  moisture: null,
+  value: null,
   lastUpdated: 'N/A',
+});
+
+// --- Add ref to store the previous value --- 
+const previousRealtimeSensorValue = ref<number | null>(null);
+
+// --- Computed property for the trend --- 
+const realtimeTrend = computed((): 'up' | 'down' | 'stable' => {
+  if (currentRealtimeSensorData.value.value === null || previousRealtimeSensorValue.value === null) {
+    return 'stable'; // Default to stable if no data or no previous data
+  }
+  if (currentRealtimeSensorData.value.value > previousRealtimeSensorValue.value) {
+    return 'up';
+  }
+  if (currentRealtimeSensorData.value.value < previousRealtimeSensorValue.value) {
+    return 'down';
+  }
+  return 'stable';
+});
+
+// --- Computed property for the SVG path data based on trend --- 
+const trendPathData = computed(() => {
+  switch (realtimeTrend.value) {
+    case 'up':
+      return 'M5,15 L20,5 L35,15'; // Simple upward arrow/line
+    case 'down':
+      return 'M5,5 L20,15 L35,5'; // Simple downward arrow/line
+    default:
+      return 'M5,10 L35,10'; // Simple horizontal line
+  }
 });
 
 // Computed properties
@@ -218,6 +314,12 @@ let dataInterval: number;
 let graphRefreshInterval: number; // Interval for refreshing the main graph
 
 onMounted(() => {
+  // Set initial visibility for all sensors
+  SENSOR_CONFIGS.forEach((sensor, index) => {
+    // Make only the first sensor visible by default
+    sensorVisibility.value[sensor.name] = index === 0;
+  });
+  
   // Update time every second
   timeInterval = setInterval(() => {
     currentTime.value = new Date();
@@ -225,38 +327,65 @@ onMounted(() => {
 
   const fetchAndUpdateRealtimeSensor = async () => {
     try {
-      // getSensorMoistureData returns: { id, sensor_id, date (string), soil_moisture (number) }[]
-      const moistureDataArray = await nexusStore.user.getSensorMoistureData(REALTIME_SENSOR_ID);
-      if (moistureDataArray && moistureDataArray.length > 0) {
-        // Sort by date descending to get the latest
-        // Ensure date strings are properly converted to Date objects for sorting
-        const sortedData = [...moistureDataArray].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      let data;
+      if (currentSensorType.value === 'moisture') {
+        data = await nexusStore.user.getSensorMoistureData(REALTIME_SENSOR_ID);
+      } else {
+        data = await nexusStore.user.getSensorTemperatureData(REALTIME_SENSOR_ID);
+      }
+      
+      if (data && data.length > 0) {
+        const sortedData = [...data].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const latestReading = sortedData[0];
+        const newValue = currentSensorType.value === 'moisture' 
+            ? Number(latestReading.soil_moisture)
+            : Number(latestReading.soil_temperature);
+
+        // --- Store the current value as the previous one BEFORE updating --- 
+        previousRealtimeSensorValue.value = currentRealtimeSensorData.value.value; 
+
+        // --- Update the current data --- 
         currentRealtimeSensorData.value = {
-          name: 'Sensor Alpha',
-          moisture: Number(latestReading.soil_moisture),
+          name: 'Sensor Alpha', 
+          value: newValue,
           lastUpdated: new Date(latestReading.date).toLocaleTimeString(),
         };
+
+        // --- Handle initial case where previous value was null --- 
+        if (previousRealtimeSensorValue.value === null) {
+          previousRealtimeSensorValue.value = newValue; // Set initial previous value
+        }
+
       } else {
-        currentRealtimeSensorData.value.moisture = null;
+        // --- Store null as previous if no data --- 
+        previousRealtimeSensorValue.value = currentRealtimeSensorData.value.value;
+        currentRealtimeSensorData.value.value = null;
         currentRealtimeSensorData.value.lastUpdated = new Date().toLocaleTimeString() + ' (No data)';
       }
     } catch (error) {
       console.error('Error fetching real-time sensor data for ID', REALTIME_SENSOR_ID, ':', error);
-      currentRealtimeSensorData.value.moisture = null;
+       // --- Store null as previous on error --- 
+      previousRealtimeSensorValue.value = currentRealtimeSensorData.value.value;
+      currentRealtimeSensorData.value.value = null;
       currentRealtimeSensorData.value.lastUpdated = new Date().toLocaleTimeString() + ' (Error)';
     }
   };
 
-  fetchAndUpdateRealtimeSensor(); // Initial fetch for the small real-time card
-  dataInterval = setInterval(fetchAndUpdateRealtimeSensor, 5000); // Fetch every 5 seconds for the card
+  fetchAndUpdateRealtimeSensor(); // Initial fetch
+  dataInterval = setInterval(fetchAndUpdateRealtimeSensor, 5000); // Fetch every 5 seconds
 
   // Periodically tell the graph to re-fetch its data
-  const GRAPH_REFRESH_INTERVAL_MS = 1000; // Changed to refresh every 1 second
+  const GRAPH_REFRESH_INTERVAL_MS = 1000;
   graphRefreshInterval = setInterval(() => {
-    if (graphComponent.value) {
-      // console.log('[Sensors.vue] Triggering graph data refresh...'); // Optional: Comment out for less console noise
-      graphComponent.value.fetchAllSensorData();
+    const currentGraph = currentSensorType.value === 'moisture' 
+      ? moistureGraphComponent.value 
+      : temperatureGraphComponent.value;
+    
+    if (currentGraph) {
+      // Only refresh if we're in raw or hourly resolution
+      if (queryParams.value.resolution === 'raw' || queryParams.value.resolution === 'hourly') {
+        currentGraph.fetchAllSensorData();
+      }
     }
   }, GRAPH_REFRESH_INTERVAL_MS);
 
@@ -277,8 +406,8 @@ onUnmounted(() => {
 interface QueryParams {
   startDate: string;
   endDate: string;
-  minMoisture: number;
-  maxMoisture: number;
+  minValue: number;
+  maxValue: number;
   resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
 }
 
@@ -290,8 +419,10 @@ const SENSOR_CONFIGS = [
   // { id: 3, name: 'Sensor 3' },
   // { id: 4, name: 'Sensor 4' },
 ];
-const activeSensorIndex = ref(0); // Start with the first sensor
-// --- End Sensor Definitions ---
+
+// Changed from activeSensorIndex to a direct sensorVisibility object
+// Initialize with first sensor enabled
+const sensorVisibility = ref<{ [key: string]: boolean }>({});
 
 // --- Define Resolutions for Slider ---
 const resolutionOptions = [
@@ -307,13 +438,36 @@ const initialResolutionIndex = resolutionOptions.findIndex(opt => opt.value === 
 const resolutionIndex = ref(initialResolutionIndex >= 0 ? initialResolutionIndex : 0); // Slider v-model (0-4)
 // --- End Resolutions for Slider ---
 
-const queryParams = ref<QueryParams>({
+// --- Define Sensor Types for Slider ---
+const sensorTypeOptions = [
+  { value: 'moisture', label: 'Soil Moisture' },
+  { value: 'temperature', label: 'Soil Temperature' },
+];
+const defaultSensorTypeValue = 'moisture'; // Default to moisture graph
+const initialSensorTypeIndex = sensorTypeOptions.findIndex(opt => opt.value === defaultSensorTypeValue);
+const sensorTypeIndex = ref(initialSensorTypeIndex >= 0 ? initialSensorTypeIndex : 0);
+// --- End Sensor Types for Slider ---
+
+// Initialize query params for both types
+const moistureQueryParams = ref<QueryParams>({
   startDate: initialDefaultDateString,
   endDate: initialDefaultDateString,
-  minMoisture: 0,
-  maxMoisture: 100,
-  // Initialize resolution based on the default string value
-  resolution: defaultResolutionValue as QueryParams['resolution'] 
+  minValue: 0,
+  maxValue: 100,
+  resolution: defaultResolutionValue as QueryParams['resolution']
+});
+
+const temperatureQueryParams = ref<QueryParams>({
+  startDate: initialDefaultDateString,
+  endDate: initialDefaultDateString,
+  minValue: -10,
+  maxValue: 50,
+  resolution: defaultResolutionValue as QueryParams['resolution']
+});
+
+// Computed property to get the current query params based on sensor type
+const queryParams = computed(() => {
+  return currentSensorType.value === 'moisture' ? moistureQueryParams.value : temperatureQueryParams.value;
 });
 
 // Computed property to get the label of the currently selected resolution
@@ -325,7 +479,7 @@ const currentResolutionLabel = computed(() => {
 watch(resolutionIndex, (newIndex) => {
   const selectedOption = resolutionOptions[newIndex];
   if (selectedOption && queryParams.value.resolution !== selectedOption.value) {
-    console.log(`[Sensors.vue] Slideshow changed. Index: ${newIndex}, New Resolution: ${selectedOption.value}`);
+    console.log(`[Sensors.vue] Resolution changed to: ${selectedOption.value}`);
     
     const newResolution = selectedOption.value as QueryParams['resolution'];
     let newStartDate = queryParams.value.startDate;
@@ -335,32 +489,83 @@ watch(resolutionIndex, (newIndex) => {
     if (newResolution === 'raw' || newResolution === 'hourly') {
       const todayStr = toLocalDateString(new Date());
       if (newStartDate !== todayStr || newEndDate !== todayStr) {
-         console.log('[Sensors.vue] Resetting date range to Today for Raw/Hourly resolution.');
-         newStartDate = todayStr;
-         newEndDate = todayStr;
+        console.log('[Sensors.vue] Resetting date range to Today for Raw/Hourly resolution.');
+        newStartDate = todayStr;
+        newEndDate = todayStr;
       }
     }
 
-    // Assign a completely new object to ensure reactivity
-    queryParams.value = {
+    // For daily/weekly/monthly, ensure we have enough data
+    if (newResolution === 'daily' || newResolution === 'weekly' || newResolution === 'monthly') {
+      const startDate = new Date(newStartDate);
+      const endDate = new Date(newEndDate);
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      console.log(`[Sensors.vue] Date range spans ${daysDiff} days for ${newResolution} resolution`);
+      
+      // Ensure we have enough data points for the selected resolution
+      if (newResolution === 'daily' && daysDiff < 2) {
+        console.log('[Sensors.vue] Extending date range for daily resolution');
+        newStartDate = toLocalDateString(new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000));
+      } else if (newResolution === 'weekly' && daysDiff < 7) {
+        console.log('[Sensors.vue] Extending date range for weekly resolution');
+        newStartDate = toLocalDateString(new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000));
+      } else if (newResolution === 'monthly' && daysDiff < 30) {
+        console.log('[Sensors.vue] Extending date range for monthly resolution');
+        newStartDate = toLocalDateString(new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000));
+      }
+    }
+
+    // Create new query params object
+    const newQueryParams = {
       ...queryParams.value,
       resolution: newResolution,
       startDate: newStartDate,
       endDate: newEndDate
     };
 
-    // --- ADDED: Explicitly trigger child update ---
-    nextTick(() => { // Wait for DOM update cycle / state propagation
-      console.log('[Sensors.vue] Inside nextTick. Attempting to call processAndDrawChart...');
-      if (graphComponent.value) {
-        console.log('[Sensors.vue] Directly triggering processAndDrawChart on graph component...');
-        graphComponent.value.processAndDrawChart(); 
-      } else {
-         console.warn('[Sensors.vue] Could not find graphComponent ref inside nextTick to trigger update.');
+    console.log('[Sensors.vue] Updated queryParams:', newQueryParams);
+
+    // Update the appropriate query params based on sensor type
+    if (currentSensorType.value === 'moisture') {
+      moistureQueryParams.value = newQueryParams;
+    } else {
+      temperatureQueryParams.value = newQueryParams;
+    }
+
+    // Force a data refresh with the new resolution
+    nextTick(() => {
+      const currentGraph = currentSensorType.value === 'moisture' 
+        ? moistureGraphComponent.value 
+        : temperatureGraphComponent.value;
+      
+      if (currentGraph) {
+        console.log('[Sensors.vue] Triggering data refresh with new resolution');
+        currentGraph.fetchAllSensorData();
       }
     });
-    // --- END ADDED ---
   }
+});
+
+// Watch sensor type index to handle changes
+watch(sensorTypeIndex, (newIndex) => {
+  const selectedType = sensorTypeOptions[newIndex];
+  
+  console.log(`[Sensors.vue] Sensor type changed to: ${selectedType.label} (${selectedType.value})`);
+  
+  // For now, this is just a placeholder for future implementation
+  // When temperature graph is actually implemented, this is where
+  // you would toggle between the different graph types
+  
+  // TODO: Implement temperature graph and switch between graph types
+  // Example logic (commented out until implementation):
+  // if (selectedType.value === 'temperature') {
+  //   showTemperatureGraph.value = true;
+  //   showMoistureGraph.value = false;
+  // } else {
+  //   showTemperatureGraph.value = false;
+  //   showMoistureGraph.value = true;
+  // }
 });
 
 // --- New logic for default date check ---
@@ -376,70 +581,102 @@ const isEndDateInitialDefault = computed(() => {
 
 const setTimeRange = (range: string) => {
   const now = new Date();
-  let start = new Date(); // Will be used to set queryParams.startDate
-  let end = new Date();   // Will be used to set queryParams.endDate
+  let start = new Date(); 
+  let end = new Date();   
+  let newResolution: QueryParams['resolution'] = queryParams.value.resolution; // Default to current
 
   switch (range) {
     case '1h':
       dynamicTimeWindow.value = 'lastHour';
-      start = now; // Date picker shows today
-      end = now;   // Date picker shows today
+      start = now; 
+      end = now;   
+      newResolution = 'hourly'; // Or 'raw' if preferred for last hour
       break;
     case '24h':
       dynamicTimeWindow.value = 'last24Hours';
-      start = new Date(now.getTime() - 24 * 60 * 60 * 1000); // e.g. yesterday 10am if now is today 10am
-      end = now; // Date picker end is today
+      start = new Date(now.getTime() - 24 * 60 * 60 * 1000); 
+      end = now; 
+      newResolution = 'hourly';
       break;
     case '7d':
       dynamicTimeWindow.value = 'last7Days';
-      start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000); // 6 days ago to include today in picker
+      start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000); 
       end = now;
+      newResolution = 'daily';
       break;
     case '30d':
       dynamicTimeWindow.value = 'last30Days';
-      start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000); // 29 days ago to include today in picker
+      start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000); 
       end = now;
+      newResolution = 'daily';
       break;
   }
 
-  queryParams.value.startDate = toLocalDateString(start);
-  queryParams.value.endDate = toLocalDateString(end);
-  // No need to call updateGraphData() here as queryParams watcher in graph + dynamicTimeWindow watcher will handle it.
-  // However, to ensure reactivity if only queryParams changes without dynamicTimeWindow changing *from a non-'none'* state,
-  // we might still need to ensure queryParams object itself is new if we weren't relying on dynamicTimeWindow.
-  // Let's explicitly assign a new object for queryParams to be safe and consistent.
-  queryParams.value = { ...queryParams.value };
+  // Update queryParams in a way that triggers reactivity
+  const newQueryParams: QueryParams = {
+    ...queryParams.value, // Spread existing values first
+    startDate: toLocalDateString(start),
+    endDate: toLocalDateString(end),
+    resolution: newResolution,
+  };
 
-  // If the graph component needs to be explicitly told to process after these changes:
+  // Update the correct reactive ref based on current sensor type
+  if (currentSensorType.value === 'moisture') {
+    moistureQueryParams.value = newQueryParams;
+  } else {
+    temperatureQueryParams.value = newQueryParams;
+  }
+  
+  // Update the resolutionIndex ref to match the newResolution
+  const newResolutionIndex = resolutionOptions.findIndex(opt => opt.value === newResolution);
+  if (newResolutionIndex !== -1 && resolutionIndex.value !== newResolutionIndex) {
+    resolutionIndex.value = newResolutionIndex;
+  }
+
+  // The watchers for queryParams (implicitly via moistureQueryParams/temperatureQueryParams) 
+  // and dynamicTimeWindow in the graph components should handle refreshing the chart.
+  console.log('[Sensors.vue] setTimeRange updated queryParams, dynamicTimeWindow, and resolution:', newQueryParams, dynamicTimeWindow.value);
+
+  // Explicitly trigger graph data fetching if needed, though watchers should handle it.
   nextTick(() => {
-    if (graphComponent.value) {
-      // The graph will react to queryParams and dynamicTimeWindow prop changes.
-      // A direct call to processAndDrawChart might be redundant if watchers are correctly set up in child.
-      // For now, relying on prop reactivity.
-      // graphComponent.value.processAndDrawChart(); 
-      console.log('[Sensors.vue] setTimeRange updated queryParams and dynamicTimeWindow.');
+    const currentGraph = currentSensorType.value === 'moisture' 
+      ? moistureGraphComponent.value 
+      : temperatureGraphComponent.value;
+    if (currentGraph) {
+      // currentGraph.fetchAllSensorData(); // Watchers in graph components should trigger this.
     }
   });
 };
 
 const updateGraphData = () => {
   dynamicTimeWindow.value = 'none'; // Reset dynamic window when manually changing dates/filters
-  // This will trigger the graph update through props
-  queryParams.value = { ...queryParams.value };
+  // Update the appropriate query params based on sensor type
+  if (currentSensorType.value === 'moisture') {
+    moistureQueryParams.value = { ...moistureQueryParams.value };
+  } else {
+    temperatureQueryParams.value = { ...temperatureQueryParams.value };
+  }
   // Similar to setTimeRange, relying on prop reactivity in the child.
   nextTick(() => {
-    if (graphComponent.value) {
-       // graphComponent.value.processAndDrawChart();
+    if (currentSensorType.value === 'moisture' && moistureGraphComponent.value) {
+       // moistureGraphComponent.value.processAndDrawChart();
        console.log('[Sensors.vue] updateGraphData updated queryParams and reset dynamicTimeWindow.');
+    } else if (currentSensorType.value === 'temperature' && temperatureGraphComponent.value) {
+      console.log('[Sensors.vue] updateGraphData updated queryParams and reset dynamicTimeWindow.');
     }
   });
 };
 
-// Add ref for the graph component
-const graphComponent = ref<InstanceType<typeof SoilMoistureGraph> | null>(null);
+// Add refs for both graph components
+const moistureGraphComponent = ref<InstanceType<typeof SoilMoistureGraph> | null>(null);
+const temperatureGraphComponent = ref<InstanceType<typeof SoilTemperatureGraph> | null>(null);
 
 const exportToCSV = () => {
-  const data = graphComponent.value?.getFilteredData();
+  const graphComponent = currentSensorType.value === 'moisture' 
+    ? moistureGraphComponent.value 
+    : temperatureGraphComponent.value;
+  
+  const data = graphComponent?.getFilteredData();
   
   if (!data || !data.length) {
     alert('No data available to export');
@@ -447,16 +684,18 @@ const exportToCSV = () => {
   }
 
   // Format the data for CSV
-  const headers = ['Timestamp', 'Sensor', 'Moisture (%)'];
+  const headers = ['Timestamp', 'Sensor', currentSensorType.value === 'moisture' ? 'Moisture (%)' : 'Temperature (°C)'];
   const csvRows = [headers];
 
   data.forEach(sensor => {
-    if (sensor.visible) { // Only export visible sensors
-      sensor.data.forEach(point => {
+    if (sensorVisibility.value[sensor.name]) {
+      sensor.data.forEach((point: DataPoint) => {
         csvRows.push([
           new Date(point.time).toISOString(),
           sensor.name,
-          point.moisture.toFixed(1)
+          currentSensorType.value === 'moisture' 
+            ? (point.moisture?.toFixed(1) ?? 'N/A')
+            : (point.temperature?.toFixed(1) ?? 'N/A')
         ]);
       });
     }
@@ -478,7 +717,7 @@ const exportToCSV = () => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url); // Clean up the URL object
+  URL.revokeObjectURL(url);
 };
 
 // --- Methods for Slideshow Navigation ---
@@ -490,40 +729,105 @@ const prevResolution = () => {
   resolutionIndex.value = (resolutionIndex.value - 1 + resolutionOptions.length) % resolutionOptions.length;
 };
 
-const nextSensor = () => {
-  if (SENSOR_CONFIGS.length > 0) { // Prevent error if array is empty
-    activeSensorIndex.value = (activeSensorIndex.value + 1) % SENSOR_CONFIGS.length;
-  }
+// --- Methods for Sensor Type Navigation ---
+const nextSensorType = () => {
+  sensorTypeIndex.value = (sensorTypeIndex.value + 1) % sensorTypeOptions.length;
 };
-const prevSensor = () => {
-  if (SENSOR_CONFIGS.length > 0) { // Prevent error if array is empty
-    activeSensorIndex.value = (activeSensorIndex.value - 1 + SENSOR_CONFIGS.length) % SENSOR_CONFIGS.length;
-  }
+
+const prevSensorType = () => {
+  sensorTypeIndex.value = (sensorTypeIndex.value - 1 + sensorTypeOptions.length) % sensorTypeOptions.length;
 };
+// --- End Methods for Sensor Type Navigation ---
+
+// Toggle sensor visibility
+const toggleSensor = (sensorName: string) => {
+  // Toggle the current state
+  sensorVisibility.value[sensorName] = !sensorVisibility.value[sensorName];
+  
+  // Ensure at least one sensor is always selected
+  const atLeastOneVisible = Object.values(sensorVisibility.value).some(visible => visible);
+  if (!atLeastOneVisible) {
+    // If no sensors are visible, re-enable the one that was just disabled
+    sensorVisibility.value[sensorName] = true;
+  }
+  
+  console.log(`[Sensors.vue] Toggled sensor ${sensorName}, now ${sensorVisibility.value[sensorName] ? 'visible' : 'hidden'}`);
+};
+
+// --- REMOVED Methods for Slideshow Navigation ---
+// const nextSensor = () => { ... }
+// const prevSensor = () => { ... }
+// --- END REMOVED Methods for Slideshow Navigation ---
+
+// --- REMOVED Computed Properties --- 
+// const currentSensorName = computed(() => { ... });
+// --- END REMOVED Computed Properties ---
+
+// --- REMOVED Computed property to generate visibility object based on active index
+// const sensorVisibility = computed(() => { ... });
+// --- END REMOVED Computed property ---
+
+// --- REMOVED Watcher for sensor changes
+// watch(activeSensorIndex, (newIndex) => { ... });
+// --- END REMOVED Watcher ---
 
 // --- Computed Properties --- 
 const currentSensorName = computed(() => {
   // Make sure SENSOR_CONFIGS is not empty
-  return SENSOR_CONFIGS.length > 0 ? SENSOR_CONFIGS[activeSensorIndex.value]?.name : 'No Sensors';
+  return SENSOR_CONFIGS.length > 0 ? SENSOR_CONFIGS[0]?.name : 'No Sensors';
 });
 
-// Computed property to generate visibility object based on active index
-const sensorVisibility = computed(() => {
-  const visibility: { [key: string]: boolean } = {};
-  SENSOR_CONFIGS.forEach((config, index) => {
-    visibility[config.name] = (index === activeSensorIndex.value);
+// Computed property for current sensor type label
+const currentSensorTypeLabel = computed(() => {
+  return sensorTypeOptions[sensorTypeIndex.value]?.label || 'N/A';
+});
+
+// Add computed property for current sensor type
+const currentSensorType = computed(() => {
+  return sensorTypeOptions[sensorTypeIndex.value].value as 'moisture' | 'temperature';
+});
+
+// Add the resetToDefault function in the script section
+const resetToDefault = () => {
+  const now = new Date();
+  const todayStr = toLocalDateString(now);
+  
+  // Reset to default state
+  dynamicTimeWindow.value = 'none';
+  
+  // Reset query params to default values
+  const defaultQueryParams: QueryParams = {
+    startDate: todayStr,
+    endDate: todayStr,
+    minValue: currentSensorType.value === 'moisture' ? 0 : -10,
+    maxValue: currentSensorType.value === 'moisture' ? 100 : 50,
+    resolution: 'hourly' as const // Default to hourly resolution
+  };
+
+  // Update the appropriate query params based on sensor type
+  if (currentSensorType.value === 'moisture') {
+    moistureQueryParams.value = defaultQueryParams;
+  } else {
+    temperatureQueryParams.value = defaultQueryParams;
+  }
+
+  // Reset resolution index to hourly
+  const hourlyIndex = resolutionOptions.findIndex(opt => opt.value === 'hourly');
+  if (hourlyIndex !== -1) {
+    resolutionIndex.value = hourlyIndex;
+  }
+
+  // Trigger graph update
+  nextTick(() => {
+    const currentGraph = currentSensorType.value === 'moisture' 
+      ? moistureGraphComponent.value 
+      : temperatureGraphComponent.value;
+    
+    if (currentGraph) {
+      currentGraph.fetchAllSensorData();
+    }
   });
-  console.log("[Sensors.vue] Computed sensorVisibility:", visibility);
-  return visibility;
-});
-
-// --- End Computed Properties ---
-
-// Watcher for sensor changes (might be needed later to update graph prop)
-watch(activeSensorIndex, (newIndex) => {
-  console.log(`[Sensors.vue] Sensor changed. Index: ${newIndex}, Name: ${currentSensorName.value}`);
-  // TODO: Update graph visibility prop based on this index
-});
+};
 </script>
 
 <style>
@@ -676,10 +980,12 @@ select {
   margin-left: 300px; /* Match query-panel width */
   flex-grow: 1;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .realtime-container {
-  margin-top: 40px;
   padding: 20px;
   background: #f8f9fa;
   border-radius: 12px;
@@ -687,14 +993,11 @@ select {
   max-width: 928px; /* Align with graph */
   margin-left: auto;   /* Center container */
   margin-right: auto;  /* Center container */
+  width: 100%;
 }
 
 .timer {
-  text-align: center;
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin-bottom: 20px;
-  color: #333;
+  display: none;
 }
 
 .sensor-carousel {
@@ -817,5 +1120,78 @@ select {
   text-align: center;
   flex-grow: 1; 
   margin: 0 5px; 
+}
+
+/* Add styles for the sensor type slideshow control */
+.sensor-type-slideshow {
+  display: flex;
+  align-items: center; 
+  justify-content: space-between; 
+  border: 1px solid #dee2e6; 
+  border-radius: 4px;
+  padding: 5px 10px; 
+  background-color: white; 
+}
+
+/* Styles for the sensor selection checkboxes */
+.sensor-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sensor-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  border-left: 4px solid var(--sensor-color);
+  background: white;
+  transition: background-color 0.2s;
+}
+
+.sensor-checkbox label:hover {
+  background: #f0f0f0;
+}
+
+.sensor-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.sensor-checkbox .sensor-name {
+  font-weight: 500;
+  color: var(--sensor-color);
+}
+
+.sensor-card-header {
+  display: flex;
+  justify-content: space-between; /* Pushes h3 and svg apart */
+  align-items: center; /* Vertically aligns items */
+  margin-bottom: 10px; /* Add space below header */
+}
+
+.sensor-card-header h3 {
+  margin: 0; /* Remove default margin from h3 */
+}
+
+.trend-indicator path {
+  transition: d 0.4s ease-in-out; /* Animate the path data change */
+}
+
+.reset-btn {
+  grid-column: 1 / -1; /* Make reset button span full width */
+  background: #f8f9fa !important;
+  border-color: #dc3545 !important;
+  color: #dc3545;
+  font-weight: 500;
+}
+
+.reset-btn:hover {
+  background: #dc3545 !important;
+  color: white !important;
 }
 </style>

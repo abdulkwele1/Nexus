@@ -168,31 +168,46 @@ class User {
   }
 
 
-    async getSensorMoistureData(sensorId: number): Promise<any[]> {
-      const url = `${VITE_NEXUS_API_URL}/sensors/${sensorId}/moisture_data`;
-
+    async getSensorTemperatureData(sensorId: number) {
       try {
-        const response = await fetch(url, {
+        const response = await fetch(`${this.baseURL}/sensors/${sensorId}/temperature_data`, {
           credentials: 'include',
         });
-
         if (!response.ok) {
-          console.error(`Error fetching moisture data for sensor ${sensorId}: ${response.status} ${response.statusText}`);
-          const errorBody = await response.text();
-          console.error("Error body:", errorBody);
-          return []; // Return empty array on error
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-
         const jsonData = await response.json();
+        
+        // Handle different possible response formats
+        if (Array.isArray(jsonData)) {
+          return jsonData;
+        }
+        if (jsonData && Array.isArray(jsonData.sensor_temperature_data)) {
+          return jsonData.sensor_temperature_data;
+        }
+        if (jsonData && Array.isArray(jsonData.data)) {
+          return jsonData.data;
+        }
+        
+        console.warn(`Temperature data for sensor ${sensorId} received in unexpected format:`, jsonData);
+        return [];
+      } catch (error) {
+        console.error('Error fetching sensor temperature data:', error);
+        return [];
+      }
+    }
 
-        // Now, determine where the array of data points is in jsonData.
-        // Common patterns:
-        // 1. jsonData itself is the array: return jsonData;
-        // 2. jsonData is an object like { "sensor_moisture_data": [...] }: return jsonData.sensor_moisture_data;
-        // 3. jsonData is an object like { "data": [...] }: return jsonData.data;
-
-        // The console.log in soilMoistureGraph.vue for `rawDataPoints` will help verify this structure.
-        // For now, let's try a few common possibilities.
+    async getSensorMoistureData(sensorId: number) {
+      try {
+        const response = await fetch(`${this.baseURL}/sensors/${sensorId}/moisture_data`, {
+          credentials: 'include',
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const jsonData = await response.json();
+        
+        // Handle different possible response formats
         if (Array.isArray(jsonData)) {
           return jsonData;
         }
@@ -204,44 +219,9 @@ class User {
         }
         
         console.warn(`Moisture data for sensor ${sensorId} received in unexpected format:`, jsonData);
-        return []; // Return empty if format is not recognized as an array
-      } catch (error) {
-        console.error(`Exception fetching/parsing moisture data for sensor ${sensorId}:`, error);
-        return [];
-      }
-    }
-
-    async getSensorTemperatureData(sensorId: number): Promise<any[]> {
-      const url = `${VITE_NEXUS_API_URL}/sensors/${sensorId}/temperature_data`;
-      
-      try {
-        const response = await fetch(url, {
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          console.error(`Error fetching temperature data for sensor ${sensorId}: ${response.status} ${response.statusText}`);
-          const errorBody = await response.text();
-          console.error("Error body:", errorBody);
-          return [];
-        }
-
-        const jsonData = await response.json();
-        // Apply similar logic as above to extract the array
-        if (Array.isArray(jsonData)) {
-          return jsonData;
-        }
-        if (jsonData && Array.isArray(jsonData.sensor_temperature_data)) {
-          return jsonData.sensor_temperature_data;
-        }
-        if (jsonData && Array.isArray(jsonData.data)) {
-          return jsonData.data;
-        }
-
-        console.warn(`Temperature data for sensor ${sensorId} received in unexpected format:`, jsonData);
         return [];
       } catch (error) {
-        console.error(`Exception fetching/parsing temperature data for sensor ${sensorId}:`, error);
+        console.error('Error fetching sensor moisture data:', error);
         return [];
       }
     }

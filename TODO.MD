@@ -2,10 +2,6 @@
 
 ## Next Up
 
-- display temperature data in the ui
-
-- allow for filtering which type of sensor data is displaying
-
 - populate lists of avaialable sensors to display from api
 
 - deploy updated version of app to production
@@ -16,10 +12,18 @@
 
 - auto log out when token has expired
 
+-Home page should be a map
+
+-Update the solar panel dashboard
+
+
 ## Nice To Have
 
 - changing color theme
 
 - font changes
 
-- rearange the side navigation bar, refactoring priority options on top
+- graph only focus mode, able to zoom into the graph similar to a map
+
+
+
