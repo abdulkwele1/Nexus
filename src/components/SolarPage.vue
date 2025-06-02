@@ -30,6 +30,10 @@
           <label>End:</label>
           <input type="date" v-model="endDate" />
         </div>
+        <div class="quick-filters">
+          <button class="filter-btn" @click="handleQuickFilter('7days')">Last 7 Days</button>
+          <button class="filter-btn" @click="handleQuickFilter('7months')">Last 7 Months</button>
+        </div>
       </aside>
       <main class="main-content">
         <solarDataManagerUi
@@ -181,6 +185,12 @@ watch([startDate, endDate], async ([newStartDate, newEndDate]) => {
   }
 }, { deep: true });
 
+// Add quick filter handler
+const handleQuickFilter = (filterType: '7days' | '7months') => {
+  console.log(`[SolarPage] Quick filter selected: ${filterType}`);
+  // Functionality will be implemented later
+};
+
 onMounted(async () => {
   // Set initial dates
   startDate.value = '2024-12-20';
@@ -271,5 +281,25 @@ onUnmounted(() => {
   flex: 1;
   padding: 32px;
   overflow-y: auto;
+}
+.quick-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.filter-btn {
+  width: 100%;
+  padding: 8px;
+  background: #e9ecef;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+.filter-btn:hover {
+  background: #007bff;
+  color: #fff;
 }
 </style>

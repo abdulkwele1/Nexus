@@ -102,47 +102,31 @@ const renderChart = () => {
             }
 
             // Set tooltip content
-            const date = model.dataPoints[0].label;
+            const rawDate = model.dataPoints[0].label;
+            const formattedDate = new Date(rawDate).toLocaleDateString('en-US', {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric'
+            });
             const electricityValue = model.dataPoints[0].raw as number;
             const directValue = model.dataPoints[1]?.raw as number;
 
             tooltipData.value = {
-              date: date,
+              date: formattedDate,
               value: directValue !== undefined 
                 ? `Electricity: ${electricityValue}%\nDirect: ${directValue}%`
                 : `Electricity: ${electricityValue}%`
             };
 
-            // Position tooltip relative to the chart container
+            // Position tooltip at mouse position
             if (consumptionGraph.value) {
               const rect = consumptionGraph.value.getBoundingClientRect();
-              const tooltipX = model.caretX;
-              const tooltipY = model.caretY;
-              
-              // Calculate position relative to the chart container
-              const left = tooltipX + rect.left;
-              const top = tooltipY + rect.top;
-              
-              // Ensure tooltip stays within chart bounds
-              const tooltipWidth = 120; // Approximate tooltip width
-              const tooltipHeight = 60; // Approximate tooltip height
-              
-              let finalLeft = left;
-              let finalTop = top;
-              
-              // Adjust if tooltip would go off the right edge
-              if (left + tooltipWidth > rect.right) {
-                finalLeft = left - tooltipWidth;
-              }
-              
-              // Adjust if tooltip would go off the bottom
-              if (top + tooltipHeight > rect.bottom) {
-                finalTop = top - tooltipHeight;
-              }
+              const mouseX = model.caretX;
+              const mouseY = model.caretY;
               
               tooltipStyle.value = {
-                left: `${finalLeft}px`,
-                top: `${finalTop}px`
+                left: `${mouseX}px`,
+                top: `${mouseY}px`
               };
             }
 
