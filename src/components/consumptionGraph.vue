@@ -193,11 +193,17 @@ const fetchLatestData = async () => {
     const sortedData = Array.from(uniqueData.values())
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    console.log('[consumptionGraph] Processed data points:', sortedData.length);
+    // Filter data for the selected date range
+    const filteredData = sortedData.filter(item => {
+      const itemDate = item.date.split('T')[0];
+      return itemDate >= currentStartDate && itemDate <= currentEndDate;
+    });
 
-    electricityUsageData.value = sortedData.map(item => item.capacity_kwh);
-    directUsageData.value = sortedData.map(item => item.consumed_kwh);
-    labels.value = sortedData.map(item => item.date.split('T')[0]);
+    console.log('[consumptionGraph] Processed data points:', filteredData.length);
+
+    electricityUsageData.value = filteredData.map(item => item.capacity_kwh);
+    directUsageData.value = filteredData.map(item => item.consumed_kwh);
+    labels.value = filteredData.map(item => item.date.split('T')[0]);
 
     console.log('[consumptionGraph] Updated chart data:', {
       electricityUsage: electricityUsageData.value,
@@ -217,7 +223,7 @@ watch(() => [props.startDate, props.endDate], ([newStartDate, newEndDate]) => {
     console.log(`[consumptionGraph] Date range changed to ${newStartDate} - ${newEndDate}`);
     fetchLatestData();
   }
-}, { deep: true });
+}, { immediate: true });
 
 // Expose the export function to the parent component
 const exportData = () => {

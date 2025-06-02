@@ -168,6 +168,7 @@ watch([startDate, endDate], async ([newStartDate, newEndDate]) => {
     if (currentGraph.value === 'yield') {
       await debouncedFetch();
     }
+    // Don't fetch for consumption graph here as it has its own watcher
   }
 }, { deep: true });
 
@@ -178,7 +179,12 @@ onMounted(async () => {
   
   await fetchLatestData();
   currentGraph.value = 'yield';
-  refreshInterval.value = window.setInterval(fetchLatestData, 10000); // Changed to 10 seconds
+  // Only set up refresh interval for yield graph
+  refreshInterval.value = window.setInterval(() => {
+    if (currentGraph.value === 'yield') {
+      fetchLatestData();
+    }
+  }, 10000);
 });
 
 onUnmounted(() => {
