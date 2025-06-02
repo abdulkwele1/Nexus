@@ -140,8 +140,17 @@ const fetchLatestData = async () => {
     });
     
     // Convert back to array and sort by date
-    solarData.value = Array.from(uniqueData.values())
+    const sortedData = Array.from(uniqueData.values())
       .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    // Filter data for the selected date range
+    const filteredData = sortedData.filter(item => {
+      const itemDate = item.date.toISOString().split('T')[0];
+      return itemDate >= currentStartDate && itemDate <= currentEndDate;
+    });
+
+    console.log('[SolarPage] Processed data points:', filteredData.length);
+    solarData.value = filteredData;
       
   } catch (error) {
     console.error("[SolarPage] Error fetching updated data:", error);
@@ -162,13 +171,13 @@ const debounce = (fn: Function, delay: number) => {
 // Debounced fetch function
 const debouncedFetch = debounce(fetchLatestData, 500);
 
+// Watch for changes in the date range
 watch([startDate, endDate], async ([newStartDate, newEndDate]) => {
   if (newStartDate && newEndDate) {
     console.log(`[SolarPage] Date range changed to ${newStartDate} - ${newEndDate}`);
     if (currentGraph.value === 'yield') {
       await debouncedFetch();
     }
-    // Don't fetch for consumption graph here as it has its own watcher
   }
 }, { deep: true });
 
@@ -179,6 +188,7 @@ onMounted(async () => {
   
   await fetchLatestData();
   currentGraph.value = 'yield';
+  
   // Only set up refresh interval for yield graph
   refreshInterval.value = window.setInterval(() => {
     if (currentGraph.value === 'yield') {
