@@ -221,7 +221,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 60px;
-  background: #f5f7fa;
+  background: #000000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -232,7 +232,7 @@ onUnmounted(() => {
 .nav-button {
   background: transparent;
   border: none;
-  color: #333;
+  color: #ffffff;
   font-size: 16px;
   cursor: pointer;
   transition: color 0.2s;
