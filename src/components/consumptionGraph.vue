@@ -3,27 +3,15 @@
     <!-- Canvas for the graph -->
     <canvas ref="consumptionGraph"></canvas>
 
-    <!-- Export Button -->
-    <button class="export-button" @click="exportData">📄 Export</button>
-
-    <!-- Dropdown Calendar Button -->
-    <button class="calendar-button" @click="toggleCalendar">Select Date Range &#9662;</button>
-
-    <!-- Calendar Modal for selecting date range -->
-    <div v-if="showCalendar" class="modal-overlay" @click="toggleCalendar">
-      <div class="modal" @click.stop>
-        <h2>Select Date Range</h2>
-        <div class="calendar-container">
-          <div class="calendar">
-            <label>Start point:</label>
-            <input type="date" v-model="startDate" />
-          </div>
-          <div class="calendar">
-            <label>End point:</label>
-            <input type="date" v-model="endDate" />
-          </div>
-        </div>
-        <button @click="toggleCalendar">Close</button>
+    <!-- Tooltip Container -->
+    <div 
+      v-if="activeTooltip" 
+      class="tooltip-container"
+      :style="tooltipStyle"
+    >
+      <div class="tooltip-content">
+        <div class="tooltip-date">{{ tooltipData.date }}</div>
+        <div class="tooltip-value">{{ tooltipData.value }}</div>
       </div>
     </div>
   </div>
@@ -34,31 +22,26 @@ import { ref, onMounted, watch, onUnmounted } from 'vue';
 import { Chart } from 'chart.js/auto';
 import { useNexusStore } from '@/stores/nexus'
 const store = useNexusStore()
+
+interface ConsumptionData {
+  date: string;
+  capacity_kwh: number;
+  consumed_kwh: number;
+}
+
 // Refs for data and labels
 const consumptionGraph = ref<HTMLCanvasElement | null>(null);
-const electricityUsageData = ref([]); // Example percentage data for electricity usage
-const directUsageData = ref([]); // Example percentage data for direct usage
-const labels = ref<string[]>([]); // Updated to be dynamic with dates
-// Calendar date selection
-const startDate = ref<string>('');
-const endDate = ref<string>('');
-const refreshInterval = ref(null);
+const electricityUsageData = ref<number[]>([]);
+const directUsageData = ref<number[]>([]);
+const labels = ref<string[]>([]);
+const refreshInterval = ref<number | null>(null);
 
-const showCalendar = ref(false); // Controls calendar modal visibility
-// Function to toggle the calendar modal
-const toggleCalendar = () => {
-  showCalendar.value = !showCalendar.value;
-};
-// Function to generate labels with panel names and dates
-const generateLabels = () => {
-  // Example logic: Display panels with selected date range
-  labels.value = [
-    `Panel 1 (${startDate.value} - ${endDate.value})`,
-    `Panel 2 (${startDate.value} - ${endDate.value})`,
-    `Panel 3 (${startDate.value} - ${endDate.value})`,
-    `Panel 4 (${startDate.value} - ${endDate.value})`,
-  ];
-};
+// Props for date range
+const props = defineProps<{
+  startDate?: string;
+  endDate?: string;
+}>();
+
 // Function to render the chart
 let chartInstance: Chart | null = null; // Variable to store chart instance
 const renderChart = () => {
@@ -74,7 +57,7 @@ const renderChart = () => {
   const maxElectricity = Math.max(...electricityUsageData.value);
   const maxDirectUsage = Math.max(...directUsageData.value);
   const maxValue = Math.max(maxElectricity, maxDirectUsage);
-  const yAxisMax = Math.ceil(maxValue / 100) * 100; // Round up to nearest hundred
+  const yAxisMax = Math.ceil(maxValue / 100) * 100;
 
   chartInstance = new Chart(ctx, {
     type: 'bar',
@@ -99,14 +82,57 @@ const renderChart = () => {
       scales: {
         y: {
           beginAtZero: true,
-          max: yAxisMax, // Use rounded max value
+          max: yAxisMax,
           ticks: {
-            stepSize: Math.max(10, Math.floor(yAxisMax / 10)) // Adjust step size based on max value
+            stepSize: Math.max(10, Math.floor(yAxisMax / 10))
           }
         }
       },
       animation: {
-        duration: 0 // Reduce animation duration for more frequent updates
+        duration: 0
+      },
+      plugins: {
+        tooltip: {
+          enabled: false,
+          external: function(context) {
+            const model = context.tooltip;
+            if (!model || !model.opacity) {
+              activeTooltip.value = false;
+              return;
+            }
+
+            // Set tooltip content
+            const rawDate = model.dataPoints[0].label;
+            const formattedDate = new Date(rawDate).toLocaleDateString('en-US', {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric'
+            });
+            const electricityValue = model.dataPoints[0].raw as number;
+            const directValue = model.dataPoints[1]?.raw as number;
+
+            tooltipData.value = {
+              date: formattedDate,
+              value: directValue !== undefined 
+                ? `Electricity: ${electricityValue}%\nDirect: ${directValue}%`
+                : `Electricity: ${electricityValue}%`
+            };
+
+            // Position tooltip at mouse position
+            if (consumptionGraph.value) {
+              const rect = consumptionGraph.value.getBoundingClientRect();
+              const mouseX = model.caretX;
+              const mouseY = model.caretY;
+              
+              tooltipStyle.value = {
+                left: `${mouseX}px`,
+                top: `${mouseY}px`
+              };
+            }
+
+            activeTooltip.value = true;
+          }
+        }
       }
     },
   });
@@ -114,40 +140,76 @@ const renderChart = () => {
 
 const fetchLatestData = async () => {
   try {
-    const panelId = parseInt(selectedPanel.value?.replace('Panel ', '') || '1');
+    const panelId = 1;
+    const currentStartDate = props.startDate || '2024-12-20';
+    const currentEndDate = props.endDate || '2024-12-24';
+    
+    console.log(`[consumptionGraph] Fetching data for panel ${panelId} from ${currentStartDate} to ${currentEndDate}`);
+    
     const response = await store.user.getPanelConsumptionData(
       panelId,
-      startDate.value || '2024-12-20',
-      endDate.value || '2024-12-24'
+      currentStartDate,
+      currentEndDate
     );
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const responseData = await response.json();
-    const consumptionSolarData = responseData.consumption_data;
+    console.log('[consumptionGraph] Response data:', responseData);
 
-    electricityUsageData.value = consumptionSolarData.map(item => item.capacity_kwh);
-    directUsageData.value = consumptionSolarData.map(item => item.consumed_kwh);
-    labels.value = consumptionSolarData.map(item => item.date.split('T')[0]);
+    if (!responseData.consumption_data) {
+      throw new Error('No consumption data in response');
+    }
 
-    renderChart(); // Add this to update the chart with new data
+    // Process and deduplicate data
+    const consumptionSolarData: ConsumptionData[] = responseData.consumption_data;
+    const uniqueData = new Map<string, ConsumptionData>();
+    
+    // Keep only the latest entry for each date
+    consumptionSolarData.forEach(item => {
+      const dateKey = item.date.split('T')[0];
+      uniqueData.set(dateKey, item);
+    });
+
+    // Convert back to array and sort by date
+    const sortedData = Array.from(uniqueData.values())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Filter data for the selected date range
+    const filteredData = sortedData.filter(item => {
+      const itemDate = item.date.split('T')[0];
+      return itemDate >= currentStartDate && itemDate <= currentEndDate;
+    });
+
+    console.log('[consumptionGraph] Processed data points:', filteredData.length);
+
+    electricityUsageData.value = filteredData.map(item => item.capacity_kwh);
+    directUsageData.value = filteredData.map(item => item.consumed_kwh);
+    labels.value = filteredData.map(item => item.date.split('T')[0]);
+
+    console.log('[consumptionGraph] Updated chart data:', {
+      electricityUsage: electricityUsageData.value,
+      directUsage: directUsageData.value,
+      labels: labels.value
+    });
+
+    renderChart();
   } catch (error) {
-    console.error("Error fetching updated data:", error);
+    console.error("[consumptionGraph] Error fetching updated data:", error);
   }
 };
 
-// Watch for changes in the startDate and endDate
-watch([startDate, endDate], ([newStartDate, newEndDate]) => {
+// Watch for changes in the date range props
+watch(() => [props.startDate, props.endDate], ([newStartDate, newEndDate]) => {
   if (newStartDate && newEndDate) {
-    console.log(`Fetching data between ${newStartDate} and ${newEndDate}`);
-    generateLabels();  // Generate labels with date range
-    updateGraphData(); // Automatically update the graph when dates are selected
+    console.log(`[consumptionGraph] Date range changed to ${newStartDate} - ${newEndDate}`);
+    fetchLatestData();
   }
-});
-// Function to update the graph with new data
-const updateGraphData = () => {
-  console.log("Updating graph with new data from", startDate.value, "to", endDate.value);
-  renderChart(); // Re-render chart with updated data
-};
-// Function to export data as CSV
+}, { immediate: true });
+
+// Expose the export function to the parent component
 const exportData = () => {
   const csvContent = "data:text/csv;charset=utf-8,Panel,Electricity Used (%),Direct Usage (%)\n"
     + labels.value.map((label, index) => `${label},${electricityUsageData.value[index]},${directUsageData.value[index]}`).join("\n");
@@ -159,33 +221,35 @@ const exportData = () => {
   link.click();
   document.body.removeChild(link);
 };
-// Mount the chart on component load
-onMounted(async() => {
-  const defaultPanelId = 1
-  const startDate = '2024-12-20'
-  const endDate = '2024-12-24'
-  const consumptionResponse = await store.user.getPanelConsumptionData(defaultPanelId, startDate, endDate)
-  const consumptionResponseData= await consumptionResponse.json()
-  const consumptionSolarData = consumptionResponseData.consumption_data
 
-  electricityUsageData.value = consumptionSolarData.map(item => item.capacity_kwh); // Map to capacity_kwh
-  directUsageData.value = consumptionSolarData.map(item => item.consumed_kwh);    // Map to consumed_kwh
-  labels.value = consumptionSolarData.map(item => item.date.split('T')[0]);  // Format the date as YYYY-MM-DD
+// Expose the export function to the parent
+defineExpose({
+  exportData
+});
 
-  console.log(JSON.stringify(consumptionSolarData))
-  renderChart();
-
-  //set up refresh interval
-  refreshInterval.value = setInterval(fetchLatestData, 3000);
+onMounted(async () => {
+  console.log('[consumptionGraph] Component mounted');
+  await fetchLatestData();
+  
+  // Set up refresh interval with a longer delay
+  refreshInterval.value = setInterval(fetchLatestData, 10000); // Changed to 10 seconds
+  console.log('[consumptionGraph] Refresh interval set up');
 });
 
 onUnmounted(() => {
-  if (refreshInterval.value){
+  if (refreshInterval.value) {
     clearInterval(refreshInterval.value);
+    console.log('[consumptionGraph] Refresh interval cleared');
   }
-})
+});
 
-const selectedPanel = ref('Panel 1'); // Add this if it's missing
+// Tooltip refs
+const activeTooltip = ref(false);
+const tooltipData = ref({ date: '', value: '' });
+const tooltipStyle = ref({
+  left: '0px',
+  top: '0px'
+});
 </script>
 
 <style scoped>
@@ -195,66 +259,32 @@ const selectedPanel = ref('Panel 1'); // Add this if it's missing
   margin: auto;
   position: relative;
 }
-/* Export Button Styling */
-.export-button {
-  position: fixed;
-  top: 90px;
-  right: 30px;
-  z-index: 1001;
-  padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-.export-button:hover {
-  background-color: #218838;
-}
-/* Calendar Button Styling */
-.calendar-button {
-  margin-top: 20px;
-  padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-.calendar-button:hover {
-  background-color: #0056b3;
-}
-/* Modal for calendar overlay */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.modal {
+
+.tooltip-container {
+  position: absolute;
   background: white;
-  padding: 20px;
-  border-radius: 8px;
-  width: 400px;
-  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  pointer-events: none;
+  z-index: 1000;
+  min-width: 120px;
 }
-/* Calendar container inside the modal */
-.calendar-container {
-  display: flex;
-  justify-content: space-between;
-  margin: 20px 0;
+
+.tooltip-content {
+  font-size: 12px;
+  line-height: 1.4;
 }
-.calendar {
-  width: 45%;
+
+.tooltip-date {
+  color: #666;
+  margin-bottom: 4px;
 }
-.calendar label {
-  font-weight: bold;
+
+.tooltip-value {
+  color: #333;
+  font-weight: 500;
+  white-space: pre-line;
 }
 </style>
