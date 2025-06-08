@@ -7,19 +7,25 @@
       :style="pointStyle(30, 70)" 
       @click="goTo('sensors')"
       title="Sensors"
-    ></div>
+    >
+      <i class="fas fa-thermometer-half"></i>
+    </div>
     <div
       class="map-point solar"
       :style="pointStyle(18, 50)"
       @click="goTo('solar')"
       title="Solar Panels"
-    ></div>
+    >
+      <i class="fas fa-solar-panel"></i>
+    </div>
   </div>
 </template>
 
 <style scoped>
 /* Importing Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@500&display=swap');
+/* Import Font Awesome */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
 
 .map-container {
   position: relative;
