@@ -4,13 +4,13 @@
     <!-- Example clickable points -->
     <div
       class="map-point sensor"
-      :style="pointStyle(30, 40)"
+      :style="pointStyle(30, 70)" 
       @click="goTo('sensors')"
       title="Sensors"
     ></div>
     <div
       class="map-point solar"
-      :style="pointStyle(70, 60)"
+      :style="pointStyle(18, 50)"
       @click="goTo('solar')"
       title="Solar Panels"
     ></div>
