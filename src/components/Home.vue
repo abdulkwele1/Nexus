@@ -1,26 +1,19 @@
 <template>
-  <div>
-    <div class="container">
-      <RouterLink to="/sensors" class="box-link">
-        <div class="box">
-          <img src="../assets/sensorIcon.jpg" alt="Sensor Icon" class="box-image" />
-          <div class="box-text">Sensors</div>
-        </div>
-      </RouterLink>
-      <RouterLink to="/solar" class="box-link">
-        <div class="box">
-          <img src="../assets/solarIcon.jpg" alt="Solar Icon" class="box-image" />
-          <div class="box-text">Solar Panels</div>
-        </div>
-      </RouterLink>
-      <!-- New Drone Box -->
-      <RouterLink to="/drone" class="box-link">
-        <div class="box">
-          <img src="../assets/droneIcon.png" alt="Drone Icon" class="box-image" />
-          <div class="box-text">Drone</div>
-        </div>
-      </RouterLink>
-    </div>
+  <div class="map-container">
+    <img src="../assets/farmMap.png" alt="Farm Map" class="farm-map" />
+    <!-- Example clickable points -->
+    <div
+      class="map-point sensor"
+      :style="pointStyle(30, 40)"
+      @click="goTo('sensors')"
+      title="Sensors"
+    ></div>
+    <div
+      class="map-point solar"
+      :style="pointStyle(70, 60)"
+      @click="goTo('solar')"
+      title="Solar Panels"
+    ></div>
   </div>
 </template>
 
@@ -28,64 +21,62 @@
 /* Importing Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@500&display=swap');
 
-/* Container style to center the boxes */
-.container {
+.map-container {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  margin: 40px auto 0 auto;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: calc(80vh - 60px); /* Adjust height for navbar */
-  gap: 50px; /* Spacing between boxes */
-  transform: translateX(5%);
 }
-
-/* Style for each box */
-.box {
-  width: 200px;
-  height: 300px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid transparent; /* Initially hide the border */
-  border-radius: 10px;
-  cursor: pointer;
-  overflow: hidden;
-  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-/* Hover effect for boxes */
-.box:hover {
-  transform: scale(1.05);
-  border-color: #ccc; /* Show the border on hover */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-/* Style for the image inside the box */
-.box-image {
+.farm-map {
   width: 100%;
   height: auto;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  display: block;
 }
-
-/* Improved style for the text inside the box */
-.box-text {
-  margin-top: 10px;
-  font-size: 18px; /* Slightly larger font size */
-  text-align: center;
-  font-family: 'Roboto', sans-serif; /* Use the imported font */
-  font-weight: 500; /* Medium weight */
-  letter-spacing: 0.5px; /* Adds space between letters */
-  text-transform: uppercase; /* Makes text uppercase */
-  color: #333; /* Darker color for better visibility */
+.map-point {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #1976d2;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.map-point:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px rgba(25,118,210,0.25);
+}
+.map-point.sensor {
+  border-color: #43a047;
+  background: #e8f5e9;
+}
+.map-point.solar {
+  border-color: #fbc02d;
+  background: #fffde7;
 }
 </style>
 
 <script setup>
-import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+const router = useRouter()
 
-// run every time page (component) loads
-// https://learnvue.co/articles/vue-lifecycle-hooks-guide
-onMounted(() => {
-    console.log('hommie')
-    // If user is on home page and document.cookie == “” is true, redirect the user to the login page
-})
+// Helper to position points by percentage (x, y)
+function pointStyle(xPercent, yPercent) {
+  return {
+    left: `calc(${xPercent}% - 14px)`, // center the 28px point
+    top: `calc(${yPercent}% - 14px)`
+  }
+}
+function goTo(page) {
+  router.push(`/${page}`)
+}
 </script>
