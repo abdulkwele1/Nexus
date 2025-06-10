@@ -1,22 +1,22 @@
 <template>
-  <div>
-    <!-- Header Icon Tiles -->
-    <div class="header-tiles">
-      <RouterLink to="/sensors" class="header-tile">
-        <i class="fas fa-thermometer-half"></i>
-        <span>Sensors</span>
-      </RouterLink>
-      <RouterLink to="/solar" class="header-tile">
-        <i class="fas fa-solar-panel"></i>
-        <span>Solar Panels</span>
-      </RouterLink>
-      <RouterLink to="/drone" class="header-tile">
-        <i class="fas fa-drone"></i>
-        <span>Drone</span>
-      </RouterLink>
-    </div>
+  <div class="home-root">
     <!-- Map View -->
     <div class="map-container">
+      <!-- Header Icon Tiles (overlay on map) -->
+      <div class="header-tiles-bar">
+        <RouterLink to="/sensors" class="header-tile">
+          <i class="fas fa-thermometer-half"></i>
+          <span>Sensors</span>
+        </RouterLink>
+        <RouterLink to="/solar" class="header-tile">
+          <i class="fas fa-solar-panel"></i>
+          <span>Solar Panels</span>
+        </RouterLink>
+        <RouterLink to="/drone" class="header-tile">
+          <i class="fas fa-drone"></i>
+          <span>Drone</span>
+        </RouterLink>
+      </div>
       <img src="../assets/farmMap.png" alt="Farm Map" class="farm-map" />
       <!-- Example clickable points -->
       <div
@@ -45,37 +45,57 @@
 /* Import Font Awesome */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
 
-.header-tiles {
+.home-root {
+  min-height: 100vh;
+  width: 100vw;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 0;
+}
+
+.header-tiles-bar {
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  z-index: 10;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 40px;
-  margin-top: 32px;
-  margin-bottom: 24px;
+  gap: 32px;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  padding: 14px 36px 10px 36px;
+  min-height: 54px;
+  border: none;
+  border-radius: 18px;
 }
 .header-tile {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-  padding: 18px 28px 10px 28px;
   text-decoration: none;
   color: #222;
   font-family: 'Roboto', sans-serif;
   font-size: 16px;
   font-weight: 500;
-  transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+  transition: transform 0.18s, box-shadow 0.18s, background 0.18s, color 0.18s;
+  border-radius: 10px;
+  padding: 6px 18px 2px 18px;
 }
 .header-tile i {
   font-size: 2rem;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .header-tile:hover {
-  background: #f5f5f5;
-  transform: translateY(-4px) scale(1.05);
+  background: #e3f2fd;
+  transform: translateY(-2px) scale(1.08);
   box-shadow: 0 4px 16px rgba(25,118,210,0.13);
   color: #1976d2;
 }
@@ -83,39 +103,59 @@
 .map-container {
   position: relative;
   width: 100%;
-  max-width: 800px;
-  margin: 40px auto 0 auto;
+  max-width: 100vw;
+  height: calc(100vh - 44px);
+  min-height: 0;
+  margin: 0 auto;
   display: flex;
   justify-content: center;
   align-items: center;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  background: #fff;
 }
 .farm-map {
   width: 100%;
-  height: auto;
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
   display: block;
+  filter: brightness(0.98) saturate(1.05);
+  transition: filter 0.3s;
+}
+.map-container:hover .farm-map {
+  filter: brightness(1) saturate(1.1);
 }
 .map-point {
   position: absolute;
-  width: 28px;
-  height: 28px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: #fff;
   border: 3px solid #1976d2;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.22s, box-shadow 0.22s, border-color 0.22s;
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
+  font-size: 1.3rem;
+  animation: pointPulse 2.2s infinite cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes pointPulse {
+  0% { box-shadow: 0 2px 12px rgba(25,118,210,0.18); }
+  50% { box-shadow: 0 6px 24px rgba(25,118,210,0.22); }
+  100% { box-shadow: 0 2px 12px rgba(25,118,210,0.18); }
 }
 .map-point i {
-  font-size: 1.1rem;
+  font-size: 1.3rem;
 }
 .map-point:hover {
-  transform: scale(1.15);
-  box-shadow: 0 4px 16px rgba(25,118,210,0.25);
+  transform: scale(1.18);
+  box-shadow: 0 8px 32px rgba(25,118,210,0.22);
+  border-color: #1565c0;
 }
 .map-point.sensor {
   border-color: #43a047;
@@ -124,6 +164,55 @@
 .map-point.solar {
   border-color: #fbc02d;
   background: #fffde7;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .header-tiles-bar {
+    gap: 18px;
+    padding: 10px 12px 6px 12px;
+    border-radius: 12px;
+    min-height: 44px;
+    top: 18px;
+  }
+  .map-container {
+    max-width: 100vw;
+    height: calc(100vh - 44px);
+    min-height: 0;
+    border-radius: 0;
+    margin-top: 0;
+  }
+  .farm-map {
+    border-radius: 0;
+  }
+}
+@media (max-width: 600px) {
+  .header-tiles-bar {
+    flex-direction: row;
+    gap: 8px;
+    padding: 6px 4px 2px 4px;
+    border-radius: 8px;
+    top: 8px;
+    min-height: 32px;
+  }
+  .map-container {
+    max-width: 100vw;
+    height: calc(100vh - 44px);
+    min-height: 0;
+    border-radius: 0;
+    margin-top: 0;
+  }
+  .farm-map {
+    border-radius: 0;
+  }
+  .header-tile {
+    font-size: 13px;
+    padding: 2px 6px 0 6px;
+  }
+  .header-tile i {
+    font-size: 1.2rem;
+    margin-bottom: 2px;
+  }
 }
 </style>
 
@@ -134,8 +223,8 @@ const router = useRouter()
 // Helper to position points by percentage (x, y)
 function pointStyle(xPercent, yPercent) {
   return {
-    left: `calc(${xPercent}% - 14px)`, // center the 28px point
-    top: `calc(${yPercent}% - 14px)`
+    left: `calc(${xPercent}% - 19px)`, // center the 38px point
+    top: `calc(${yPercent}% - 19px)`
   }
 }
 function goTo(page) {
