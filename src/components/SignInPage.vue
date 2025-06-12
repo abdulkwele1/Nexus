@@ -59,27 +59,48 @@ async function handleLogin() {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background-color: #ffffff;
+  min-height: calc(100vh - 60px); /* Subtract navbar height */
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 20px;
 }
 
 input {
-  margin-bottom: 10px;
-  padding: 10px;
+  width: 100%;
+  max-width: 300px;
+  margin-bottom: 16px;
+  padding: 12px;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 button {
-  padding: 10px 20px;
+  width: 100%;
+  max-width: 300px;
+  padding: 12px;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   background-color: #007bff;
   color: white;
+  font-size: 16px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
 }
 
 button:hover {
   background-color: #0056b3;
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(1px);
 }
 </style>
