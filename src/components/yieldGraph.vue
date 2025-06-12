@@ -130,7 +130,7 @@ const createChart = () => {
     .call(d3.axisLeft(y));
 
   // Render chart based on type
-  if (props.isLineChart) {
+    if (props.isLineChart) {
     // Create a time scale for the line chart
     const timeScale = d3.scaleTime()
       .domain(d3.extent(sortedData, d => d.date) as [Date, Date])
@@ -143,26 +143,26 @@ const createChart = () => {
       .curve(d3.curveLinear);
 
     // Add the line path
-    svg.append("path")
+      svg.append("path")
       .datum(sortedData)
-      .attr("fill", "none")
-      .attr("stroke", "#69b3a2")
-      .attr("stroke-width", 2)
-      .attr("d", line);
+        .attr("fill", "none")
+        .attr("stroke", "#69b3a2")
+        .attr("stroke-width", 2)
+        .attr("d", line);
 
     // Add points
-    svg.selectAll(".hover-circle")
+      svg.selectAll(".hover-circle")
       .data(sortedData)
-      .enter()
-      .append("circle")
-      .attr("class", "hover-circle")
+        .enter()
+        .append("circle")
+        .attr("class", "hover-circle")
       .attr("cx", d => timeScale(d.date))
-      .attr("cy", d => y(d.kwh_yield))
-      .attr("r", 4)
-      .attr("fill", "#69b3a2")
+        .attr("cy", d => y(d.kwh_yield))
+        .attr("r", 4)
+        .attr("fill", "#69b3a2")
       .on("mouseover", (event, d) => showTooltip(event, d))
-      .on("mousemove", moveTooltip)
-      .on("mouseout", hideTooltip);
+        .on("mousemove", moveTooltip)
+        .on("mouseout", hideTooltip);
 
     // Update x-axis for line chart
     const xAxis = d3.axisBottom(timeScale)
@@ -175,22 +175,22 @@ const createChart = () => {
       .selectAll("text")
       .attr("transform", "rotate(-45)")
       .style("text-anchor", "end");
-  } else {
+    } else {
     // Bar chart
-    svg.selectAll(".bar")
+      svg.selectAll(".bar")
       .data(sortedData)
-      .enter()
-      .append("rect")
-      .attr("class", "bar")
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
       .attr("x", d => x(d3.timeFormat("%Y-%m-%d")(d.date)) || 0)
-      .attr("y", d => y(d.kwh_yield))
-      .attr("width", x.bandwidth())
-      .attr("height", d => y(0) - y(d.kwh_yield))
-      .attr("fill", "#69b3a2")
+        .attr("y", d => y(d.kwh_yield))
+        .attr("width", x.bandwidth())
+        .attr("height", d => y(0) - y(d.kwh_yield))
+        .attr("fill", "#69b3a2")
       .on("mouseover", (event, d) => showTooltip(event, d))
-      .on("mousemove", moveTooltip)
-      .on("mouseout", hideTooltip);
-  }
+        .on("mousemove", moveTooltip)
+        .on("mouseout", hideTooltip);
+    }
 };
 
 const fetchLatestData = async () => {

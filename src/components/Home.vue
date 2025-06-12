@@ -53,12 +53,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
 }
 
 .header-tiles-bar {
   position: absolute;
-  top: 32px;
+  top: 90px; /* Adjusted to create more space below navbar */
   left: 50%;
   transform: translateX(-50%);
   width: auto;
@@ -104,9 +106,9 @@
   position: relative;
   width: 100%;
   max-width: 100vw;
-  height: calc(100vh - 44px);
+  height: 100vh;
   min-height: 0;
-  margin: 0 auto;
+  margin: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -173,7 +175,7 @@
     padding: 10px 12px 6px 12px;
     border-radius: 12px;
     min-height: 44px;
-    top: 18px;
+    top: 80px; /* Adjusted for smaller screens */
   }
   .map-container {
     max-width: 100vw;
@@ -192,7 +194,7 @@
     gap: 8px;
     padding: 6px 4px 2px 4px;
     border-radius: 8px;
-    top: 8px;
+    top: 70px; /* Adjusted for mobile screens */
     min-height: 32px;
   }
   .map-container {
