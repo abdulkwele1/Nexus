@@ -246,12 +246,17 @@
 /* Add new tooltip styles */
 .sensor-tooltip {
   position: fixed;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 8px;
-  padding: 12px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 16px;
   min-width: 200px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(8px);
+  box-shadow: 
+    0 4px 24px -1px rgba(0, 0, 0, 0.08),
+    0 0 1px 0 rgba(0, 0, 0, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   z-index: 1000;
   pointer-events: none;
   transform: translateX(-50%);
@@ -259,34 +264,36 @@
 
 .tooltip-header {
   font-weight: 600;
-  color: #1976d2;
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(25, 118, 210, 0.9);
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .tooltip-content {
   font-size: 0.9rem;
+  color: rgba(0, 0, 0, 0.8);
 }
 
 .tooltip-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 4px 0;
 }
 
 .tooltip-row i {
   width: 16px;
-  color: #666;
+  color: rgba(102, 102, 102, 0.8);
 }
 
 .tooltip-time {
   font-size: 0.8rem;
-  color: #666;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(102, 102, 102, 0.8);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 </style>
 
