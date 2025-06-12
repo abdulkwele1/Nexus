@@ -18,14 +18,40 @@
         </RouterLink>
       </div>
       <img src="../assets/farmMap.png" alt="Farm Map" class="farm-map" />
-      <!-- Example clickable points -->
+      <!-- Sensor point with tooltip -->
       <div
         class="map-point sensor"
         :style="pointStyle(30, 70)"
         @click="goTo('sensors')"
+        @mouseenter="handleMouseEnter($event, 'sensor')"
+        @mouseleave="handleMouseLeave"
         title="Sensors"
       >
         <i class="fas fa-thermometer-half"></i>
+      </div>
+      <!-- Tooltip -->
+      <div
+        v-if="showTooltip"
+        class="sensor-tooltip"
+        :style="{
+          left: `${tooltipPosition.x}px`,
+          top: `${tooltipPosition.y - 120}px`
+        }"
+      >
+        <div class="tooltip-header">{{ sensorData.name }}</div>
+        <div class="tooltip-content">
+          <div class="tooltip-row">
+            <i class="fas fa-tint"></i>
+            <span>Moisture: {{ formatValue(sensorData.moisture, 'moisture') }}</span>
+          </div>
+          <div class="tooltip-row">
+            <i class="fas fa-thermometer-half"></i>
+            <span>Temperature: {{ formatValue(sensorData.temperature, 'temperature') }}</span>
+          </div>
+          <div class="tooltip-time">
+            Last updated: {{ sensorData.lastUpdated ? formatTime(sensorData.lastUpdated) : 'Loading...' }}
+          </div>
+        </div>
       </div>
       <div
         class="map-point solar"
@@ -216,11 +242,75 @@
     margin-bottom: 2px;
   }
 }
+
+/* Add new tooltip styles */
+.sensor-tooltip {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 200px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.tooltip-header {
+  font-weight: 600;
+  color: #1976d2;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.tooltip-content {
+  font-size: 0.9rem;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tooltip-row i {
+  width: 16px;
+  color: #666;
+}
+
+.tooltip-time {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
 </style>
 
 <script setup>
-import { useRouter } from 'vue-router'
-const router = useRouter()
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useNexusStore } from '@/stores/nexus';
+
+const router = useRouter();
+const nexusStore = useNexusStore();
+
+// Sensor data state
+const sensorData = ref({
+  name: 'Sensor Alpha',
+  moisture: null,
+  temperature: null,
+  lastUpdated: null
+});
+
+const SENSOR_ID = 444574498032128;
+
+// Tooltip state
+const showTooltip = ref(false);
+const tooltipPosition = ref({ x: 0, y: 0 });
 
 // Helper to position points by percentage (x, y)
 function pointStyle(xPercent, yPercent) {
@@ -229,7 +319,76 @@ function pointStyle(xPercent, yPercent) {
     top: `calc(${yPercent}% - 19px)`
   }
 }
+
 function goTo(page) {
   router.push(`/${page}`)
+}
+
+// Format functions
+function formatValue(value, type) {
+  if (value === null) return 'Loading...';
+  return type === 'temperature' 
+    ? `${value.toFixed(1)}°C`
+    : `${value.toFixed(1)}%`;
+}
+
+function formatTime(time) {
+  if (!time) return '';
+  return new Date(time).toLocaleTimeString();
+}
+
+// Fetch sensor data
+async function fetchSensorData() {
+  try {
+    const [moistureData, temperatureData] = await Promise.all([
+      nexusStore.user.getSensorMoistureData(SENSOR_ID),
+      nexusStore.user.getSensorTemperatureData(SENSOR_ID)
+    ]);
+
+    if (moistureData?.length && temperatureData?.length) {
+      const latestMoisture = moistureData[moistureData.length - 1];
+      const latestTemperature = temperatureData[temperatureData.length - 1];
+
+      sensorData.value = {
+        name: 'Sensor Alpha',
+        moisture: Number(latestMoisture.soil_moisture),
+        temperature: Number(latestTemperature.soil_temperature),
+        lastUpdated: new Date(Math.max(
+          new Date(latestMoisture.date),
+          new Date(latestTemperature.date)
+        ))
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching sensor data:', error);
+  }
+}
+
+// Update data periodically
+let updateInterval;
+
+onMounted(() => {
+  fetchSensorData();
+  updateInterval = setInterval(fetchSensorData, 5000);
+});
+
+onUnmounted(() => {
+  if (updateInterval) {
+    clearInterval(updateInterval);
+  }
+});
+
+// Tooltip handlers
+function handleMouseEnter(event, type) {
+  const rect = event.target.getBoundingClientRect();
+  tooltipPosition.value = {
+    x: rect.left + window.scrollX,
+    y: rect.top + window.scrollY
+  };
+  showTooltip.value = true;
+}
+
+function handleMouseLeave() {
+  showTooltip.value = false;
 }
 </script>
