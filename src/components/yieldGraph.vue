@@ -130,7 +130,7 @@ const createChart = () => {
     .call(d3.axisLeft(y));
 
   // Render chart based on type
-  if (props.isLineChart) {
+    if (props.isLineChart) {
     // Create a time scale for the line chart
     const timeScale = d3.scaleTime()
       .domain(d3.extent(sortedData, d => d.date) as [Date, Date])
@@ -143,26 +143,26 @@ const createChart = () => {
       .curve(d3.curveLinear);
 
     // Add the line path
-    svg.append("path")
+      svg.append("path")
       .datum(sortedData)
-      .attr("fill", "none")
-      .attr("stroke", "#69b3a2")
-      .attr("stroke-width", 2)
-      .attr("d", line);
+        .attr("fill", "none")
+        .attr("stroke", "#69b3a2")
+        .attr("stroke-width", 2)
+        .attr("d", line);
 
     // Add points
-    svg.selectAll(".hover-circle")
+      svg.selectAll(".hover-circle")
       .data(sortedData)
-      .enter()
-      .append("circle")
-      .attr("class", "hover-circle")
+        .enter()
+        .append("circle")
+        .attr("class", "hover-circle")
       .attr("cx", d => timeScale(d.date))
-      .attr("cy", d => y(d.kwh_yield))
-      .attr("r", 4)
-      .attr("fill", "#69b3a2")
+        .attr("cy", d => y(d.kwh_yield))
+        .attr("r", 4)
+        .attr("fill", "#69b3a2")
       .on("mouseover", (event, d) => showTooltip(event, d))
-      .on("mousemove", moveTooltip)
-      .on("mouseout", hideTooltip);
+        .on("mousemove", moveTooltip)
+        .on("mouseout", hideTooltip);
 
     // Update x-axis for line chart
     const xAxis = d3.axisBottom(timeScale)
@@ -175,22 +175,22 @@ const createChart = () => {
       .selectAll("text")
       .attr("transform", "rotate(-45)")
       .style("text-anchor", "end");
-  } else {
+    } else {
     // Bar chart
-    svg.selectAll(".bar")
+      svg.selectAll(".bar")
       .data(sortedData)
-      .enter()
-      .append("rect")
-      .attr("class", "bar")
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
       .attr("x", d => x(d3.timeFormat("%Y-%m-%d")(d.date)) || 0)
-      .attr("y", d => y(d.kwh_yield))
-      .attr("width", x.bandwidth())
-      .attr("height", d => y(0) - y(d.kwh_yield))
-      .attr("fill", "#69b3a2")
+        .attr("y", d => y(d.kwh_yield))
+        .attr("width", x.bandwidth())
+        .attr("height", d => y(0) - y(d.kwh_yield))
+        .attr("fill", "#69b3a2")
       .on("mouseover", (event, d) => showTooltip(event, d))
-      .on("mousemove", moveTooltip)
-      .on("mouseout", hideTooltip);
-  }
+        .on("mousemove", moveTooltip)
+        .on("mouseout", hideTooltip);
+    }
 };
 
 const fetchLatestData = async () => {
@@ -272,29 +272,36 @@ onMounted(() => {
 
 .tooltip-container {
   position: absolute;
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 8px 12px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 
+    0 4px 24px -1px rgba(0, 0, 0, 0.08),
+    0 0 1px 0 rgba(0, 0, 0, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15);
   pointer-events: none;
   z-index: 1000;
   min-width: 120px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .tooltip-content {
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.8);
 }
 
 .tooltip-date {
-  color: #666;
-  margin-bottom: 4px;
+  color: rgba(0, 0, 0, 0.6);
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 
 .tooltip-value {
-  color: #333;
-  font-weight: 500;
+  color: rgba(0, 0, 0, 0.9);
+  font-weight: 600;
 }
 
 .points circle {

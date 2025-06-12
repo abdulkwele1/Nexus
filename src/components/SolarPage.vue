@@ -16,19 +16,19 @@
         <hr />
         <button @click="showAddData = !showAddData">
           {{ showAddData ? 'Close Add Data' : 'Add Data' }}
-        </button>
+      </button>
         <button @click="handleExport">Export Data</button>
         <button
           v-if="currentGraph === 'yield'"
           @click="isLineChart = !isLineChart"
         >
           {{ isLineChart ? 'Bar Chart' : 'Line Chart' }}
-        </button>
+      </button>
         <div class="date-range">
           <label>Start:</label>
-          <input type="date" v-model="startDate" />
+              <input type="date" v-model="startDate" />
           <label>End:</label>
-          <input type="date" v-model="endDate" />
+              <input type="date" v-model="endDate" />
         </div>
         <div class="quick-filters">
           <button class="filter-btn" @click="handleQuickFilter('7days')">Last 7 Days</button>
@@ -138,8 +138,8 @@ const fetchLatestData = async () => {
     yieldData.forEach((item: any) => {
       const dateKey = new Date(item.date).toISOString().split('T')[0];
       uniqueData.set(dateKey, {
-        date: new Date(item.date),
-        kwh_yield: parseFloat(item.kwh_yield) || 0,
+      date: new Date(item.date),
+      kwh_yield: parseFloat(item.kwh_yield) || 0,
       });
     });
     
@@ -174,7 +174,7 @@ const debounce = (fn: Function, delay: number) => {
 
 // Debounced fetch function
 const debouncedFetch = debounce(fetchLatestData, 500);
-
+        
 // Watch for changes in the date range
 watch([startDate, endDate], async ([newStartDate, newEndDate]) => {
   if (newStartDate && newEndDate) {
@@ -198,7 +198,7 @@ onMounted(async () => {
   
   await fetchLatestData();
   currentGraph.value = 'yield';
-  
+
   // Only set up refresh interval for yield graph
   refreshInterval.value = window.setInterval(() => {
     if (currentGraph.value === 'yield') {

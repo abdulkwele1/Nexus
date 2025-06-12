@@ -876,29 +876,36 @@ defineExpose({
 
 .tooltip-container {
   position: absolute;
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 8px 12px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 
+    0 4px 24px -1px rgba(0, 0, 0, 0.08),
+    0 0 1px 0 rgba(0, 0, 0, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15);
   pointer-events: none;
   z-index: 1000;
   min-width: 120px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .tooltip-content {
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.8);
 }
 
 .tooltip-date {
-  color: #666;
-  margin-bottom: 4px;
+  color: rgba(0, 0, 0, 0.6);
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 
 .tooltip-value {
-  color: #333;
-  font-weight: 500;
+  color: rgba(0, 0, 0, 0.9);
+  font-weight: 600;
 }
 
 .points circle {

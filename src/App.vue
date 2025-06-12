@@ -11,15 +11,41 @@ const isSettingsPage = computed(() => route.path === '/settings');
 </script>
 
 <template>
-  <header>
-    <div class="wrapper">
-      <!-- Conditionally render navBar based on the route path -->
-      <navBar v-if="!isSettingsPage" msg="Second time!" />
-    </div>
-  </header>
-
-  <RouterView />
+  <div class="app-container">
+    <!-- Conditionally render navBar based on the route path -->
+    <navBar v-if="!isSettingsPage" msg="Second time!" />
+    <RouterView />
+  </div>
 </template>
+
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+#app, .app-container {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  width: 100%;
+}
+
+header {
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
+}
+
+.wrapper {
+  margin: 0;
+  padding: 0;
+}
+</style>
 
 <style scoped>
 header {
