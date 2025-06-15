@@ -211,149 +211,112 @@ func (m *MQTTClient) HealthCheck() error {
 
 }
 
-// HandleMessage implements mqtt.MessageHandler, determines data type from topic,
+// SensorReading represents a single sensor reading
+type SensorReading struct {
+	Value     float64 `json:"value"`
+	Timestamp int64   `json:"timestamp"`
+}
 
-// parses payload, and calls the appropriate SDK method.
-
+// HandleMessage implements mqtt.MessageHandler
 func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
-
 	topic := msg.Topic()
-
 	payload := msg.Payload()
-
-	ctx := context.Background() // Or derive context from elsewhere if appropriate
+	ctx := context.Background()
 
 	m.logger.Info().Str("topic", topic).Msg("Received message")
-
 	m.logger.Trace().Str("topic", topic).Str("payload", string(payload)).Msg("Raw MQTT Payload")
 
-	// New expected topic structure: /device_sensor_data/{deviceID}/{sensorID_numeric}/{sensorID_hex?}/{channel?}/{typeCode}/{value?}
-
-	// Example: /device_sensor_data/444574498032128/2CF7F1C0627000B2/1/vs/4103
-
+	// Parse topic parts
 	parts := strings.Split(topic, "/")
-
-	// Check format: needs at least 7 parts (due to leading / and new value identifier) and specific prefix
 	if len(parts) < 7 || parts[0] != "" || parts[1] != "device_sensor_data" {
-		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format or insufficient parts")
+		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format")
 		return
 	}
 
-	// Assuming the numeric ID (parts[2]) is the one needed by the SDK
-	sensorIDStr := parts[2]
-	// The value identifier (parts[6]) determines the data type (e.g., 4102 for temp, 4103 for moisture)
+	// Extract sensor information
+	deviceID := parts[2]
+	sensorID := parts[3]
 	valueIdentifier := parts[6]
 
-	// Convert sensor ID string to integer
-	sensorIDInt, err := strconv.Atoi(sensorIDStr)
-
+	// Convert deviceID to integer
+	deviceIDInt, err := strconv.Atoi(deviceID)
 	if err != nil {
-
-		m.logger.Error().Err(err).Str("topic", topic).Str("sensorIDStr", sensorIDStr).Msg("Failed to convert sensor ID to integer")
-
+		m.logger.Error().Err(err).Str("deviceID", deviceID).Msg("Failed to convert device ID to integer")
 		return
-
 	}
 
-	// Process based on the value identifier from the topic
+	// Parse the payload
+	var reading SensorReading
+	if err := json.Unmarshal(payload, &reading); err != nil {
+		m.logger.Error().Err(err).Msg("Failed to parse sensor reading payload")
+		return
+	}
+
+	// Create timestamp
+	ts := time.UnixMilli(reading.Timestamp)
+
+	// Log the sensor data with identification
+	m.logger.Info().
+		Str("deviceID", deviceID).
+		Str("sensorID", sensorID).
+		Str("type", valueIdentifier).
+		Float64("value", reading.Value).
+		Time("timestamp", ts).
+		Msg("Received sensor reading")
+
+	// Process based on sensor type
 	switch valueIdentifier {
-	case "4102": // Code for temperature
-		var reading api.SensorReading // Use SensorReading for the raw payload
-		err := json.Unmarshal(payload, &reading)
-		if err != nil {
-			m.logger.Error().Err(err).Str("topic", topic).Msg("Failed to unmarshal temperature sensor reading")
-			return
-		}
-
-		ts := time.UnixMilli(reading.Timestamp) // Convert timestamp
-
-		// Construct the SensorTemperatureData object
+	case "4102": // Temperature
 		tempDetail := api.SensorTemperatureData{
-			SensorID:        sensorIDInt,
+			SensorID:        deviceIDInt,
 			Date:            ts,
 			SoilTemperature: reading.Value,
-			// ID might be set by DB or not needed if SDK handles it
 		}
-
-		// Construct the wrapper object for the SDK
 		sdkPayload := api.SetSensorTemperatureDataResponse{
 			SensorTemperatureData: []api.SensorTemperatureData{tempDetail},
 		}
-
-		// Assuming SetSensorTemperatureData exists and takes int sensorID and the sdkPayload
-		err = m.sdkClient.SetSensorTemperatureData(ctx, sensorIDInt, sdkPayload) // Pass the correctly constructed sdkPayload
+		err := m.sdkClient.SetSensorTemperatureData(ctx, deviceIDInt, sdkPayload)
 		if err != nil {
-			m.logger.Error().Err(err).Int("sensorID", sensorIDInt).Msg("Failed to set sensor temperature data via SDK")
+			m.logger.Error().Err(err).
+				Str("deviceID", deviceID).
+				Str("sensorID", sensorID).
+				Msg("Failed to set temperature data")
 			return
 		}
-		// Update the log to show the actual reading received
-		m.logger.Info().Int("sensorID", sensorIDInt).Float64("Temperature", reading.Value).Int64("Timestamp", reading.Timestamp).Msg("Successfully processed and sent temperature data")
+		m.logger.Info().
+			Str("deviceID", deviceID).
+			Str("sensorID", sensorID).
+			Float64("temperature", reading.Value).
+			Msg("Successfully processed temperature data")
 
-	case "4103": // Code for moisture
-		var reading api.SensorReading
-		err := json.Unmarshal(payload, &reading)
-
-		if err != nil {
-
-			m.logger.Error().Err(err).Str("topic", topic).Msg("Failed to unmarshal sensor reading")
-
-			return
-
-		}
-
-		// Convert timestamp if needed (e.g., Unix ms to time.Time)
-
-		ts := time.UnixMilli(reading.Timestamp) // Example conversion
-
-		moisturePayloadForSDK := api.SensorMoistureData{
-
-			SensorID: sensorIDInt,
-
-			Date: ts,
-
+	case "4103": // Moisture
+		moistureDetail := api.SensorMoistureData{
+			SensorID:     deviceIDInt,
+			Date:         ts,
 			SoilMoisture: reading.Value,
-
-			// ID might be set by DB or not needed here
-
 		}
-
-		// Adapt the SDK call based on what it expects.
-
-		// Does it expect the single SensorMoistureData struct or the wrapper?
-
-		// This is just a guess based on previous code:
-
-		sdkResponseWrapper := api.SetSensorMoistureDataResponse{
-
-			SensorMoistureData: []api.SensorMoistureData{moisturePayloadForSDK},
+		sdkPayload := api.SetSensorMoistureDataResponse{
+			SensorMoistureData: []api.SensorMoistureData{moistureDetail},
 		}
-
-		// The original SDK call used 'moistureData' which was SetSensorMoistureDataResponse
-
-		// You need to adjust this call based on what m.sdkClient.SetSensorMoistureData actually accepts.
-
-		// It might need the 'reading' directly, or the 'moisturePayloadForSDK', or the 'sdkResponseWrapper'.
-
-		// Let's assume it needs the wrapper for now, like the original code did:
-
-		err = m.sdkClient.SetSensorMoistureData(ctx, sensorIDInt, sdkResponseWrapper) // <-- Pass adapted data
-
+		err := m.sdkClient.SetSensorMoistureData(ctx, deviceIDInt, sdkPayload)
 		if err != nil {
-
-			m.logger.Error().Err(err).Int("sensorID", sensorIDInt).Msg("Failed to set sensor moisture data via SDK")
-
+			m.logger.Error().Err(err).
+				Str("deviceID", deviceID).
+				Str("sensorID", sensorID).
+				Msg("Failed to set moisture data")
 			return
-
 		}
-
-		// Update the log to show the actual reading received
-
-		m.logger.Info().Int("sensorID", sensorIDInt).Float64("Moisture", reading.Value).Int64("Timestamp", reading.Timestamp).Msg("Successfully processed and sent moisture data")
+		m.logger.Info().
+			Str("deviceID", deviceID).
+			Str("sensorID", sensorID).
+			Float64("moisture", reading.Value).
+			Msg("Successfully processed moisture data")
 
 	default:
-
-		m.logger.Warn().Str("topic", topic).Str("valueIdentifier", valueIdentifier).Msg("Received message with unhandled value identifier")
-
+		m.logger.Warn().
+			Str("deviceID", deviceID).
+			Str("sensorID", sensorID).
+			Str("valueIdentifier", valueIdentifier).
+			Msg("Received message with unhandled value identifier")
 	}
-
 }
