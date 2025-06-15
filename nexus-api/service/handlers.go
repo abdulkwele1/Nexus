@@ -505,6 +505,16 @@ func CreateSetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 			return
 		}
 
+		// Ensure sensor exists before saving data
+		err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, fmt.Sprintf("%d", sensorID))
+		if err != nil {
+			apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %d, error: %s", sensorID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
+			return
+		}
+
 		// Iterate over each SensorMoistureData item and save to the database
 		for _, sensorMoistureData := range request.SensorMoistureData {
 
@@ -604,6 +614,16 @@ func CreateSetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request"})
+			return
+		}
+
+		// Ensure sensor exists before saving data
+		err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, fmt.Sprintf("%d", sensorID))
+		if err != nil {
+			apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %d, error: %s", sensorID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
 			return
 		}
 
