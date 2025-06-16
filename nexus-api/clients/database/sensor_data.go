@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -87,6 +88,44 @@ func (d *SensorTemperatureData) Save(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewInsert().
 		Model(d).
 		Exec(ctx)
+	return err
+}
+
+// EnsureSensorExists ensures a sensor exists in the database, creating it if it doesn't exist
+func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID int, deviceID string) error {
+	// Check if sensor already exists
+	var existingSensor Sensor
+	err := db.NewSelect().
+		Model(&existingSensor).
+		Where("id = ?", sensorID).
+		Scan(ctx)
+
+	// If sensor exists, we're done
+	if err == nil {
+		return nil
+	}
+
+	// If error is not "no rows found", return the error
+	if err.Error() != "sql: no rows in result set" {
+		return err
+	}
+
+	// Create new sensor entry
+	newSensor := Sensor{
+		ID:               sensorID,
+		Name:             fmt.Sprintf("Sensor %X (Auto-created)", sensorID),
+		Location:         fmt.Sprintf("Device %s", deviceID),
+		InstallationDate: time.Now(),
+		SensorCoordinates: SensorCoordinates{
+			Latitude:  0.0,
+			Longitude: 0.0,
+		},
+	}
+
+	_, err = db.NewInsert().
+		Model(&newSensor).
+		Exec(ctx)
+
 	return err
 }
 
