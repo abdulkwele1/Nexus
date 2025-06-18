@@ -63,9 +63,9 @@ const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 // Adjusted to match the number of colors and typical sensor setup
 const SENSOR_CONFIGS = [
   { id: 444574498032128, name: 'Sensor Alpha' },
-  // { id: 2, name: 'Sensor 2' }, // Temporarily commented out
-  // { id: 3, name: 'Sensor 3' }, // Temporarily commented out
-  // { id: 4, name: 'Sensor 4' }, // Temporarily commented out
+  { id: 3240324265503883405, name: 'Sensor Beta' },
+  { id: 3240324265503883452, name: 'Sensor Gamma' },
+  { id: 3240324265503883460, name: 'Sensor Delta' },
 ];
 
 //possibly where I would put the real data in due time
