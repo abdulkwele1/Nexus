@@ -415,9 +415,9 @@ interface QueryParams {
 // TODO: Centralize this configuration later
 const SENSOR_CONFIGS = [
   { id: 444574498032128, name: 'Sensor Alpha' },
-  // { id: 2, name: 'Sensor 2' }, // Keep commented out if still desired
-  // { id: 3, name: 'Sensor 3' },
-  // { id: 4, name: 'Sensor 4' },
+  { id: 3240324265503883405, name: 'Sensor Beta' },
+  { id: 3240324265503883452, name: 'Sensor Gamma' },
+  { id: 3240324265503883460, name: 'Sensor Delta' },
 ];
 
 // Changed from activeSensorIndex to a direct sensorVisibility object
