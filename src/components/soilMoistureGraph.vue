@@ -38,6 +38,11 @@ interface Sensor {
   name: string;
 }
 
+interface SensorConfig {
+  id: number;
+  name: string;
+}
+
 interface Props {
   queryParams: {
     startDate: string;
@@ -49,6 +54,7 @@ interface Props {
   sensorVisibility: { [key: string]: boolean };
   dynamicTimeWindow?: 'none' | 'lastHour' | 'last24Hours' | 'last7Days' | 'last30Days';
   dataType: 'moisture' | 'temperature';
+  sensorConfigs: SensorConfig[];
 }
 
 const props = defineProps<Props>();
@@ -59,30 +65,9 @@ const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(
 
 const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 
-// Define SENSOR_CONFIGS (could be props later if more dynamic)
-// Adjusted to match the number of colors and typical sensor setup
-const SENSOR_CONFIGS = [
-  { id: 444574498032128, name: 'Sensor Alpha' },
-  { id: 3240324265503883405, name: 'Sensor Beta' },
-  { id: 3240324265503883452, name: 'Sensor Gamma' },
-  { id: 3240324265503883460, name: 'Sensor Delta' },
-];
-
-//possibly where I would put the real data in due time
-// const sensors = ref<Sensor[]>([
-//   { data: mockData.sensor1, name: 'Sensor 1', visible: true },
-//   { data: mockData.sensor2, name: 'Sensor 2', visible: true },
-//   { data: mockData.sensor3, name: 'Sensor 3', visible: true },
-//   { data: mockData.sensor4, name: 'Sensor 4', visible: true }
-// ]);
-
 const nexusStore = useNexusStore();
 
-// Initialize sensors ref without internal visibility
-const sensors = ref<Sensor[]>(SENSOR_CONFIGS.map((config) => ({
-  data: [], 
-  name: config.name,
-})));
+const sensors = ref<Sensor[]>([]);
 
 // Add new refs for tooltip
 const activeTooltip = ref(false);
@@ -96,7 +81,10 @@ async function fetchAllSensorData() {
   let fetchError = false;
   try {
     console.log(`[soilMoistureGraph] Fetching data with resolution: ${props.queryParams.resolution}`);
-    const allSensorsDataPromises = SENSOR_CONFIGS.map(async (config, index) => {
+    
+    const sensorsToFetch = props.sensorConfigs.filter(config => props.sensorVisibility[config.name]);
+    
+    const allSensorsDataPromises = sensorsToFetch.map(async (config) => {
       let rawDataPoints;
       if (props.dataType === 'moisture') {
         rawDataPoints = await nexusStore.user.getSensorMoistureData(config.id);
@@ -110,14 +98,16 @@ async function fetchAllSensorData() {
           moisture: props.dataType === 'moisture' ? Number(point.soil_moisture) : Number(point.soil_temperature),
         })).sort((a, b) => a.time.getTime() - b.time.getTime());
         
-        sensors.value[index].data = formattedData;
-        console.log(`[soilMoistureGraph] Fetched ${formattedData.length} points for sensor ${config.name}`);
+        return { name: config.name, data: formattedData };
       } else {
         console.warn(`No data for sensor ${config.name}`);
-        sensors.value[index].data = [];
+        return { name: config.name, data: [] };
       }
     });
-    await Promise.all(allSensorsDataPromises);
+
+    const fetchedSensors = await Promise.all(allSensorsDataPromises);
+    sensors.value = fetchedSensors;
+
   } catch (error) {
     console.error("Error fetching sensor data:", error);
     fetchError = true;
@@ -351,7 +341,7 @@ const createChart = () => {
   sensors.value.forEach((sensor, i) => {
     if (!props.sensorVisibility[sensor.name]) return;
 
-    const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
+    const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
     const color = colors[sensorColorIndex % colors.length];
 
     // Add the line
@@ -467,7 +457,7 @@ const createChart = () => {
     .attr("width", 19)
     .attr("height", 19)
     .attr("fill", (d: Sensor) => {
-      const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === d.name);
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
       return colors[sensorColorIndex % colors.length];
     });
 
@@ -724,10 +714,36 @@ watch(() => props.dataType, () => {
   fetchAllSensorData();
 });
 
+function exportDataAsCSV() {
+  const dataToExport = getFilteredData();
+  if (dataToExport.length === 0) {
+    alert("No data available to export.");
+    return;
+  }
+
+  let csvContent = "data:text/csv;charset=utf-8,Sensor Name,Timestamp,Value\n";
+
+  dataToExport.forEach(sensor => {
+    sensor.data.forEach(point => {
+      const value = props.dataType === 'moisture' ? point.moisture : (point as any).temperature;
+      csvContent += `${sensor.name},${point.time.toISOString()},${value}\n`;
+    });
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `sensor_data_${props.dataType}.csv`);
+  document.body.appendChild(link); 
+  link.click();
+  document.body.removeChild(link);
+}
+
 defineExpose({
   getFilteredData,
   fetchAllSensorData, // Expose the data fetching function
-  processAndDrawChart // Expose the processing function
+  processAndDrawChart, // Expose the processing function
+  exportDataAsCSV
 });
 
 onMounted(async () => {

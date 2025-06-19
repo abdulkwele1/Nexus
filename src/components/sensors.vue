@@ -13,7 +13,7 @@
         <h3>Selected Sensors</h3>
         <div class="sensor-selection">
           <div 
-            v-for="(sensor, index) in SENSOR_CONFIGS" 
+            v-for="(sensor, index) in sensorConfigs" 
             :key="sensor.id"
             class="sensor-checkbox"
           >
@@ -161,6 +161,7 @@
         :sensorVisibility="sensorVisibility" 
         :dynamicTimeWindow="dynamicTimeWindow"
         :dataType="currentSensorType"
+        :sensorConfigs="sensorConfigs"
       />
       <SoilTemperatureGraph
         v-else
@@ -169,6 +170,7 @@
         :sensorVisibility="sensorVisibility"
         :dynamicTimeWindow="dynamicTimeWindow"
         :dataType="currentSensorType"
+        :sensorConfigs="sensorConfigs"
       />
     </div>
   </div>
@@ -313,12 +315,35 @@ let timeInterval: number;
 let dataInterval: number;
 let graphRefreshInterval: number; // Interval for refreshing the main graph
 
-onMounted(() => {
-  // Set initial visibility for all sensors
-  SENSOR_CONFIGS.forEach((sensor, index) => {
-    // Make only the first sensor visible by default
-    sensorVisibility.value[sensor.name] = index === 0;
-  });
+onMounted(async () => {
+  // Fetch sensors from API
+  const fetchedSensors = await nexusStore.user.getAllSensors();
+  console.log('Fetched sensors:', fetchedSensors);
+  
+  if (fetchedSensors && Array.isArray(fetchedSensors) && fetchedSensors.length > 0) {
+    sensorConfigs.value = fetchedSensors.map((s: any) => ({ id: s.ID, name: s.Name }));
+    console.log('Mapped sensor configs:', sensorConfigs.value);
+    
+    // Set initial visibility for all sensors
+    sensorConfigs.value.forEach((sensor: SensorConfig, index: number) => {
+      // Make only the first sensor visible by default
+      sensorVisibility.value[sensor.name] = index === 0;
+    });
+  } else {
+    // Fallback to show UI even if no sensors found
+    console.log('No sensors found or API call failed, using fallback data');
+    sensorConfigs.value = [
+      { id: 444574498032128, name: 'Sensor Alpha' },
+      { id: 3240324265503883405, name: 'Sensor Beta' },
+      { id: 3240324265503883452, name: 'Sensor Gamma' },
+      { id: 3240324265503883460, name: 'Sensor Delta' }
+    ];
+    
+    // Set initial visibility for fallback sensors
+    sensorConfigs.value.forEach((sensor: SensorConfig, index: number) => {
+      sensorVisibility.value[sensor.name] = index === 0;
+    });
+  }
   
   // Update time every second
   timeInterval = setInterval(() => {
@@ -411,14 +436,14 @@ interface QueryParams {
   resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
 }
 
-// --- Define Sensors for Slideshow (Matching soilMoistureGraph.vue) ---
-// TODO: Centralize this configuration later
-const SENSOR_CONFIGS = [
-  { id: 444574498032128, name: 'Sensor Alpha' },
-  { id: 3240324265503883405, name: 'Sensor Beta' },
-  { id: 3240324265503883452, name: 'Sensor Gamma' },
-  { id: 3240324265503883460, name: 'Sensor Delta' },
-];
+// Define interface for sensor configuration
+interface SensorConfig {
+  id: number;
+  name: string;
+}
+
+// Dynamic sensor configs loaded from API
+const sensorConfigs = ref<SensorConfig[]>([]);
 
 // Changed from activeSensorIndex to a direct sensorVisibility object
 // Initialize with first sensor enabled
@@ -773,8 +798,8 @@ const toggleSensor = (sensorName: string) => {
 
 // --- Computed Properties --- 
 const currentSensorName = computed(() => {
-  // Make sure SENSOR_CONFIGS is not empty
-  return SENSOR_CONFIGS.length > 0 ? SENSOR_CONFIGS[0]?.name : 'No Sensors';
+  // Make sure sensorConfigs is not empty
+  return sensorConfigs.value.length > 0 ? sensorConfigs.value[0]?.name : 'No Sensors';
 });
 
 // Computed property for current sensor type label
