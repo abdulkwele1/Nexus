@@ -323,6 +323,11 @@ onMounted(async () => {
   if (fetchedSensors && Array.isArray(fetchedSensors) && fetchedSensors.length > 0) {
     sensorConfigs.value = fetchedSensors.map((s: any) => ({ id: s.ID, name: s.Name }));
     console.log('Mapped sensor configs:', sensorConfigs.value);
+    // Debug: Log the specific sensor we're having trouble with
+    const debugSensor = sensorConfigs.value.find(s => s.name.includes('2CF7F1C06270008D'));
+    if (debugSensor) {
+      console.log('Debug sensor 2CF7F1C06270008D:', debugSensor);
+    }
     
     // Set initial visibility for all sensors
     sensorConfigs.value.forEach((sensor: SensorConfig, index: number) => {

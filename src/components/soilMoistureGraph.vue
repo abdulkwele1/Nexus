@@ -85,6 +85,7 @@ async function fetchAllSensorData() {
     const sensorsToFetch = props.sensorConfigs.filter(config => props.sensorVisibility[config.name]);
     
     const allSensorsDataPromises = sensorsToFetch.map(async (config) => {
+      console.log(`[soilMoistureGraph] Fetching data for sensor: ${config.name} (ID: ${config.id})`);
       let rawDataPoints;
       if (props.dataType === 'moisture') {
         rawDataPoints = await nexusStore.user.getSensorMoistureData(config.id);

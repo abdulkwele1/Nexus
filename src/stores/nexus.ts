@@ -255,4 +255,19 @@ class User {
         }
         return false
   }
+
+  async getAllSensors() {
+    try {
+      const response = await fetch(`${this.baseURL}/sensors`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching all sensors:', error);
+      return [];
+    }
+  }
 }
