@@ -12,19 +12,31 @@
       <div class="panel-section">
         <h3>Selected Sensors</h3>
         <div class="sensor-selection">
-          <div 
-            v-for="(sensor, index) in SENSOR_CONFIGS" 
-            :key="sensor.id"
-            class="sensor-checkbox"
-          >
-            <label :style="{ '--sensor-color': colors[index % colors.length] }">
-              <input 
-                type="checkbox" 
-                :checked="sensorVisibility[sensor.name]" 
-                @change="toggleSensor(sensor.name)"
-              >
-              <span class="sensor-name">{{ sensor.name }}</span>
-            </label>
+          <div v-if="sensorsLoading" class="loading-state">
+            Loading sensors...
+          </div>
+          <div v-else-if="sensorsError" class="error-state">
+            {{ sensorsError }}
+            <button @click="fetchSensors" class="retry-btn">Retry</button>
+          </div>
+          <div v-else-if="SENSOR_CONFIGS.length === 0" class="no-sensors-state">
+            No sensors available
+          </div>
+          <div v-else>
+            <div 
+              v-for="(sensor, index) in SENSOR_CONFIGS" 
+              :key="sensor.id"
+              class="sensor-checkbox"
+            >
+              <label :style="{ '--sensor-color': colors[index % colors.length] }">
+                <input 
+                  type="checkbox" 
+                  :checked="sensorVisibility[sensor.name]" 
+                  @change="toggleSensor(sensor.name)"
+                >
+                <span class="sensor-name">{{ sensor.name }}</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -313,12 +325,45 @@ let timeInterval: number;
 let dataInterval: number;
 let graphRefreshInterval: number; // Interval for refreshing the main graph
 
-onMounted(() => {
-  // Set initial visibility for all sensors
-  SENSOR_CONFIGS.forEach((sensor, index) => {
-    // Make only the first sensor visible by default
-    sensorVisibility.value[sensor.name] = index === 0;
-  });
+// Function to fetch sensors from API
+const fetchSensors = async () => {
+  try {
+    sensorsLoading.value = true;
+    sensorsError.value = null;
+    const sensors = await nexusStore.user.getAllSensors();
+    
+    if (Array.isArray(sensors) && sensors.length > 0) {
+      SENSOR_CONFIGS.value = sensors.map((sensor: any) => ({
+        id: sensor.id,
+        name: sensor.name || `Sensor ${sensor.id}`
+      }));
+      
+      // Set initial visibility for all sensors - only first sensor visible by default
+      SENSOR_CONFIGS.value.forEach((sensor, index) => {
+        sensorVisibility.value[sensor.name] = index === 0;
+      });
+      
+      console.log(`[Sensors.vue] Loaded ${SENSOR_CONFIGS.value.length} sensors from API`);
+    } else {
+      // Fallback to default sensor if no sensors returned
+      SENSOR_CONFIGS.value = [{ id: 444574498032128, name: 'Sensor Alpha' }];
+      sensorVisibility.value['Sensor Alpha'] = true;
+      console.warn('[Sensors.vue] No sensors returned from API, using fallback sensor');
+    }
+  } catch (error) {
+    console.error('[Sensors.vue] Error fetching sensors:', error);
+    sensorsError.value = 'Failed to load sensors';
+    // Fallback to default sensor on error
+    SENSOR_CONFIGS.value = [{ id: 444574498032128, name: 'Sensor Alpha' }];
+    sensorVisibility.value['Sensor Alpha'] = true;
+  } finally {
+    sensorsLoading.value = false;
+  }
+};
+
+onMounted(async () => {
+  // Fetch sensors from API first
+  await fetchSensors();
   
   // Update time every second
   timeInterval = setInterval(() => {
@@ -411,14 +456,10 @@ interface QueryParams {
   resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
 }
 
-// --- Define Sensors for Slideshow (Matching soilMoistureGraph.vue) ---
-// TODO: Centralize this configuration later
-const SENSOR_CONFIGS = [
-  { id: 444574498032128, name: 'Sensor Alpha' },
-  // { id: 2, name: 'Sensor 2' }, // Keep commented out if still desired
-  // { id: 3, name: 'Sensor 3' },
-  // { id: 4, name: 'Sensor 4' },
-];
+// --- Define Sensors for Slideshow (Dynamic from API) ---
+const SENSOR_CONFIGS = ref<Array<{ id: number; name: string }>>([]);
+const sensorsLoading = ref(true);
+const sensorsError = ref<string | null>(null);
 
 // Changed from activeSensorIndex to a direct sensorVisibility object
 // Initialize with first sensor enabled
@@ -774,7 +815,7 @@ const toggleSensor = (sensorName: string) => {
 // --- Computed Properties --- 
 const currentSensorName = computed(() => {
   // Make sure SENSOR_CONFIGS is not empty
-  return SENSOR_CONFIGS.length > 0 ? SENSOR_CONFIGS[0]?.name : 'No Sensors';
+  return SENSOR_CONFIGS.value.length > 0 ? SENSOR_CONFIGS.value[0]?.name : 'No Sensors';
 });
 
 // Computed property for current sensor type label
@@ -1193,5 +1234,47 @@ select {
 .reset-btn:hover {
   background: #dc3545 !important;
   color: white !important;
+}
+
+/* Sensor loading and error states */
+.loading-state, .error-state, .no-sensors-state {
+  padding: 12px;
+  text-align: center;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+.loading-state {
+  background: #f8f9fa;
+  color: #666;
+  font-style: italic;
+}
+
+.error-state {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.no-sensors-state {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.retry-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-left: 8px;
+  transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+  background: #c82333;
 }
 </style>
