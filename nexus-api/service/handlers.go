@@ -234,14 +234,20 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		panelID, err := strconv.Atoi(vars["panel_id"])
+		panelIDRaw := vars["panel_id"]
+
+		// Parse and validate panelID as an integer
+		panelID, err := strconv.Atoi(panelIDRaw)
 		if err != nil {
-			http.Error(w, "invalid panel_id", http.StatusBadRequest)
+			apiService.Error().Msgf("Invalid panel_id: %s", panelIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid panel_id"})
 			return
 		}
 
 		// Retrieve data for the panelID
-		data, err := database.GetSolarPanelYieldDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
+		data, err := database.GetYieldDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
 		if err != nil {
 			if errors.Is(err, database.ErrorNoSolarPanelYieldData) {
 				apiService.Debug().Msgf("No data found for panel_id: %d", panelID)
@@ -250,8 +256,11 @@ func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No data found"})
 				return
 			}
-			apiService.Error().Err(err).Msgf("Failed to get panel yield data for panel_id: %d", panelID)
-			http.Error(w, "failed to get panel yield data", http.StatusInternalServerError)
+
+			apiService.Error().Msgf("Error retrieving data for panel_id: %d, error: %s", panelID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
 			return
 		}
 
@@ -260,7 +269,7 @@ func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 		for _, d := range data {
 			response.YieldData = append(response.YieldData, api.YieldData{
 				Date:     d.Date,
-				KwhYield: d.Kwh,
+				KwhYield: d.KwHYield,
 			})
 		}
 
@@ -274,33 +283,50 @@ func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 func CreateSetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		panelID, err := strconv.Atoi(vars["panel_id"])
+		panelIDRaw := vars["panel_id"]
+
+		// Parse and validate panelID as an integer
+		panelID, err := strconv.Atoi(panelIDRaw)
 		if err != nil {
-			http.Error(w, "invalid panel_id", http.StatusBadRequest)
+			apiService.Error().Msgf("Invalid panel_id: %s", panelIDRaw)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid panel_id"})
 			return
 		}
 
-		var payload api.SetPanelYieldDataRequest
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+		request := api.SetPanelYieldDataResponse{}
+		err = json.NewDecoder(r.Body).Decode(&request)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request"})
 			return
 		}
 
-		for _, record := range payload.YieldData {
+		// Iterate over each YieldData item and save to the database
+		for _, yieldData := range request.YieldData {
 			solarPanelData := database.SolarPanelYieldData{
-				PanelID: panelID,
-				Date:    record.Date,
-				Kwh:     record.KwhYield,
+				Date:     yieldData.Date,
+				KwHYield: yieldData.KwhYield,
+				PanelID:  panelID,
 			}
-			_, err = apiService.DatabaseClient.DB.NewInsert().Model(&solarPanelData).Exec(r.Context())
+
+			err := solarPanelData.Save(r.Context(), apiService.DatabaseClient.DB)
 			if err != nil {
-				apiService.Error().Err(err).Msgf("Failed to set panel yield data for panel_id: %d", panelID)
-				http.Error(w, "failed to set panel yield data", http.StatusInternalServerError)
+				apiService.Error().Msgf("Failed to save yield data for panel_id: %d, data: %+v, error: %s", panelID, solarPanelData, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to save yield data"})
 				return
 			}
 		}
 
+		// Send success response
+		apiService.Trace().Msgf("Successfully saved yield data for panel_id: %d", panelID)
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Yield data saved successfully"})
 	}
 }
 
