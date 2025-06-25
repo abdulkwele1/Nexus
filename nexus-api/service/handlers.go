@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 )
 
 func CreateHealthCheckHandler(databaseClient *database.PostgresClient) http.HandlerFunc {
@@ -233,20 +234,14 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		panelIDRaw := vars["panel_id"]
-
-		// Parse and validate panelID as an integer
-		panelID, err := strconv.Atoi(panelIDRaw)
+		panelID, err := strconv.Atoi(vars["panel_id"])
 		if err != nil {
-			apiService.Error().Msgf("Invalid panel_id: %s", panelIDRaw)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid panel_id"})
+			http.Error(w, "invalid panel_id", http.StatusBadRequest)
 			return
 		}
 
 		// Retrieve data for the panelID
-		data, err := database.GetYieldDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
+		data, err := database.GetSolarPanelYieldDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
 		if err != nil {
 			if errors.Is(err, database.ErrorNoSolarPanelYieldData) {
 				apiService.Debug().Msgf("No data found for panel_id: %d", panelID)
@@ -255,11 +250,8 @@ func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No data found"})
 				return
 			}
-
-			apiService.Error().Msgf("Error retrieving data for panel_id: %d, error: %s", panelID, err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			apiService.Error().Err(err).Msgf("Failed to get panel yield data for panel_id: %d", panelID)
+			http.Error(w, "failed to get panel yield data", http.StatusInternalServerError)
 			return
 		}
 
@@ -268,7 +260,7 @@ func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 		for _, d := range data {
 			response.YieldData = append(response.YieldData, api.YieldData{
 				Date:     d.Date,
-				KwhYield: d.KwHYield,
+				KwhYield: d.Kwh,
 			})
 		}
 
@@ -282,50 +274,33 @@ func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 func CreateSetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		panelIDRaw := vars["panel_id"]
-
-		// Parse and validate panelID as an integer
-		panelID, err := strconv.Atoi(panelIDRaw)
+		panelID, err := strconv.Atoi(vars["panel_id"])
 		if err != nil {
-			apiService.Error().Msgf("Invalid panel_id: %s", panelIDRaw)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid panel_id"})
+			http.Error(w, "invalid panel_id", http.StatusBadRequest)
 			return
 		}
 
-		request := api.SetPanelYieldDataResponse{}
-		err = json.NewDecoder(r.Body).Decode(&request)
-
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request"})
+		var payload api.SetPanelYieldDataRequest
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		// Iterate over each YieldData item and save to the database
-		for _, yieldData := range request.YieldData {
+		for _, record := range payload.YieldData {
 			solarPanelData := database.SolarPanelYieldData{
-				Date:     yieldData.Date,
-				KwHYield: yieldData.KwhYield,
-				PanelID:  panelID,
+				PanelID: panelID,
+				Date:    record.Date,
+				Kwh:     record.KwhYield,
 			}
-
-			err := solarPanelData.Save(r.Context(), apiService.DatabaseClient.DB)
+			_, err = apiService.DatabaseClient.DB.NewInsert().Model(&solarPanelData).Exec(r.Context())
 			if err != nil {
-				apiService.Error().Msgf("Failed to save yield data for panel_id: %d, data: %+v, error: %s", panelID, solarPanelData, err)
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to save yield data"})
+				apiService.Error().Err(err).Msgf("Failed to set panel yield data for panel_id: %d", panelID)
+				http.Error(w, "failed to set panel yield data", http.StatusInternalServerError)
 				return
 			}
 		}
 
-		// Send success response
-		apiService.Trace().Msgf("Successfully saved yield data for panel_id: %d", panelID)
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Yield data saved successfully"})
 	}
 }
 
@@ -347,7 +322,7 @@ func CreateGetPanelConsumptionDataHandler(apiService *APIService) http.HandlerFu
 		// Retrieve data for the panelID
 		data, err := database.GetConsumptionDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
 		if err != nil {
-			if errors.Is(err, database.ErrorNoSolarPanelYieldData) {
+			if errors.Is(err, database.ErrorNoSolarPanelConsumptionData) {
 				apiService.Debug().Msgf("No data found for panel_id: %d", panelID)
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusNotFound)
@@ -651,5 +626,39 @@ func CreateSetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Temperature data saved successfully"})
+	}
+}
+
+func CreateGetAllSensorsHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		username, ok := ctx.Value(UsernameContextKey).(string)
+		if !ok {
+			http.Error(w, "failed to get username from context", http.StatusUnauthorized)
+			return
+		}
+
+		sensors, err := apiService.DatabaseClient.GetAllSensors(ctx, username)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("failed to get all sensors from database")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(sensors) == 0 {
+			log.Ctx(ctx).Debug().Msg("no sensors found in database")
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]string{}) // Return empty array instead of erroring
+			return
+		}
+
+		log.Ctx(ctx).Debug().Int("count", len(sensors)).Msg("sending back sensors")
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(sensors)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("failed to encode sensors to json")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }

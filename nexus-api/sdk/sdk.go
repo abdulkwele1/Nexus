@@ -441,6 +441,39 @@ func (nc *NexusClient) SetPanelConsumptionData(ctx context.Context, panelID int,
 	return nil
 }
 
+// GetAllSensors retrieves all sensors from the API
+func (nc *NexusClient) GetAllSensors(ctx context.Context) ([]api.Sensor, error) {
+	endpoint := fmt.Sprintf("%s/sensors", nc.Config.NexusAPIEndpoint)
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return nil, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var sensors []api.Sensor
+	err = json.NewDecoder(response.Body).Decode(&sensors)
+	if err != nil {
+		return nil, err
+	}
+
+	return sensors, nil
+}
+
 // SetAuthHeaders sets the headers needed to authenticate requests
 // to the Nexus API, returning error (if any)
 func SetAuthHeaders(request *http.Request, cookie *http.Cookie) error {
