@@ -441,3 +441,84 @@ func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
 			"Date should be within 1 second of expected")
 	}
 }
+
+func TestE2EGetAllSensors(t *testing.T) {
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+
+	assert.NoError(t, err)
+
+	// Create some test sensors
+	testSensors := []database.Sensor{
+		{
+			ID:       rand.Intn(10000000),
+			Name:     "Test Sensor 1",
+			Location: "Test Location 1",
+		},
+		{
+			ID:       rand.Intn(10000000),
+			Name:     "Test Sensor 2",
+			Location: "Test Location 2",
+		},
+		{
+			ID:       rand.Intn(10000000),
+			Name:     "Test Sensor 3",
+			Location: "Test Location 3",
+		},
+	}
+
+	// Save test sensors to database
+	for _, sensor := range testSensors {
+		err = sensor.Save(testCtx, databaseClient.DB)
+		assert.NoError(t, err, "Saving test sensor should succeed")
+	}
+
+	// Step 1: GET all sensors
+	gotSensors, err := testClient.GetAllSensors(testCtx)
+	assert.NoError(t, err, "Retrieving all sensors should succeed")
+
+	// Step 2: Verify that our test sensors are in the response
+	assert.GreaterOrEqual(t, len(gotSensors), len(testSensors), "Should have at least as many sensors as we created")
+
+	// Check that each of our test sensors is present in the response
+	foundSensors := make(map[int]bool)
+	for _, sensor := range gotSensors {
+		foundSensors[sensor.ID] = true
+	}
+
+	for _, expectedSensor := range testSensors {
+		assert.True(t, foundSensors[expectedSensor.ID], "Test sensor with ID %d should be found in response", expectedSensor.ID)
+	}
+
+	// Step 3: Verify that at least one sensor has the expected structure
+	if len(gotSensors) > 0 {
+		firstSensor := gotSensors[0]
+		assert.NotEmpty(t, firstSensor.Name, "Sensor should have a name")
+		assert.NotEmpty(t, firstSensor.Location, "Sensor should have a location")
+		assert.NotZero(t, firstSensor.ID, "Sensor should have a non-zero ID")
+	}
+}

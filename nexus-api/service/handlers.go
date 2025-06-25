@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 )
 
 func CreateHealthCheckHandler(databaseClient *database.PostgresClient) http.HandlerFunc {
@@ -347,7 +348,7 @@ func CreateGetPanelConsumptionDataHandler(apiService *APIService) http.HandlerFu
 		// Retrieve data for the panelID
 		data, err := database.GetConsumptionDataForPanelID(r.Context(), apiService.DatabaseClient.DB, panelID)
 		if err != nil {
-			if errors.Is(err, database.ErrorNoSolarPanelYieldData) {
+			if errors.Is(err, database.ErrorNoSolarPanelConsumptionData) {
 				apiService.Debug().Msgf("No data found for panel_id: %d", panelID)
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusNotFound)
@@ -651,5 +652,39 @@ func CreateSetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Temperature data saved successfully"})
+	}
+}
+
+func CreateGetAllSensorsHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		username, ok := ctx.Value(UsernameContextKey).(string)
+		if !ok {
+			http.Error(w, "failed to get username from context", http.StatusUnauthorized)
+			return
+		}
+
+		sensors, err := apiService.DatabaseClient.GetAllSensors(ctx, username)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("failed to get all sensors from database")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(sensors) == 0 {
+			log.Ctx(ctx).Debug().Msg("no sensors found in database")
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]string{}) // Return empty array instead of erroring
+			return
+		}
+
+		log.Ctx(ctx).Debug().Int("count", len(sensors)).Msg("sending back sensors")
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(sensors)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("failed to encode sensors to json")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }

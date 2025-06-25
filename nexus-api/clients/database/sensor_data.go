@@ -116,10 +116,6 @@ func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID int, deviceID 
 		Name:             fmt.Sprintf("Sensor %X (Auto-created)", sensorID),
 		Location:         fmt.Sprintf("Device %s", deviceID),
 		InstallationDate: time.Now(),
-		SensorCoordinates: SensorCoordinates{
-			Latitude:  0.0,
-			Longitude: 0.0,
-		},
 	}
 
 	_, err = db.NewInsert().
@@ -133,4 +129,48 @@ func (spyd *Sensor) Save(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewInsert().Model(spyd).Exec(ctx)
 
 	return err
+}
+
+func (c *PostgresClient) GetAllSensors(ctx context.Context, username string) ([]Sensor, error) {
+	var sensors []Sensor
+	// TODO: When users are associated with sensors, filter by username/userid
+	err := c.DB.NewSelect().Model(&sensors).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return sensors, nil
+}
+
+func GetSensorTemperatureData(ctx context.Context, db *bun.DB, sensorID int) ([]SensorTemperatureData, error) {
+	var data []SensorTemperatureData
+	err := db.NewSelect().
+		Model(&data).
+		Where("sensor_id = ?", sensorID).
+		Scan(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, ErrorNoSensorTemperatureData
+	}
+
+	return data, nil
+}
+
+func CreateSensor(ctx context.Context, db *bun.DB, name, location string) (Sensor, error) {
+	sensor := Sensor{
+		Name:             name,
+		Location:         location,
+		InstallationDate: time.Now(),
+	}
+	_, err := db.NewInsert().Model(&sensor).Exec(ctx)
+	return sensor, err
+}
+
+func GetSensorByID(ctx context.Context, db *bun.DB, id int) (Sensor, error) {
+	var sensor Sensor
+	err := db.NewSelect().Model(&sensor).Where("id = ?", id).Scan(ctx)
+	return sensor, err
 }

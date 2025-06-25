@@ -96,6 +96,9 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/sensors/{sensor_id}/temperature_data", CorsMiddleware(AuthMiddleware(CreateGetSensorTemperatureDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc("/sensors/{sensor_id}/temperature_data", CorsMiddleware(AuthMiddleware(CreateSetSensorTemperatureDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
 
+	// Route to get all sensors
+	router.HandleFunc("/sensors", CorsMiddleware(AuthMiddleware(CreateGetAllSensorsHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),
 		Handler: router,
