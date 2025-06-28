@@ -434,6 +434,7 @@ func CreateGetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		sensorIDRaw := vars["sensor_id"]
+		log.Info().Msgf("[handlers.go] Received request for moisture data for sensor_id: %s", sensorIDRaw)
 
 		// Parse and validate sensorID as an integer
 		sensorID, err := strconv.Atoi(sensorIDRaw)

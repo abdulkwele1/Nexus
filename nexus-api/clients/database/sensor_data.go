@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 )
 
@@ -42,6 +43,7 @@ type Sensor struct {
 }
 
 func GetSensorMoistureDataForSensorID(ctx context.Context, db *bun.DB, sensorID int) ([]SensorMoistureData, error) {
+	log.Info().Msgf("[sensor_data.go] Querying moisture data for sensor_id: %d", sensorID)
 	var data []SensorMoistureData
 	err := db.NewSelect().
 		Model(&data).

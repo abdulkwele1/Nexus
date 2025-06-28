@@ -99,6 +99,7 @@ async function fetchAllSensorData() {
         console.warn(`[soilMoistureGraph] No configuration found for sensor ${sensor.name}`);
         return;
       }
+      console.log(`[soilMoistureGraph] Requesting moisture data for sensor ID: ${sensorConfig.id}`);
 
       if (props.dataType === 'moisture') {
         rawDataPoints = await nexusStore.user.getSensorMoistureData(sensorConfig.id);

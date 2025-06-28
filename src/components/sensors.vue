@@ -342,6 +342,7 @@ const fetchSensors = async () => {
     sensorsLoading.value = true;
     sensorsError.value = null;
     const sensors = await nexusStore.user.getAllSensors();
+    console.log('[sensors.vue] Fetched sensors:', JSON.stringify(sensors, null, 2));
     
     if (Array.isArray(sensors) && sensors.length > 0) {
       SENSOR_CONFIGS.value = sensors.map((sensor: any) => ({
