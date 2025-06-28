@@ -48,6 +48,7 @@ interface Props {
   sensorVisibility: { [key: string]: boolean };
   dynamicTimeWindow?: 'none' | 'lastHour' | 'last24Hours' | 'last7Days' | 'last30Days';
   dataType: 'temperature' | 'moisture';
+  sensorConfigs: Array<{ id: number; name: string }>;
 }
 
 const props = defineProps<Props>();
@@ -66,48 +67,58 @@ const tooltipStyle = ref({
 
 const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 
-// Define SENSOR_CONFIGS (could be props later if more dynamic)
-const SENSOR_CONFIGS = [
-  { id: 444574498032128, name: 'Sensor Alpha' },
-];
+// Initialize sensors ref without internal visibility
+const sensors = ref<Sensor[]>([]);
 
 const nexusStore = useNexusStore();
 
-// Initialize sensors ref without internal visibility
-const sensors = ref<Sensor[]>(SENSOR_CONFIGS.map((config) => ({
-  data: [], 
-  name: config.name,
-})));
-
 async function fetchAllSensorData() {
   let fetchError = false;
-  sensors.value.forEach(sensor => sensor.data = []); // Clear data before fetch
   console.log(`[TEMP_GRAPH] fetchAllSensorData called. DataType: ${props.dataType}, Resolution: ${props.queryParams.resolution}`);
   
   try {
-    const allSensorsDataPromises = SENSOR_CONFIGS.map(async (config, index) => {
+    // Get visible sensors from props
+    const visibleSensors = Object.entries(props.sensorVisibility)
+      .filter(([_, isVisible]) => isVisible)
+      .map(([name]) => name);
+    
+    // Clear existing data
+    sensors.value = visibleSensors.map(name => ({
+      data: [],
+      name: name
+    }));
+
+    const allSensorsDataPromises = sensors.value.map(async (sensor) => {
       let rawDataPoints;
+      // Get sensor ID from parent component's sensorConfigs prop
+      const sensorConfig = props.sensorConfigs.find(config => config.name === sensor.name);
+      
+      if (!sensorConfig) {
+        console.warn(`[TEMP_GRAPH] No configuration found for sensor ${sensor.name}`);
+        return;
+      }
+
       // Ensure we only fetch temperature data here
       if (props.dataType === 'temperature') { 
-        console.log(`[TEMP_GRAPH] Fetching temperature for sensor ${config.name} (ID: ${config.id})`);
+        console.log(`[TEMP_GRAPH] Fetching temperature for sensor ${sensor.name} (ID: ${sensorConfig.id})`);
         try {
-        rawDataPoints = await nexusStore.user.getSensorTemperatureData(config.id);
-          console.log(`[TEMP_GRAPH] Raw temperature data received for ${config.name}:`, rawDataPoints);
+          rawDataPoints = await nexusStore.user.getSensorTemperatureData(sensorConfig.id);
+          console.log(`[TEMP_GRAPH] Raw temperature data received for ${sensor.name}:`, rawDataPoints);
         } catch (error) {
-          console.error(`[TEMP_GRAPH] Error fetching temperature data for sensor ${config.name}:`, error);
+          console.error(`[TEMP_GRAPH] Error fetching temperature data for sensor ${sensor.name}:`, error);
           return;
-      }
+        }
       
         if (!rawDataPoints || !Array.isArray(rawDataPoints)) {
-          console.error(`[TEMP_GRAPH] Invalid data received for sensor ${config.name}:`, rawDataPoints);
+          console.error(`[TEMP_GRAPH] Invalid data received for sensor ${sensor.name}:`, rawDataPoints);
           return;
         }
         
         if (rawDataPoints.length === 0) {
-          console.warn(`[TEMP_GRAPH] No temperature data points received for sensor ${config.name}`);
+          console.warn(`[TEMP_GRAPH] No temperature data points received for sensor ${sensor.name}`);
           return;
         }
-        
+      
         // Format temperature data
         const formattedTemperatureData: DataPoint[] = rawDataPoints
           .filter((point: any) => {
@@ -116,23 +127,23 @@ async function fetchAllSensorData() {
                           typeof point.soil_temperature === 'number' && 
                           !isNaN(point.soil_temperature);
             if (!isValid) {
-              console.warn(`[TEMP_GRAPH] Invalid data point for ${config.name}:`, point);
+              console.warn(`[TEMP_GRAPH] Invalid data point for ${sensor.name}:`, point);
             }
             return isValid;
           })
           .map((point: any) => ({
-          time: new Date(point.date),
-          temperature: Number(point.soil_temperature), 
+            time: new Date(point.date),
+            temperature: Number(point.soil_temperature), 
           }))
           .sort((a, b) => a.time.getTime() - b.time.getTime());
         
-        console.log(`[TEMP_GRAPH] Formatted ${formattedTemperatureData.length} valid points for sensor ${config.name}`);
+        console.log(`[TEMP_GRAPH] Formatted ${formattedTemperatureData.length} valid points for sensor ${sensor.name}`);
         if (formattedTemperatureData.length > 0) {
           console.log(`[TEMP_GRAPH] First point:`, formattedTemperatureData[0]);
           console.log(`[TEMP_GRAPH] Last point:`, formattedTemperatureData[formattedTemperatureData.length - 1]);
         }
 
-        sensors.value[index].data = formattedTemperatureData;
+        sensor.data = formattedTemperatureData;
       } else {
         console.warn(`[TEMP_GRAPH] Incorrect dataType prop received: ${props.dataType}. Expected 'temperature'.`);
       }
@@ -141,7 +152,7 @@ async function fetchAllSensorData() {
     await Promise.all(allSensorsDataPromises);
     
     // Log final state of sensors data
-    sensors.value.forEach((sensor, index) => {
+    sensors.value.forEach((sensor) => {
       console.log(`[TEMP_GRAPH] Final data state for sensor ${sensor.name}: ${sensor.data.length} points`);
     });
     
@@ -425,7 +436,7 @@ const createChart = () => {
     }
     console.log(`[TEMP_GRAPH] Drawing line for visible sensor: ${sensor.name} with ${sensor.data.length} points.`);
 
-    const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
+    const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
     const color = colors[sensorColorIndex % colors.length];
 
     const path = svg.value!.append("path")
@@ -540,7 +551,7 @@ const createChart = () => {
     .attr("width", 19)
     .attr("height", 19)
     .attr("fill", (d) => {
-      const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === d.name);
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
       return colors[sensorColorIndex % colors.length];
     });
 
@@ -568,7 +579,7 @@ const createChart = () => {
     
     const tooltipData = visibleSensorsWithData
       .map((sensor) => {
-        const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
+        const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
         const color = colors[sensorColorIndex % colors.length];
 
         const index = bisect(sensor.data, xPos);

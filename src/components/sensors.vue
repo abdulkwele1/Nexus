@@ -173,6 +173,7 @@
         :sensorVisibility="sensorVisibility" 
         :dynamicTimeWindow="dynamicTimeWindow"
         :dataType="currentSensorType"
+        :sensorConfigs="SENSOR_CONFIGS"
       />
       <SoilTemperatureGraph
         v-else
@@ -181,6 +182,7 @@
         :sensorVisibility="sensorVisibility"
         :dynamicTimeWindow="dynamicTimeWindow"
         :dataType="currentSensorType"
+        :sensorConfigs="SENSOR_CONFIGS"
       />
     </div>
   </div>
@@ -325,7 +327,16 @@ let timeInterval: number;
 let dataInterval: number;
 let graphRefreshInterval: number; // Interval for refreshing the main graph
 
-// Function to fetch sensors from API
+// --- Define Sensors for Slideshow (Dynamic from API) ---
+const SENSOR_CONFIGS = ref<Array<{ id: number; name: string }>>([]);
+const sensorsLoading = ref(true);
+const sensorsError = ref<string | null>(null);
+
+// Changed from activeSensorIndex to a direct sensorVisibility object
+// Initialize with first sensor enabled
+const sensorVisibility = ref<{ [key: string]: boolean }>({});
+
+// Function to fetch sensors from the API
 const fetchSensors = async () => {
   try {
     sensorsLoading.value = true;
@@ -335,34 +346,28 @@ const fetchSensors = async () => {
     if (Array.isArray(sensors) && sensors.length > 0) {
       SENSOR_CONFIGS.value = sensors.map((sensor: any) => ({
         id: sensor.id,
-        name: sensor.name || `Sensor ${sensor.id}`
+        name: sensor.name || `Sensor ${sensor.id}`,
       }));
       
-      // Set initial visibility for all sensors - only first sensor visible by default
+      // Initialize visibility state for all sensors
+      // By default, enable only the first sensor
       SENSOR_CONFIGS.value.forEach((sensor, index) => {
         sensorVisibility.value[sensor.name] = index === 0;
       });
-      
-      console.log(`[Sensors.vue] Loaded ${SENSOR_CONFIGS.value.length} sensors from API`);
     } else {
-      // Fallback to default sensor if no sensors returned
-      SENSOR_CONFIGS.value = [{ id: 444574498032128, name: 'Sensor Alpha' }];
-      sensorVisibility.value['Sensor Alpha'] = true;
-      console.warn('[Sensors.vue] No sensors returned from API, using fallback sensor');
+      sensorsError.value = 'No sensors found';
+      SENSOR_CONFIGS.value = [];
     }
   } catch (error) {
-    console.error('[Sensors.vue] Error fetching sensors:', error);
+    console.error('Error fetching sensors:', error);
     sensorsError.value = 'Failed to load sensors';
-    // Fallback to default sensor on error
-    SENSOR_CONFIGS.value = [{ id: 444574498032128, name: 'Sensor Alpha' }];
-    sensorVisibility.value['Sensor Alpha'] = true;
+    SENSOR_CONFIGS.value = [];
   } finally {
     sensorsLoading.value = false;
   }
 };
 
 onMounted(async () => {
-  // Fetch sensors from API first
   await fetchSensors();
   
   // Update time every second
@@ -455,15 +460,6 @@ interface QueryParams {
   maxValue: number;
   resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
 }
-
-// --- Define Sensors for Slideshow (Dynamic from API) ---
-const SENSOR_CONFIGS = ref<Array<{ id: number; name: string }>>([]);
-const sensorsLoading = ref(true);
-const sensorsError = ref<string | null>(null);
-
-// Changed from activeSensorIndex to a direct sensorVisibility object
-// Initialize with first sensor enabled
-const sensorVisibility = ref<{ [key: string]: boolean }>({});
 
 // --- Define Resolutions for Slider ---
 const resolutionOptions = [
