@@ -6,7 +6,3 @@ CREATE TABLE sensor_moisture_data (
     FOREIGN KEY (sensor_id) REFERENCES sensors(id),
     UNIQUE (sensor_id, date)
 );
-
-ALTER TABLE sensors
-ADD COLUMN latitude DOUBLE PRECISION,
-ADD COLUMN longitude DOUBLE PRECISION;

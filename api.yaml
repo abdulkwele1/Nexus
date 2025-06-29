@@ -111,7 +111,7 @@ paths:
           name: sensor_id
           required: true
           schema:
-            type: integer
+            type: string
           description: The unique ID of the sensor
       responses:
         '200':
@@ -129,7 +129,7 @@ paths:
           name: sensor_id
           required: true
           schema:
-            type: integer
+            type: string
           description: The unique ID of the sensor
       requestBody:
         required: true
@@ -151,7 +151,7 @@ paths:
           name: sensor_id
           required: true
           schema:
-            type: integer
+            type: string
           description: The unique ID of the sensor
       responses:
         '200':
@@ -166,7 +166,7 @@ paths:
           name: sensor_id
           required: true
           schema:
-            type: integer
+            type: string
           description: The unique ID of the sensor
         - in: query
           name: start_date
@@ -194,7 +194,7 @@ paths:
           name: sensor_id
           required: true
           schema:
-            type: integer
+            type: string
           description: The unique ID of the sensor
       requestBody:
         required: true
@@ -217,7 +217,7 @@ paths:
           name: sensor_id
           required: true
           schema:
-            type: integer
+            type: string
           description: The unique ID of the sensor
         - in: query
           name: start_date
@@ -245,7 +245,7 @@ paths:
           name: sensor_id
           required: true
           schema:
-            type: integer
+            type: string
           description: The unique ID of the sensor
       requestBody:
         required: true
@@ -484,7 +484,7 @@ components:
       type: object
       properties:
         sensor_id:
-          type: integer
+          type: string
         name:
           type: string
         location:
