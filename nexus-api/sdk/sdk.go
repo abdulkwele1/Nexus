@@ -244,8 +244,8 @@ func (nc *NexusClient) SetPanelYieldData(ctx context.Context, panelID int, yield
 }
 
 // GetSensorMoistureData retrieves moisture data for a specific sensor
-func (nc *NexusClient) GetSensorMoistureData(ctx context.Context, sensorID int) (api.GetSensorMoistureDataResponse, error) {
-	endpoint := fmt.Sprintf("%s/sensors/%d/moisture_data", nc.Config.NexusAPIEndpoint, sensorID)
+func (nc *NexusClient) GetSensorMoistureData(ctx context.Context, sensorID string) (api.GetSensorMoistureDataResponse, error) {
+	endpoint := fmt.Sprintf("%s/sensors/%s/moisture_data", nc.Config.NexusAPIEndpoint, sensorID)
 
 	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
@@ -277,41 +277,41 @@ func (nc *NexusClient) GetSensorMoistureData(ctx context.Context, sensorID int) 
 }
 
 // SetSensorMoistureData saves moisture data for a specific sensor
-func (nc *NexusClient) SetSensorMoistureData(ctx context.Context, sensorID int, moistureData api.SetSensorMoistureDataResponse) error {
-	endpoint := fmt.Sprintf("%s/sensors/%d/moisture_data", nc.Config.NexusAPIEndpoint, sensorID)
+func (nc *NexusClient) SetSensorMoistureData(ctx context.Context, sensorID string, moistureData api.SetSensorMoistureDataResponse) error {
+	endpoint := fmt.Sprintf("%s/sensors/%s/moisture_data", nc.Config.NexusAPIEndpoint, sensorID)
 
 	body, err := json.Marshal(moistureData)
 	if err != nil {
 		return err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	httpRequest, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
 
-	request.Header.Set("Content-Type", "application/json")
-	err = SetAuthHeaders(request, nc.Cookie)
+	httpRequest.Header.Set("Content-Type", "application/json")
+	err = SetAuthHeaders(httpRequest, nc.Cookie)
 	if err != nil {
 		return err
 	}
 
-	response, err := nc.http.Do(request)
+	response, err := nc.http.Do(httpRequest)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
 
-	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
-		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
 	}
 
 	return nil
 }
 
 // GetSensorTemperatureData retrieves temperature data for a specific sensor
-func (nc *NexusClient) GetSensorTemperatureData(ctx context.Context, sensorID int) (api.GetSensorTemperatureDataResponse, error) {
-	endpoint := fmt.Sprintf("%s/sensors/%d/temperature_data", nc.Config.NexusAPIEndpoint, sensorID)
+func (nc *NexusClient) GetSensorTemperatureData(ctx context.Context, sensorID string) (api.GetSensorTemperatureDataResponse, error) {
+	endpoint := fmt.Sprintf("%s/sensors/%s/temperature_data", nc.Config.NexusAPIEndpoint, sensorID)
 
 	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
@@ -343,33 +343,33 @@ func (nc *NexusClient) GetSensorTemperatureData(ctx context.Context, sensorID in
 }
 
 // SetSensorTemperatureData saves temperature data for a specific sensor
-func (nc *NexusClient) SetSensorTemperatureData(ctx context.Context, sensorID int, temperatureData api.SetSensorTemperatureDataResponse) error {
-	endpoint := fmt.Sprintf("%s/sensors/%d/temperature_data", nc.Config.NexusAPIEndpoint, sensorID)
+func (nc *NexusClient) SetSensorTemperatureData(ctx context.Context, sensorID string, temperatureData api.SetSensorTemperatureDataResponse) error {
+	endpoint := fmt.Sprintf("%s/sensors/%s/temperature_data", nc.Config.NexusAPIEndpoint, sensorID)
 
 	body, err := json.Marshal(temperatureData)
 	if err != nil {
 		return err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	httpRequest, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
 
-	request.Header.Set("Content-Type", "application/json")
-	err = SetAuthHeaders(request, nc.Cookie)
+	httpRequest.Header.Set("Content-Type", "application/json")
+	err = SetAuthHeaders(httpRequest, nc.Cookie)
 	if err != nil {
 		return err
 	}
 
-	response, err := nc.http.Do(request)
+	response, err := nc.http.Do(httpRequest)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
 
-	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
-		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
 	}
 
 	return nil

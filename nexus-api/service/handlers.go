@@ -469,7 +469,7 @@ func CreateGetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 		for _, d := range data {
 			response.SensorMoistureData = append(response.SensorMoistureData, api.SensorMoistureData{
 				ID:           d.ID,
-				SensorID:     d.SensorID,
+				SensorID:     fmt.Sprintf("%X", d.SensorID),
 				Date:         d.Date,
 				SoilMoisture: d.SoilMoisture,
 			})
@@ -582,7 +582,7 @@ func CreateGetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 		for _, d := range data {
 			response.SensorTemperatureData = append(response.SensorTemperatureData, api.SensorTemperatureData{
 				ID:              d.ID,
-				SensorID:        d.SensorID,
+				SensorID:        fmt.Sprintf("%X", d.SensorID),
 				Date:            d.Date,
 				SoilTemperature: d.SoilTemperature,
 			})

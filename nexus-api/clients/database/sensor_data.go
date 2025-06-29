@@ -35,11 +35,11 @@ type SensorCoordinates struct {
 }
 
 type Sensor struct {
-	ID                int       `json:"id"`
-	Name              string    `json:"name"`
-	Location          string    `json:"location"`
-	InstallationDate  time.Time `json:"installation_date"`
-	SensorCoordinates `json:"sensor_coordinates"`
+	ID               string    `json:"id" bun:"id,pk"`
+	Name             string    `json:"name" bun:"name"`
+	Location         string    `json:"location" bun:"location"`
+	InstallationDate time.Time `json:"installation_date" bun:"installation_date"`
+	SensorCoordinates
 }
 
 func GetSensorMoistureDataForSensorID(ctx context.Context, db *bun.DB, sensorID int) ([]SensorMoistureData, error) {
@@ -114,7 +114,7 @@ func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID int, deviceID 
 
 	// Create new sensor entry
 	newSensor := Sensor{
-		ID:               sensorID,
+		ID:               fmt.Sprintf("%X", sensorID),
 		Name:             fmt.Sprintf("Sensor %X (Auto-created)", sensorID),
 		Location:         fmt.Sprintf("Device %s", deviceID),
 		InstallationDate: time.Now(),
@@ -173,6 +173,6 @@ func CreateSensor(ctx context.Context, db *bun.DB, name, location string) (Senso
 
 func GetSensorByID(ctx context.Context, db *bun.DB, id int) (Sensor, error) {
 	var sensor Sensor
-	err := db.NewSelect().Model(&sensor).Where("id = ?", id).Scan(ctx)
+	err := db.NewSelect().Model(&sensor).Where("id = ?", fmt.Sprintf("%X", id)).Scan(ctx)
 	return sensor, err
 }
