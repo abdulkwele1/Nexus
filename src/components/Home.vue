@@ -18,28 +18,46 @@
         </RouterLink>
       </div>
       <img src="../assets/farmMap.png" alt="Farm Map" class="farm-map" />
-      <!-- Sensor point with tooltip -->
+      <!-- Sensor BC point with tooltip -->
       <div
-        class="map-point sensor"
+        class="map-point sensor sensor-bc"
         :style="pointStyle(30, 70)"
         @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, 'sensor')"
+        @mouseenter="handleMouseEnter($event, 'BC')"
         @mouseleave="handleMouseLeave"
-        title="Sensors"
+        title="Sensor BC"
       >
         <i class="fas fa-thermometer-half"></i>
       </div>
+
+      <!-- Sensor C4 point with tooltip -->
+      <div
+        class="map-point sensor sensor-c4"
+        :style="pointStyle(40, 60)"
+        @click="goTo('sensors')"
+        @mouseenter="handleMouseEnter($event, 'C4')"
+        @mouseleave="handleMouseLeave"
+        title="Sensor C4"
+      >
+        <i class="fas fa-thermometer-half"></i>
+      </div>
+
       <!-- Tooltip -->
       <div
         v-if="showTooltip"
         class="sensor-tooltip"
         :style="{
           left: `${tooltipPosition.x}px`,
-          top: `${tooltipPosition.y - 120}px`
+          top: `${tooltipPosition.y - 120}px`,
+          '--sensor-color': activeSensor === 'BC' ? '#2196F3' : '#FF5722'
         }"
       >
         <div class="tooltip-header">{{ sensorData.name }}</div>
         <div class="tooltip-content">
+          <div class="tooltip-row">
+            <i class="fas fa-microchip"></i>
+            <span>ID: {{ sensorData.id }}</span>
+          </div>
           <div class="tooltip-row">
             <i class="fas fa-tint"></i>
             <span>Moisture: {{ formatValue(sensorData.moisture, 'moisture') }}</span>
@@ -264,7 +282,7 @@
 
 .tooltip-header {
   font-weight: 600;
-  color: rgba(25, 118, 210, 0.9);
+  color: var(--sensor-color);
   margin-bottom: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -295,6 +313,16 @@
   padding-top: 10px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
+
+.map-point.sensor-bc {
+  border-color: #2196F3;
+  background: #E3F2FD;
+}
+
+.map-point.sensor-c4 {
+  border-color: #FF5722;
+  background: #FBE9E7;
+}
 </style>
 
 <script setup>
@@ -305,15 +333,29 @@ import { useNexusStore } from '@/stores/nexus';
 const router = useRouter();
 const nexusStore = useNexusStore();
 
+const SENSORS = {
+  BC: {
+    id: '2CF7F1C0627000BC',
+    name: 'Sensor BC',
+    color: '#2196F3'
+  },
+  C4: {
+    id: '2CF7F1C0627000C4',
+    name: 'Sensor C4',
+    color: '#FF5722'
+  }
+};
+
 // Sensor data state
 const sensorData = ref({
-  name: 'Sensor Alpha',
+  id: '',
+  name: '',
   moisture: null,
   temperature: null,
   lastUpdated: null
 });
 
-const SENSOR_ID = 444574498032128;
+const activeSensor = ref(null);
 
 // Tooltip state
 const showTooltip = ref(false);
@@ -344,12 +386,27 @@ function formatTime(time) {
   return new Date(time).toLocaleTimeString();
 }
 
-// Fetch sensor data
-async function fetchSensorData() {
+// Update tooltip handlers
+function handleMouseEnter(event, sensorKey) {
+  const rect = event.target.getBoundingClientRect();
+  tooltipPosition.value = {
+    x: rect.left + window.scrollX,
+    y: rect.top + window.scrollY
+  };
+  activeSensor.value = sensorKey;
+  showTooltip.value = true;
+  fetchSensorData(sensorKey);
+}
+
+// Update fetch sensor data
+async function fetchSensorData(sensorKey) {
   try {
+    const sensor = SENSORS[sensorKey];
+    if (!sensor) return;
+
     const [moistureData, temperatureData] = await Promise.all([
-      nexusStore.user.getSensorMoistureData(SENSOR_ID),
-      nexusStore.user.getSensorTemperatureData(SENSOR_ID)
+      nexusStore.user.getSensorMoistureData(sensor.id),
+      nexusStore.user.getSensorTemperatureData(sensor.id)
     ]);
 
     if (moistureData?.length && temperatureData?.length) {
@@ -357,7 +414,8 @@ async function fetchSensorData() {
       const latestTemperature = temperatureData[temperatureData.length - 1];
 
       sensorData.value = {
-        name: 'Sensor Alpha',
+        id: sensor.id,
+        name: sensor.name,
         moisture: Number(latestMoisture.soil_moisture),
         temperature: Number(latestTemperature.soil_temperature),
         lastUpdated: new Date(Math.max(
@@ -375,26 +433,14 @@ async function fetchSensorData() {
 let updateInterval;
 
 onMounted(() => {
-  fetchSensorData();
-  updateInterval = setInterval(fetchSensorData, 5000);
+  // No need for initial fetch or interval anymore
 });
 
 onUnmounted(() => {
-  if (updateInterval) {
-    clearInterval(updateInterval);
-  }
+  // No need to clear interval anymore
 });
 
 // Tooltip handlers
-function handleMouseEnter(event, type) {
-  const rect = event.target.getBoundingClientRect();
-  tooltipPosition.value = {
-    x: rect.left + window.scrollX,
-    y: rect.top + window.scrollY
-  };
-  showTooltip.value = true;
-}
-
 function handleMouseLeave() {
   showTooltip.value = false;
 }
