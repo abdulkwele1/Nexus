@@ -131,7 +131,7 @@ class User {
 
         return response
 }
-  async setSensorTemperatureData(sensorId: number, date: string, soilTemperature: number): Promise<any> {
+  async setSensorTemperatureData(sensorId: string, date: string, soilTemperature: number): Promise<any> {
     const url = `${VITE_NEXUS_API_URL}/sensors/${sensorId}/temperature_data`
 
     const response = await fetch(url, {
@@ -149,7 +149,7 @@ class User {
     return response;
   }
 
-  async setSensorMoistureData(sensorId: number, date: string, soilMoisture: number): Promise<any> {
+  async setSensorMoistureData(sensorId: string, date: string, soilMoisture: number): Promise<any> {
     const url = `${VITE_NEXUS_API_URL}/sensors/${sensorId}/moisture_data`
 
     const response = await fetch(url, {
@@ -168,7 +168,7 @@ class User {
   }
 
 
-    async getSensorTemperatureData(sensorId: number) {
+    async getSensorTemperatureData(sensorId: string) {
       try {
         const response = await fetch(`${this.baseURL}/sensors/${sensorId}/temperature_data`, {
           credentials: 'include',
@@ -197,7 +197,7 @@ class User {
       }
     }
 
-    async getSensorMoistureData(sensorId: number) {
+    async getSensorMoistureData(sensorId: string) {
       try {
         const response = await fetch(`${this.baseURL}/sensors/${sensorId}/moisture_data`, {
           credentials: 'include',
