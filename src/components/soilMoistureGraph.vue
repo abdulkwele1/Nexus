@@ -58,7 +58,17 @@ const chartContainer = ref<HTMLElement | null>(null);
 const svg = ref<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
 const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
 
-const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
+// Update colors to be more distinguishable
+const colors = [
+  '#2196F3',  // Bright Blue
+  '#FF5722',  // Deep Orange
+  '#4CAF50',  // Green
+  '#9C27B0',  // Purple
+  '#FFC107',  // Amber
+  '#E91E63',  // Pink
+  '#00BCD4',  // Cyan
+  '#FF9800'   // Orange
+];
 
 // Remove hardcoded SENSOR_CONFIGS and use props
 const nexusStore = useNexusStore();

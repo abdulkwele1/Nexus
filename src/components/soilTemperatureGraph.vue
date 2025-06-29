@@ -65,7 +65,17 @@ const tooltipStyle = ref({
   top: '0px'
 });
 
-const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
+// Update colors to be more distinguishable
+const colors = [
+  '#2196F3',  // Bright Blue
+  '#FF5722',  // Deep Orange
+  '#4CAF50',  // Green
+  '#9C27B0',  // Purple
+  '#FFC107',  // Amber
+  '#E91E63',  // Pink
+  '#00BCD4',  // Cyan
+  '#FF9800'   // Orange
+];
 
 // Initialize sensors ref without internal visibility
 const sensors = ref<Sensor[]>([]);
