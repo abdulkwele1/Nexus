@@ -195,10 +195,16 @@ import SoilMoistureGraph from './soilMoistureGraph.vue';
 import SoilTemperatureGraph from './soilTemperatureGraph.vue';
 import { useNexusStore } from '@/stores/nexus';
 
+interface SensorConfig {
+  id: string;
+  name: string;
+}
+
 interface DataPoint {
   time: Date;
   moisture?: number;
   temperature?: number;
+  sensorId?: string;
 }
 
 // Add conversion function
@@ -245,7 +251,8 @@ const currentSensorIndex = ref(0);
 const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
 
 const nexusStore = useNexusStore();
-const REALTIME_SENSOR_ID = 444574498032128;
+// Convert decimal 444574498032128 to hex string
+const REALTIME_SENSOR_ID = "2CF7F1C0627000C4";
 
 interface RealtimeSensorDisplay {
   name: string;
@@ -328,7 +335,7 @@ let dataInterval: number;
 let graphRefreshInterval: number; // Interval for refreshing the main graph
 
 // --- Define Sensors for Slideshow (Dynamic from API) ---
-const SENSOR_CONFIGS = ref<Array<{ id: number; name: string }>>([]);
+const SENSOR_CONFIGS = ref<SensorConfig[]>([]);
 const sensorsLoading = ref(true);
 const sensorsError = ref<string | null>(null);
 

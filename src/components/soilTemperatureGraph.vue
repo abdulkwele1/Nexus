@@ -47,8 +47,8 @@ interface Props {
   }
   sensorVisibility: { [key: string]: boolean };
   dynamicTimeWindow?: 'none' | 'lastHour' | 'last24Hours' | 'last7Days' | 'last30Days';
-  dataType: 'temperature' | 'moisture';
-  sensorConfigs: Array<{ id: number; name: string }>;
+  dataType: 'moisture' | 'temperature';
+  sensorConfigs: Array<{ id: string; name: string }>;
 }
 
 const props = defineProps<Props>();
