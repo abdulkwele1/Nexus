@@ -3,9 +3,9 @@ package database
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 )
 
@@ -16,14 +16,14 @@ var (
 
 type SensorMoistureData struct {
 	ID           int       `bun:"id,pk,autoincrement"`
-	SensorID     int       `bun:"sensor_id"`
+	SensorID     string    `bun:"sensor_id"`
 	Date         time.Time `bun:"date,notnull"`
 	SoilMoisture float64   `bun:"soil_moisture"`
 }
 
 type SensorTemperatureData struct {
 	ID              int       `bun:"id,pk,autoincrement"`
-	SensorID        int       `bun:"sensor_id"`
+	SensorID        string    `bun:"sensor_id"`
 	Date            time.Time `bun:"date"`
 	SoilTemperature float64   `bun:"soil_temperature"`
 }
@@ -34,14 +34,15 @@ type SensorCoordinates struct {
 }
 
 type Sensor struct {
-	ID                int       `json:"id"`
-	Name              string    `json:"name"`
-	Location          string    `json:"location"`
-	InstallationDate  time.Time `json:"installation_date"`
-	SensorCoordinates `json:"sensor_coordinates"`
+	ID               string    `json:"id" bun:"id,pk"`
+	Name             string    `json:"name" bun:"name"`
+	Location         string    `json:"location" bun:"location"`
+	InstallationDate time.Time `json:"installation_date" bun:"installation_date"`
+	SensorCoordinates
 }
 
-func GetSensorMoistureDataForSensorID(ctx context.Context, db *bun.DB, sensorID int) ([]SensorMoistureData, error) {
+func GetSensorMoistureDataForSensorID(ctx context.Context, db *bun.DB, sensorID string) ([]SensorMoistureData, error) {
+	log.Info().Msgf("[sensor_data.go] Querying moisture data for sensor_id: %s", sensorID)
 	var data []SensorMoistureData
 	err := db.NewSelect().
 		Model(&data).
@@ -59,7 +60,7 @@ func GetSensorMoistureDataForSensorID(ctx context.Context, db *bun.DB, sensorID 
 	return data, nil
 }
 
-func GetSensorTemperatureDataForSensorID(ctx context.Context, db *bun.DB, sensorID int) ([]SensorTemperatureData, error) {
+func GetSensorTemperatureDataForSensorID(ctx context.Context, db *bun.DB, sensorID string) ([]SensorTemperatureData, error) {
 	var data []SensorTemperatureData
 	err := db.NewSelect().
 		Model(&data).
@@ -92,7 +93,7 @@ func (d *SensorTemperatureData) Save(ctx context.Context, db *bun.DB) error {
 }
 
 // EnsureSensorExists ensures a sensor exists in the database, creating it if it doesn't exist
-func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID int, deviceID string) error {
+func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID string, deviceID string) error {
 	// Check if sensor already exists
 	var existingSensor Sensor
 	err := db.NewSelect().
@@ -113,8 +114,8 @@ func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID int, deviceID 
 	// Create new sensor entry
 	newSensor := Sensor{
 		ID:               sensorID,
-		Name:             fmt.Sprintf("Sensor %X (Auto-created)", sensorID),
-		Location:         fmt.Sprintf("Device %s", deviceID),
+		Name:             "Sensor " + sensorID + " (Auto-created)",
+		Location:         "Device " + deviceID,
 		InstallationDate: time.Now(),
 	}
 
@@ -127,7 +128,6 @@ func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID int, deviceID 
 
 func (spyd *Sensor) Save(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewInsert().Model(spyd).Exec(ctx)
-
 	return err
 }
 
@@ -141,7 +141,7 @@ func (c *PostgresClient) GetAllSensors(ctx context.Context, username string) ([]
 	return sensors, nil
 }
 
-func GetSensorTemperatureData(ctx context.Context, db *bun.DB, sensorID int) ([]SensorTemperatureData, error) {
+func GetSensorTemperatureData(ctx context.Context, db *bun.DB, sensorID string) ([]SensorTemperatureData, error) {
 	var data []SensorTemperatureData
 	err := db.NewSelect().
 		Model(&data).
@@ -169,7 +169,7 @@ func CreateSensor(ctx context.Context, db *bun.DB, name, location string) (Senso
 	return sensor, err
 }
 
-func GetSensorByID(ctx context.Context, db *bun.DB, id int) (Sensor, error) {
+func GetSensorByID(ctx context.Context, db *bun.DB, id string) (Sensor, error) {
 	var sensor Sensor
 	err := db.NewSelect().Model(&sensor).Where("id = ?", id).Scan(ctx)
 	return sensor, err

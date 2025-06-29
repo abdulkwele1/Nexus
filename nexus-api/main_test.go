@@ -335,11 +335,13 @@ func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
 	assert.NoError(t, err)
 
 	// sensor ID to test
-	sensorID := rand.Intn(10000000)
+	sensorID := "2CF7F1C06270008D" // Using a hex string ID
 
-	// add user to database
+	// add sensor to database
 	testSensor := database.Sensor{
-		ID: sensorID,
+		ID:       sensorID,
+		Name:     "Test Sensor",
+		Location: "Test Location",
 	}
 
 	err = testSensor.Save(testCtx, databaseClient.DB)
@@ -404,33 +406,35 @@ func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
 	assert.NoError(t, err)
 
 	// sensor ID to test
-	sensorID := rand.Intn(10000000)
+	sensorID := "2CF7F1C0627000BC" // Using a hex string ID
 
-	// add user to database
+	// add sensor to database
 	testSensor := database.Sensor{
-		ID: sensorID,
+		ID:       sensorID,
+		Name:     "Test Sensor",
+		Location: "Test Location",
 	}
 
 	err = testSensor.Save(testCtx, databaseClient.DB)
 	assert.NoError(t, err)
 
-	// Test payload for setting Moisture data
+	// Test payload for setting Temperature data
 	expectedTemperatureData := api.SetSensorTemperatureDataResponse{SensorTemperatureData: []api.SensorTemperatureData{
 		{Date: time.Now().Add(1 * time.Second).UTC(), SoilTemperature: 100, SensorID: sensorID},
 		{Date: time.Now().Add(1 * time.Second).UTC(), SoilTemperature: 150, SensorID: sensorID},
 	}}
 
-	// Step 1: POST (Set) moisture data
+	// Step 1: POST (Set) temperature data
 	err = testClient.SetSensorTemperatureData(testCtx, sensorID, expectedTemperatureData)
 	assert.NoError(t, err, "Setting Temperature data should succeed")
 
-	// change to get sensor moisture data
+	// change to get sensor temperature data
 	gotTemperatureData, err := testClient.GetSensorTemperatureData(testCtx, sensorID)
-	assert.NoError(t, err, "Retrieving yield data should succeed")
+	assert.NoError(t, err, "Retrieving temperature data should succeed")
 
-	// Step 3: compare to moisture data - ignoring ID field which is auto-generated
+	// Step 3: compare to temperature data - ignoring ID field which is auto-generated
 	assert.Equal(t, len(expectedTemperatureData.SensorTemperatureData), len(gotTemperatureData.SensorTemperatureData),
-		"Number of moisture data entries should match")
+		"Number of temperature data entries should match")
 
 	for i, expected := range expectedTemperatureData.SensorTemperatureData {
 		actual := gotTemperatureData.SensorTemperatureData[i]
@@ -475,17 +479,17 @@ func TestE2EGetAllSensors(t *testing.T) {
 	// Create some test sensors
 	testSensors := []database.Sensor{
 		{
-			ID:       rand.Intn(10000000),
+			ID:       "2CF7F1C06270008D",
 			Name:     "Test Sensor 1",
 			Location: "Test Location 1",
 		},
 		{
-			ID:       rand.Intn(10000000),
+			ID:       "2CF7F1C0627000BC",
 			Name:     "Test Sensor 2",
 			Location: "Test Location 2",
 		},
 		{
-			ID:       rand.Intn(10000000),
+			ID:       "2CF7F1C0627000C4",
 			Name:     "Test Sensor 3",
 			Location: "Test Location 3",
 		},
@@ -505,13 +509,13 @@ func TestE2EGetAllSensors(t *testing.T) {
 	assert.GreaterOrEqual(t, len(gotSensors), len(testSensors), "Should have at least as many sensors as we created")
 
 	// Check that each of our test sensors is present in the response
-	foundSensors := make(map[int]bool)
+	foundSensors := make(map[string]bool)
 	for _, sensor := range gotSensors {
 		foundSensors[sensor.ID] = true
 	}
 
 	for _, expectedSensor := range testSensors {
-		assert.True(t, foundSensors[expectedSensor.ID], "Test sensor with ID %d should be found in response", expectedSensor.ID)
+		assert.True(t, foundSensors[expectedSensor.ID], "Test sensor with ID %s should be found in response", expectedSensor.ID)
 	}
 
 	// Step 3: Verify that at least one sensor has the expected structure

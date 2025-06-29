@@ -12,19 +12,31 @@
       <div class="panel-section">
         <h3>Selected Sensors</h3>
         <div class="sensor-selection">
-          <div 
-            v-for="(sensor, index) in SENSOR_CONFIGS" 
-            :key="sensor.id"
-            class="sensor-checkbox"
-          >
-            <label :style="{ '--sensor-color': colors[index % colors.length] }">
-              <input 
-                type="checkbox" 
-                :checked="sensorVisibility[sensor.name]" 
-                @change="toggleSensor(sensor.name)"
-              >
-              <span class="sensor-name">{{ sensor.name }}</span>
-            </label>
+          <div v-if="sensorsLoading" class="loading-state">
+            Loading sensors...
+          </div>
+          <div v-else-if="sensorsError" class="error-state">
+            {{ sensorsError }}
+            <button @click="fetchSensors" class="retry-btn">Retry</button>
+          </div>
+          <div v-else-if="SENSOR_CONFIGS.length === 0" class="no-sensors-state">
+            No sensors available
+          </div>
+          <div v-else>
+            <div 
+              v-for="(sensor, index) in SENSOR_CONFIGS" 
+              :key="sensor.id"
+              class="sensor-checkbox"
+            >
+              <label :style="{ '--sensor-color': colors[index % colors.length] }">
+                <input 
+                  type="checkbox" 
+                  :checked="sensorVisibility[sensor.name]" 
+                  @change="toggleSensor(sensor.name)"
+                >
+                <span class="sensor-name">{{ sensor.name }}</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -161,6 +173,7 @@
         :sensorVisibility="sensorVisibility" 
         :dynamicTimeWindow="dynamicTimeWindow"
         :dataType="currentSensorType"
+        :sensorConfigs="SENSOR_CONFIGS"
       />
       <SoilTemperatureGraph
         v-else
@@ -169,6 +182,7 @@
         :sensorVisibility="sensorVisibility"
         :dynamicTimeWindow="dynamicTimeWindow"
         :dataType="currentSensorType"
+        :sensorConfigs="SENSOR_CONFIGS"
       />
     </div>
   </div>
@@ -181,10 +195,16 @@ import SoilMoistureGraph from './soilMoistureGraph.vue';
 import SoilTemperatureGraph from './soilTemperatureGraph.vue';
 import { useNexusStore } from '@/stores/nexus';
 
+interface SensorConfig {
+  id: string;
+  name: string;
+}
+
 interface DataPoint {
   time: Date;
   moisture?: number;
   temperature?: number;
+  sensorId?: string;
 }
 
 // Add conversion function
@@ -228,10 +248,11 @@ const dynamicTimeWindow = ref<'none' | 'lastHour' | 'last24Hours' | 'last7Days' 
 // Real-time data setup
 const currentTime = ref(new Date());
 const currentSensorIndex = ref(0);
-const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
+const colors = ['#2196F3', '#FF5722', '#4CAF50', '#9C27B0']; // Material Design colors: Blue, Deep Orange, Green, Purple
 
 const nexusStore = useNexusStore();
-const REALTIME_SENSOR_ID = 444574498032128;
+// Convert decimal 444574498032128 to hex string
+const REALTIME_SENSOR_ID = "2CF7F1C0627000C4";
 
 interface RealtimeSensorDisplay {
   name: string;
@@ -313,12 +334,49 @@ let timeInterval: number;
 let dataInterval: number;
 let graphRefreshInterval: number; // Interval for refreshing the main graph
 
-onMounted(() => {
-  // Set initial visibility for all sensors
-  SENSOR_CONFIGS.forEach((sensor, index) => {
-    // Make only the first sensor visible by default
-    sensorVisibility.value[sensor.name] = index === 0;
-  });
+// --- Define Sensors for Slideshow (Dynamic from API) ---
+const SENSOR_CONFIGS = ref<SensorConfig[]>([]);
+const sensorsLoading = ref(true);
+const sensorsError = ref<string | null>(null);
+
+// Changed from activeSensorIndex to a direct sensorVisibility object
+// Initialize with first sensor enabled
+const sensorVisibility = ref<{ [key: string]: boolean }>({});
+
+// Function to fetch sensors from the API
+const fetchSensors = async () => {
+  try {
+    sensorsLoading.value = true;
+    sensorsError.value = null;
+    const sensors = await nexusStore.user.getAllSensors();
+    console.log('[sensors.vue] Fetched sensors:', JSON.stringify(sensors, null, 2));
+    
+    if (Array.isArray(sensors) && sensors.length > 0) {
+      SENSOR_CONFIGS.value = sensors.map((sensor: any) => ({
+        id: sensor.id,
+        name: sensor.name || `Sensor ${sensor.id}`,
+      }));
+      
+      // Initialize visibility state for all sensors
+      // By default, enable only the first sensor
+      SENSOR_CONFIGS.value.forEach((sensor, index) => {
+        sensorVisibility.value[sensor.name] = index === 0;
+      });
+    } else {
+      sensorsError.value = 'No sensors found';
+      SENSOR_CONFIGS.value = [];
+    }
+  } catch (error) {
+    console.error('Error fetching sensors:', error);
+    sensorsError.value = 'Failed to load sensors';
+    SENSOR_CONFIGS.value = [];
+  } finally {
+    sensorsLoading.value = false;
+  }
+};
+
+onMounted(async () => {
+  await fetchSensors();
   
   // Update time every second
   timeInterval = setInterval(() => {
@@ -410,19 +468,6 @@ interface QueryParams {
   maxValue: number;
   resolution: 'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly';
 }
-
-// --- Define Sensors for Slideshow (Matching soilMoistureGraph.vue) ---
-// TODO: Centralize this configuration later
-const SENSOR_CONFIGS = [
-  { id: 444574498032128, name: 'Sensor Alpha' },
-  // { id: 2, name: 'Sensor 2' }, // Keep commented out if still desired
-  // { id: 3, name: 'Sensor 3' },
-  // { id: 4, name: 'Sensor 4' },
-];
-
-// Changed from activeSensorIndex to a direct sensorVisibility object
-// Initialize with first sensor enabled
-const sensorVisibility = ref<{ [key: string]: boolean }>({});
 
 // --- Define Resolutions for Slider ---
 const resolutionOptions = [
@@ -774,7 +819,7 @@ const toggleSensor = (sensorName: string) => {
 // --- Computed Properties --- 
 const currentSensorName = computed(() => {
   // Make sure SENSOR_CONFIGS is not empty
-  return SENSOR_CONFIGS.length > 0 ? SENSOR_CONFIGS[0]?.name : 'No Sensors';
+  return SENSOR_CONFIGS.value.length > 0 ? SENSOR_CONFIGS.value[0]?.name : 'No Sensors';
 });
 
 // Computed property for current sensor type label
@@ -1193,5 +1238,47 @@ select {
 .reset-btn:hover {
   background: #dc3545 !important;
   color: white !important;
+}
+
+/* Sensor loading and error states */
+.loading-state, .error-state, .no-sensors-state {
+  padding: 12px;
+  text-align: center;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+.loading-state {
+  background: #f8f9fa;
+  color: #666;
+  font-style: italic;
+}
+
+.error-state {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.no-sensors-state {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.retry-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-left: 8px;
+  transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+  background: #c82333;
 }
 </style>

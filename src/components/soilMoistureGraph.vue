@@ -49,6 +49,7 @@ interface Props {
   sensorVisibility: { [key: string]: boolean };
   dynamicTimeWindow?: 'none' | 'lastHour' | 'last24Hours' | 'last7Days' | 'last30Days';
   dataType: 'moisture' | 'temperature';
+  sensorConfigs: Array<{ id: string; name: string }>;
 }
 
 const props = defineProps<Props>();
@@ -57,32 +58,23 @@ const chartContainer = ref<HTMLElement | null>(null);
 const svg = ref<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
 const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
 
-const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
-
-// Define SENSOR_CONFIGS (could be props later if more dynamic)
-// Adjusted to match the number of colors and typical sensor setup
-const SENSOR_CONFIGS = [
-  { id: 444574498032128, name: 'Sensor Alpha' },
-  // { id: 2, name: 'Sensor 2' }, // Temporarily commented out
-  // { id: 3, name: 'Sensor 3' }, // Temporarily commented out
-  // { id: 4, name: 'Sensor 4' }, // Temporarily commented out
+// Update colors to be more distinguishable
+const colors = [
+  '#2196F3',  // Bright Blue
+  '#FF5722',  // Deep Orange
+  '#4CAF50',  // Green
+  '#9C27B0',  // Purple
+  '#FFC107',  // Amber
+  '#E91E63',  // Pink
+  '#00BCD4',  // Cyan
+  '#FF9800'   // Orange
 ];
 
-//possibly where I would put the real data in due time
-// const sensors = ref<Sensor[]>([
-//   { data: mockData.sensor1, name: 'Sensor 1', visible: true },
-//   { data: mockData.sensor2, name: 'Sensor 2', visible: true },
-//   { data: mockData.sensor3, name: 'Sensor 3', visible: true },
-//   { data: mockData.sensor4, name: 'Sensor 4', visible: true }
-// ]);
-
+// Remove hardcoded SENSOR_CONFIGS and use props
 const nexusStore = useNexusStore();
 
 // Initialize sensors ref without internal visibility
-const sensors = ref<Sensor[]>(SENSOR_CONFIGS.map((config) => ({
-  data: [], 
-  name: config.name,
-})));
+const sensors = ref<Sensor[]>([]);
 
 // Add new refs for tooltip
 const activeTooltip = ref(false);
@@ -96,12 +88,33 @@ async function fetchAllSensorData() {
   let fetchError = false;
   try {
     console.log(`[soilMoistureGraph] Fetching data with resolution: ${props.queryParams.resolution}`);
-    const allSensorsDataPromises = SENSOR_CONFIGS.map(async (config, index) => {
+    
+    // Get visible sensors from props
+    const visibleSensors = Object.entries(props.sensorVisibility)
+      .filter(([_, isVisible]) => isVisible)
+      .map(([name]) => name);
+    
+    // Clear existing data
+    sensors.value = visibleSensors.map(name => ({
+      data: [],
+      name: name
+    }));
+
+    const allSensorsDataPromises = sensors.value.map(async (sensor) => {
       let rawDataPoints;
+      // Get sensor ID from parent component's sensorConfigs prop
+      const sensorConfig = props.sensorConfigs.find(config => config.name === sensor.name);
+      
+      if (!sensorConfig) {
+        console.warn(`[soilMoistureGraph] No configuration found for sensor ${sensor.name}`);
+        return;
+      }
+      console.log(`[soilMoistureGraph] Requesting moisture data for sensor ID: ${sensorConfig.id}`);
+
       if (props.dataType === 'moisture') {
-        rawDataPoints = await nexusStore.user.getSensorMoistureData(config.id);
+        rawDataPoints = await nexusStore.user.getSensorMoistureData(sensorConfig.id);
       } else {
-        rawDataPoints = await nexusStore.user.getSensorTemperatureData(config.id);
+        rawDataPoints = await nexusStore.user.getSensorTemperatureData(sensorConfig.id);
       }
       
       if (rawDataPoints && Array.isArray(rawDataPoints)) {
@@ -110,11 +123,11 @@ async function fetchAllSensorData() {
           moisture: props.dataType === 'moisture' ? Number(point.soil_moisture) : Number(point.soil_temperature),
         })).sort((a, b) => a.time.getTime() - b.time.getTime());
         
-        sensors.value[index].data = formattedData;
-        console.log(`[soilMoistureGraph] Fetched ${formattedData.length} points for sensor ${config.name}`);
+        sensor.data = formattedData;
+        console.log(`[soilMoistureGraph] Fetched ${formattedData.length} points for sensor ${sensor.name}`);
       } else {
-        console.warn(`No data for sensor ${config.name}`);
-        sensors.value[index].data = [];
+        console.warn(`No data for sensor ${sensor.name}`);
+        sensor.data = [];
       }
     });
     await Promise.all(allSensorsDataPromises);
@@ -349,9 +362,17 @@ const createChart = () => {
 
   // Add lines for each visible sensor
   sensors.value.forEach((sensor, i) => {
-    if (!props.sensorVisibility[sensor.name]) return;
+    if (!props.sensorVisibility[sensor.name]) {
+      console.log(`[soilMoistureGraph] Skipping line for hidden sensor: ${sensor.name}`);
+      return; 
+    }
+    if (sensor.data.length === 0) {
+      console.log(`[soilMoistureGraph] Skipping line for sensor with no data: ${sensor.name}`);
+      return;
+    }
+    console.log(`[soilMoistureGraph] Drawing line for visible sensor: ${sensor.name} with ${sensor.data.length} points.`);
 
-    const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === sensor.name);
+    const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
     const color = colors[sensorColorIndex % colors.length];
 
     // Add the line
@@ -467,7 +488,7 @@ const createChart = () => {
     .attr("width", 19)
     .attr("height", 19)
     .attr("fill", (d: Sensor) => {
-      const sensorColorIndex = SENSOR_CONFIGS.findIndex(sc => sc.name === d.name);
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
       return colors[sensorColorIndex % colors.length];
     });
 

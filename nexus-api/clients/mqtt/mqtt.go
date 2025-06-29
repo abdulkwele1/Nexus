@@ -7,8 +7,6 @@ import (
 
 	"fmt"
 
-	"strconv"
-
 	"strings"
 
 	"time"
@@ -235,17 +233,8 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	// Extract sensor information
 	deviceID := parts[2]
-	sensorIDHex := parts[3] // This is the actual individual sensor ID in hex
+	sensorID := parts[3] // Use the hex sensor ID directly
 	valueIdentifier := parts[6]
-
-	// Convert hex sensor ID to integer
-	sensorIDInt, err := strconv.ParseInt(sensorIDHex, 16, 64)
-	if err != nil {
-		m.logger.Error().Err(err).Str("sensorIDHex", sensorIDHex).Msg("Failed to convert sensor ID from hex to integer")
-		return
-	}
-
-	// We keep deviceID as string for logging since we now use sensorIDInt for database operations
 
 	// Parse the payload
 	var reading SensorReading
@@ -260,8 +249,7 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 	// Log the sensor data with identification
 	m.logger.Info().
 		Str("deviceID", deviceID).
-		Str("sensorID", sensorIDHex).
-		Int64("sensorIDInt", sensorIDInt).
+		Str("sensorID", sensorID).
 		Str("type", valueIdentifier).
 		Float64("value", reading.Value).
 		Time("timestamp", ts).
@@ -271,59 +259,54 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 	switch valueIdentifier {
 	case "4102": // Temperature
 		tempDetail := api.SensorTemperatureData{
-			SensorID:        int(sensorIDInt), // Use the individual sensor ID, not device ID
+			SensorID:        sensorID, // Use hex ID directly
 			Date:            ts,
 			SoilTemperature: reading.Value,
 		}
 		sdkPayload := api.SetSensorTemperatureDataResponse{
 			SensorTemperatureData: []api.SensorTemperatureData{tempDetail},
 		}
-		err := m.sdkClient.SetSensorTemperatureData(ctx, int(sensorIDInt), sdkPayload)
+		err := m.sdkClient.SetSensorTemperatureData(ctx, sensorID, sdkPayload)
 		if err != nil {
 			m.logger.Error().Err(err).
 				Str("deviceID", deviceID).
-				Str("sensorID", sensorIDHex).
-				Int64("sensorIDInt", sensorIDInt).
+				Str("sensorID", sensorID).
 				Msg("Failed to set temperature data")
 			return
 		}
 		m.logger.Info().
 			Str("deviceID", deviceID).
-			Str("sensorID", sensorIDHex).
-			Int64("sensorIDInt", sensorIDInt).
+			Str("sensorID", sensorID).
 			Float64("temperature", reading.Value).
 			Msg("Successfully processed temperature data")
 
 	case "4103": // Moisture
 		moistureDetail := api.SensorMoistureData{
-			SensorID:     int(sensorIDInt), // Use the individual sensor ID, not device ID
+			SensorID:     sensorID, // Use hex ID directly
 			Date:         ts,
 			SoilMoisture: reading.Value,
 		}
 		sdkPayload := api.SetSensorMoistureDataResponse{
 			SensorMoistureData: []api.SensorMoistureData{moistureDetail},
 		}
-		err := m.sdkClient.SetSensorMoistureData(ctx, int(sensorIDInt), sdkPayload)
+		err := m.sdkClient.SetSensorMoistureData(ctx, sensorID, sdkPayload)
 		if err != nil {
 			m.logger.Error().Err(err).
 				Str("deviceID", deviceID).
-				Str("sensorID", sensorIDHex).
-				Int64("sensorIDInt", sensorIDInt).
+				Str("sensorID", sensorID).
 				Msg("Failed to set moisture data")
 			return
 		}
 		m.logger.Info().
 			Str("deviceID", deviceID).
-			Str("sensorID", sensorIDHex).
-			Int64("sensorIDInt", sensorIDInt).
+			Str("sensorID", sensorID).
 			Float64("moisture", reading.Value).
 			Msg("Successfully processed moisture data")
 
 	default:
 		m.logger.Warn().
 			Str("deviceID", deviceID).
-			Str("sensorID", sensorIDHex).
-			Int64("sensorIDInt", sensorIDInt).
+			Str("sensorID", sensorID).
 			Str("valueIdentifier", valueIdentifier).
 			Msg("Received message with unhandled value identifier")
 	}
