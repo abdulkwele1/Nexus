@@ -248,7 +248,7 @@ const dynamicTimeWindow = ref<'none' | 'lastHour' | 'last24Hours' | 'last7Days' 
 // Real-time data setup
 const currentTime = ref(new Date());
 const currentSensorIndex = ref(0);
-const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
+const colors = ['#2196F3', '#FF5722', '#4CAF50', '#9C27B0']; // Material Design colors: Blue, Deep Orange, Green, Purple
 
 const nexusStore = useNexusStore();
 // Convert decimal 444574498032128 to hex string
