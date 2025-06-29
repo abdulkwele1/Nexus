@@ -15,16 +15,7 @@ ALTER TABLE sensor_temperature_data
 ADD CONSTRAINT unique_sensor_temperature_data 
 UNIQUE (sensor_id, date);
 
--- Insert the original data points
-INSERT INTO sensor_temperature_data (sensor_id, date, soil_temperature) VALUES
-(1, '2024-12-20 00:00:00+00', 100),
-(1, '2024-12-21 00:00:00+00', 150),
-(1, '2024-12-22 00:00:00+00', 125),
-(1, '2024-12-23 00:00:00+00', 200),
-(1, '2024-12-24 00:00:00+00', 175)
-ON CONFLICT (sensor_id, date) DO NOTHING;
-
--- Now, generate 6 months of hourly data for sensor_id 444574498032128
+-- Generate 6 months of hourly data for sensor_id 444574498032128
 -- This uses generate_series to create timestamps and a function for temperature values
 WITH hourly_timestamps AS (
   SELECT 
