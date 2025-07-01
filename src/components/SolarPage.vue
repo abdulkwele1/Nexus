@@ -38,7 +38,7 @@
         </div>
         <div class="quick-filters">
           <button class="filter-btn" @click="handleQuickFilter('7days')">Last 7 Days</button>
-          <button class="filter-btn" @click="handleQuickFilter('7months')">Last 7 Months</button>
+          <button class="filter-btn" @click="handleQuickFilter('12months')">Last 12 Months</button>
         </div>
       </aside>
       <main class="main-content">
@@ -194,7 +194,7 @@ watch([startDate, endDate], async ([newStartDate, newEndDate]) => {
 }, { deep: true });
 
 // Add quick filter handler
-const handleQuickFilter = (filterType: '7days' | '7months') => {
+const handleQuickFilter = (filterType: '7days' | '12months') => {
   console.log(`[SolarPage] Quick filter selected: ${filterType}`);
   
   const end = new Date();
@@ -202,8 +202,8 @@ const handleQuickFilter = (filterType: '7days' | '7months') => {
   
   if (filterType === '7days') {
     start.setDate(end.getDate() - 7);
-  } else if (filterType === '7months') {
-    start.setMonth(end.getMonth() - 7);
+  } else if (filterType === '12months') {
+    start.setMonth(end.getMonth() - 12);
   }
   
   // Format dates as YYYY-MM-DD

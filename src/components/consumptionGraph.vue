@@ -114,7 +114,7 @@ const renderChart = () => {
             callbacks: {
               label: function(context: TooltipItem<'pie'>) {
                 const value = context.raw as number;
-                return `${context.label}: ${value.toFixed(1)}%`;
+                return `${context.label}: ${value.toFixed(1)}kWh`;
               }
             }
           },
@@ -144,12 +144,12 @@ const renderChart = () => {
         labels: labels.value,
         datasets: [
           {
-            label: 'Electricity Stored (%)',
+            label: 'Electricity Stored (kWh)',
             data: electricityUsageData.value,
             backgroundColor: '#007bff',
           },
           {
-            label: 'Direct Usage (%)',
+            label: 'Direct Usage (kWh)',
             data: directUsageData.value,
             backgroundColor: '#ffc107',
           },
@@ -193,8 +193,8 @@ const renderChart = () => {
               tooltipData.value = {
                 date: formattedDate,
                 value: directValue !== undefined 
-                  ? `Electricity: ${electricityValue}%\nDirect: ${directValue}%`
-                  : `Electricity: ${electricityValue}%`
+                  ? `Electricity: ${electricityValue}kWh\nDirect: ${directValue}kWh`
+                  : `Electricity: ${electricityValue}kWh`
               };
 
               // Position tooltip at mouse position
@@ -297,7 +297,7 @@ watch(() => props.isPieChart, (newValue) => {
 
 // Expose the export function to the parent component
 const exportData = () => {
-  const csvContent = "data:text/csv;charset=utf-8,Panel,Electricity Used (%),Direct Usage (%)\n"
+  const csvContent = "data:text/csv;charset=utf-8,Panel,Electricity Used (kWh),Direct Usage (kWh)\n"
     + labels.value.map((label, index) => `${label},${electricityUsageData.value[index]},${directUsageData.value[index]}`).join("\n");
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
