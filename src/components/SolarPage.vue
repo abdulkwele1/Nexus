@@ -24,6 +24,12 @@
         >
           {{ isLineChart ? 'Bar Chart' : 'Line Chart' }}
       </button>
+        <button
+          v-if="currentGraph === 'consumption'"
+          @click="isConsumptionPieChart = !isConsumptionPieChart"
+        >
+          {{ isConsumptionPieChart ? 'Bar Chart' : 'Pie Chart' }}
+        </button>
         <div class="date-range">
           <label>Start:</label>
               <input type="date" v-model="startDate" />
@@ -32,7 +38,7 @@
         </div>
         <div class="quick-filters">
           <button class="filter-btn" @click="handleQuickFilter('7days')">Last 7 Days</button>
-          <button class="filter-btn" @click="handleQuickFilter('7months')">Last 7 Months</button>
+          <button class="filter-btn" @click="handleQuickFilter('12months')">Last 12 Months</button>
         </div>
       </aside>
       <main class="main-content">
@@ -51,6 +57,7 @@
           v-if="currentGraph === 'consumption'"
           :startDate="startDate"
           :endDate="endDate"
+          :isPieChart="isConsumptionPieChart"
           ref="consumptionRef"
         />
       </main>
@@ -79,6 +86,7 @@ const startDate = ref<string>('');
 const endDate = ref<string>('');
 const solarData = ref<SolarDataPoint[]>([]);
 const isLineChart = ref(false);
+const isConsumptionPieChart = ref(false);
 const refreshInterval = ref<number | null>(null);
 const consumptionRef = ref<InstanceType<typeof Consumption> | null>(null);
 const isFetching = ref(false);
@@ -186,9 +194,23 @@ watch([startDate, endDate], async ([newStartDate, newEndDate]) => {
 }, { deep: true });
 
 // Add quick filter handler
-const handleQuickFilter = (filterType: '7days' | '7months') => {
+const handleQuickFilter = (filterType: '7days' | '12months') => {
   console.log(`[SolarPage] Quick filter selected: ${filterType}`);
-  // Functionality will be implemented later
+  
+  const end = new Date();
+  const start = new Date();
+  
+  if (filterType === '7days') {
+    start.setDate(end.getDate() - 7);
+  } else if (filterType === '12months') {
+    start.setMonth(end.getMonth() - 12);
+  }
+  
+  // Format dates as YYYY-MM-DD
+  startDate.value = start.toISOString().split('T')[0];
+  endDate.value = end.toISOString().split('T')[0];
+  
+  console.log(`[SolarPage] Date range updated: ${startDate.value} to ${endDate.value}`);
 };
 
 onMounted(async () => {
