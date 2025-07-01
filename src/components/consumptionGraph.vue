@@ -20,6 +20,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onUnmounted } from 'vue';
 import { Chart } from 'chart.js/auto';
+import type { ChartType, TooltipItem } from 'chart.js';
 import { useNexusStore } from '@/stores/nexus'
 const store = useNexusStore()
 
@@ -40,102 +41,181 @@ const refreshInterval = ref<number | null>(null);
 const props = defineProps<{
   startDate?: string;
   endDate?: string;
+  isPieChart?: boolean;
 }>();
 
+// Add type for chart instance
+let chartInstance: Chart | null = null;
+
 // Function to render the chart
-let chartInstance: Chart | null = null; // Variable to store chart instance
 const renderChart = () => {
   const ctx = consumptionGraph.value?.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) {
+    console.error('[consumptionGraph] Could not get canvas context');
+    return;
+  }
 
   // Destroy previous chart if it exists
   if (chartInstance) {
+    console.log('[consumptionGraph] Destroying previous chart instance');
     chartInstance.destroy();
+    chartInstance = null;
   }
 
-  // Set a fixed maximum or calculate based on data
-  const maxElectricity = Math.max(...electricityUsageData.value);
-  const maxDirectUsage = Math.max(...directUsageData.value);
-  const maxValue = Math.max(maxElectricity, maxDirectUsage);
-  const yAxisMax = Math.ceil(maxValue / 100) * 100;
+  // Make sure we have data to display
+  if (!electricityUsageData.value.length || !directUsageData.value.length) {
+    console.log('[consumptionGraph] No data available to render chart');
+    return;
+  }
 
-  chartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels.value,
-      datasets: [
-        {
-          label: 'Electricity Stored (%)',
-          data: electricityUsageData.value,
-          backgroundColor: '#007bff',
-        },
-        {
-          label: 'Direct Usage (%)',
-          data: directUsageData.value,
-          backgroundColor: '#ffc107',
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          max: yAxisMax,
-          ticks: {
-            stepSize: Math.max(10, Math.floor(yAxisMax / 10))
-          }
-        }
+  console.log('[consumptionGraph] Rendering chart as:', props.isPieChart ? 'pie' : 'bar');
+
+  if (props.isPieChart) {
+    // Pie chart configuration
+    const totalData = electricityUsageData.value.map((electricity, index) => ({
+      electricity,
+      direct: directUsageData.value[index],
+      date: labels.value[index]
+    }));
+
+    // Calculate averages for the selected period
+    const avgElectricity = totalData.reduce((sum, point) => sum + point.electricity, 0) / totalData.length;
+    const avgDirect = totalData.reduce((sum, point) => sum + point.direct, 0) / totalData.length;
+    
+    console.log('[consumptionGraph] Calculated averages for pie chart:', {
+      electricity: avgElectricity,
+      direct: avgDirect,
+      dataPoints: totalData.length
+    });
+
+    chartInstance = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['Avg. Electricity Stored', 'Avg. Direct Usage'],
+        datasets: [{
+          data: [avgElectricity || 0, avgDirect || 0],
+          backgroundColor: ['#007bff', '#ffc107'],
+          borderColor: ['rgba(0, 123, 255, 0.2)', 'rgba(255, 193, 7, 0.2)'],
+          borderWidth: 1
+        }]
       },
-      animation: {
-        duration: 0
-      },
-      plugins: {
-        tooltip: {
-          enabled: false,
-          external: function(context) {
-            const model = context.tooltip;
-            if (!model || !model.opacity) {
-              activeTooltip.value = false;
-              return;
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: {
+            display: true,
+            text: `Average Energy Distribution (${totalData.length} days)`,
+            font: {
+              size: 16
             }
-
-            // Set tooltip content
-            const rawDate = model.dataPoints[0].label;
-            const formattedDate = new Date(rawDate).toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric'
-            });
-            const electricityValue = model.dataPoints[0].raw as number;
-            const directValue = model.dataPoints[1]?.raw as number;
-
-            tooltipData.value = {
-              date: formattedDate,
-              value: directValue !== undefined 
-                ? `Electricity: ${electricityValue}%\nDirect: ${directValue}%`
-                : `Electricity: ${electricityValue}%`
-            };
-
-            // Position tooltip at mouse position
-            if (consumptionGraph.value) {
-              const rect = consumptionGraph.value.getBoundingClientRect();
-              const mouseX = model.caretX;
-              const mouseY = model.caretY;
-              
-              tooltipStyle.value = {
-                left: `${mouseX}px`,
-                top: `${mouseY}px`
-              };
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context: TooltipItem<'pie'>) {
+                const value = context.raw as number;
+                return `${context.label}: ${value.toFixed(1)}%`;
+              }
             }
-
-            activeTooltip.value = true;
+          },
+          legend: {
+            position: 'bottom',
+            labels: {
+              padding: 20,
+              font: {
+                size: 14
+              }
+            }
           }
         }
       }
-    },
-  });
+    } as any);
+    console.log('[consumptionGraph] Pie chart rendered with averages:', [avgElectricity || 0, avgDirect || 0]);
+  } else {
+    // Existing bar chart configuration
+    const maxElectricity = Math.max(...electricityUsageData.value);
+    const maxDirectUsage = Math.max(...directUsageData.value);
+    const maxValue = Math.max(maxElectricity, maxDirectUsage);
+    const yAxisMax = Math.ceil(maxValue / 100) * 100;
+
+    chartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels.value,
+        datasets: [
+          {
+            label: 'Electricity Stored (%)',
+            data: electricityUsageData.value,
+            backgroundColor: '#007bff',
+          },
+          {
+            label: 'Direct Usage (%)',
+            data: directUsageData.value,
+            backgroundColor: '#ffc107',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: yAxisMax,
+            ticks: {
+              stepSize: Math.max(10, Math.floor(yAxisMax / 10))
+            }
+          }
+        },
+        animation: {
+          duration: 0
+        },
+        plugins: {
+          tooltip: {
+            enabled: false,
+            external: function(context) {
+              const model = context.tooltip;
+              if (!model || !model.opacity) {
+                activeTooltip.value = false;
+                return;
+              }
+
+              // Set tooltip content
+              const rawDate = model.dataPoints[0].label;
+              const formattedDate = new Date(rawDate).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              });
+              const electricityValue = model.dataPoints[0].raw as number;
+              const directValue = model.dataPoints[1]?.raw as number;
+
+              tooltipData.value = {
+                date: formattedDate,
+                value: directValue !== undefined 
+                  ? `Electricity: ${electricityValue}%\nDirect: ${directValue}%`
+                  : `Electricity: ${electricityValue}%`
+              };
+
+              // Position tooltip at mouse position
+              if (consumptionGraph.value) {
+                const rect = consumptionGraph.value.getBoundingClientRect();
+                const mouseX = model.caretX;
+                const mouseY = model.caretY;
+                
+                tooltipStyle.value = {
+                  left: `${mouseX}px`,
+                  top: `${mouseY}px`
+                };
+              }
+
+              activeTooltip.value = true;
+            }
+          }
+        }
+      },
+    });
+  }
 };
 
 const fetchLatestData = async () => {
@@ -208,6 +288,12 @@ watch(() => [props.startDate, props.endDate], ([newStartDate, newEndDate]) => {
     fetchLatestData();
   }
 }, { immediate: true });
+
+// Add watch for isPieChart changes
+watch(() => props.isPieChart, (newValue) => {
+  console.log('[consumptionGraph] Chart type changed to:', newValue ? 'pie' : 'bar');
+  renderChart();
+});
 
 // Expose the export function to the parent component
 const exportData = () => {

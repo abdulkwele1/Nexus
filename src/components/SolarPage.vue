@@ -24,6 +24,12 @@
         >
           {{ isLineChart ? 'Bar Chart' : 'Line Chart' }}
       </button>
+        <button
+          v-if="currentGraph === 'consumption'"
+          @click="isConsumptionPieChart = !isConsumptionPieChart"
+        >
+          {{ isConsumptionPieChart ? 'Bar Chart' : 'Pie Chart' }}
+        </button>
         <div class="date-range">
           <label>Start:</label>
               <input type="date" v-model="startDate" />
@@ -51,6 +57,7 @@
           v-if="currentGraph === 'consumption'"
           :startDate="startDate"
           :endDate="endDate"
+          :isPieChart="isConsumptionPieChart"
           ref="consumptionRef"
         />
       </main>
@@ -79,6 +86,7 @@ const startDate = ref<string>('');
 const endDate = ref<string>('');
 const solarData = ref<SolarDataPoint[]>([]);
 const isLineChart = ref(false);
+const isConsumptionPieChart = ref(false);
 const refreshInterval = ref<number | null>(null);
 const consumptionRef = ref<InstanceType<typeof Consumption> | null>(null);
 const isFetching = ref(false);
@@ -188,7 +196,21 @@ watch([startDate, endDate], async ([newStartDate, newEndDate]) => {
 // Add quick filter handler
 const handleQuickFilter = (filterType: '7days' | '7months') => {
   console.log(`[SolarPage] Quick filter selected: ${filterType}`);
-  // Functionality will be implemented later
+  
+  const end = new Date();
+  const start = new Date();
+  
+  if (filterType === '7days') {
+    start.setDate(end.getDate() - 7);
+  } else if (filterType === '7months') {
+    start.setMonth(end.getMonth() - 7);
+  }
+  
+  // Format dates as YYYY-MM-DD
+  startDate.value = start.toISOString().split('T')[0];
+  endDate.value = end.toISOString().split('T')[0];
+  
+  console.log(`[SolarPage] Date range updated: ${startDate.value} to ${endDate.value}`);
 };
 
 onMounted(async () => {
