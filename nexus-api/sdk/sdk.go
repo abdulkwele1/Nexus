@@ -481,8 +481,8 @@ func (nc *NexusClient) GetAllSensors(ctx context.Context) ([]api.Sensor, error) 
 func (nc *NexusClient) GetDroneImages(ctx context.Context, startDate, endDate time.Time) (api.GetDroneImagesResponse, error) {
 	endpoint := fmt.Sprintf("%s/drone_images?start_date=%s&end_date=%s",
 		nc.Config.NexusAPIEndpoint,
-		startDate.Format("2006-01-02"),
-		endDate.Format("2006-01-02"))
+		startDate.Format(time.RFC3339),
+		endDate.Format(time.RFC3339))
 
 	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {

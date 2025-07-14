@@ -526,3 +526,86 @@ func TestE2EGetAllSensors(t *testing.T) {
 		assert.NotZero(t, firstSensor.ID, "Sensor should have a non-zero ID")
 	}
 }
+
+func TestE2ESetAndGetDroneImages(t *testing.T) {
+	// Step 0: prepare test data
+	testClient := nexusClientGenerator()
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+	assert.NoError(t, err)
+
+	// Test data
+	testDescription := "Test drone image"
+	testFileName := "test_image.jpg"
+	testFileContent := []byte("test image content")
+	testMetadata := map[string]interface{}{
+		"test_key":  "test_value",
+		"mime_type": "image/jpeg", // Add explicit mime type
+	}
+
+	// Step 1: Test Upload
+	uploadResponse, err := testClient.UploadDroneImages(
+		testCtx,
+		[][]byte{testFileContent},
+		[]string{testFileName},
+		testDescription,
+		testMetadata,
+	)
+	assert.NoError(t, err, "Uploading drone image should succeed")
+	assert.Equal(t, 1, len(uploadResponse.UploadedImages), "Should have uploaded one image")
+	uploadedImage := uploadResponse.UploadedImages[0]
+
+	// Step 2: Test Get Single Image
+	retrievedImage, err := testClient.GetDroneImage(testCtx, uploadedImage.ID)
+	assert.NoError(t, err, "Retrieving single drone image should succeed")
+	assert.Equal(t, uploadedImage.ID, retrievedImage.ID, "Retrieved image ID should match uploaded image")
+	assert.Equal(t, testFileName, retrievedImage.FileName, "Retrieved filename should match uploaded filename")
+	assert.Equal(t, testDescription, retrievedImage.Description, "Retrieved description should match uploaded description")
+
+	// Step 3: Test Get All Images
+	endDate := time.Now().Add(time.Hour)   // Add buffer to ensure we're after upload time
+	startDate := endDate.AddDate(0, -1, 0) // Last 30 days
+	allImages, err := testClient.GetDroneImages(testCtx, startDate, endDate)
+	assert.NoError(t, err, "Retrieving all drone images should succeed")
+	assert.GreaterOrEqual(t, len(allImages.Images), 1, "Should have at least one image")
+
+	// Find our uploaded image in the list
+	found := false
+	for _, img := range allImages.Images {
+		if img.ID == uploadedImage.ID {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Uploaded image should be found in list of all images")
+
+	// Step 4: Test Delete Image
+	err = testClient.DeleteDroneImage(testCtx, uploadedImage.ID)
+	assert.NoError(t, err, "Deleting drone image should succeed")
+
+	// Verify deletion
+	_, err = testClient.GetDroneImage(testCtx, uploadedImage.ID)
+	assert.Error(t, err, "Getting deleted image should return error")
+}
