@@ -30,9 +30,9 @@ INSERT INTO drone_images (
     '{"location": "South Field", "altitude": "30m", "camera": "DJI Phantom 4 Pro"}'::jsonb
 ),
 (
-    'g69e8g0d-3456-789a-12ef-gh0123456789',
+    '69e8a0bd-3456-789a-12ef-ab0123456789',
     'drone_image_3.jpg',
-    '/drone_images/g69e8g0d-3456-789a-12ef-gh0123456789',
+    '/drone_images/69e8a0bd-3456-789a-12ef-ab0123456789',
     CURRENT_TIMESTAMP - INTERVAL '3 days',
     1536576,  -- 1.5MB
     'image/jpeg',

@@ -244,7 +244,51 @@ class User {
       return response
 }
 
+  async getDroneImages(): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/drone/images`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'GET',
+      });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const jsonData = await response.json();
+      return Array.isArray(jsonData) ? jsonData : [];
+    } catch (error) {
+      console.error('Error fetching drone images:', error);
+      return [];
+    }
+  }
+
+  async uploadDroneImage(imageFile: File, metadata: { location: string, timestamp: string }): Promise<any> {
+    try {
+      const formData = new FormData();
+      formData.append('image', imageFile);
+      formData.append('location', metadata.location);
+      formData.append('timestamp', metadata.timestamp);
+
+      const response = await fetch(`${this.baseURL}/drone/images`, {
+        credentials: 'include',
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error uploading drone image:', error);
+      throw error;
+    }
+  }
 
     // Function to get a cookie by name
     getCookie(): any {
