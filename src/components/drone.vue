@@ -8,7 +8,23 @@
         accept="image/*" 
         multiple 
         class="file-input"
+        ref="fileInput"
       />
+      
+      <!-- Preview Section -->
+      <div v-if="selectedFiles.length" class="preview-section">
+        <h3>Selected Images ({{ selectedFiles.length }})</h3>
+        <div class="preview-grid">
+          <div v-for="(file, index) in selectedFilePreviews" :key="index" class="preview-item">
+            <img :src="file.preview" :alt="file.name" class="preview-image" />
+            <button @click="removeFile(index)" class="remove-btn" title="Remove image">
+              <span>×</span>
+            </button>
+            <span class="file-name">{{ file.name }}</span>
+          </div>
+        </div>
+      </div>
+
       <button @click="uploadImages" class="upload-btn" :disabled="!selectedFiles.length">
         Upload Selected Images
       </button>
@@ -216,7 +232,26 @@ export default {
       return `${startStr} - ${endStr}`;
     },
     handleFileUpload(event) {
-      this.selectedFiles = Array.from(event.target.files);
+      const files = Array.from(event.target.files);
+      this.selectedFiles = files;
+      
+      // Generate previews for selected files
+      this.selectedFilePreviews = files.map(file => ({
+        name: file.name,
+        preview: URL.createObjectURL(file),
+        file: file
+      }));
+    },
+    removeFile(index) {
+      // Remove from both arrays
+      URL.revokeObjectURL(this.selectedFilePreviews[index].preview);
+      this.selectedFilePreviews.splice(index, 1);
+      this.selectedFiles.splice(index, 1);
+      
+      // Reset file input if all files are removed
+      if (this.selectedFiles.length === 0) {
+        this.$refs.fileInput.value = '';
+      }
     },
     async uploadImages() {
       if (!this.selectedFiles.length || this.isUploading) return;
@@ -239,10 +274,15 @@ export default {
         const result = await response.json();
         // Refresh the current week's images after upload
         await this.fetchWeekImages();
-        this.selectedFiles = [];
         
-        // Reset file input
-        event.target.value = '';
+        // Clean up previews and reset
+        this.selectedFilePreviews.forEach(preview => {
+          URL.revokeObjectURL(preview.preview);
+        });
+        this.selectedFilePreviews = [];
+        this.selectedFiles = [];
+        this.$refs.fileInput.value = '';
+        
       } catch (error) {
         console.error('Error uploading images:', error);
       } finally {
@@ -535,5 +575,84 @@ export default {
   text-align: center;
   color: #666;
   padding: 20px;
+}
+
+.preview-section {
+  margin: 20px 0;
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.preview-section h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.1em;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.preview-item {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f5f5f5;
+  padding: 5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.preview-image {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #ff4444;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: all 0.2s ease;
+}
+
+.remove-btn:hover {
+  background: #ff4444;
+  color: white;
+  transform: scale(1.1);
+}
+
+.remove-btn span {
+  line-height: 1;
+  font-weight: bold;
+}
+
+.file-name {
+  display: block;
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 5px;
 }
 </style>
