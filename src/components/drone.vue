@@ -25,8 +25,8 @@
         </div>
       </div>
 
-      <button @click="uploadImages" class="upload-btn" :disabled="!selectedFiles.length">
-        Upload Selected Images
+      <button @click="uploadImages" class="upload-btn" :disabled="!selectedFiles.length || isUploading">
+        {{ isUploading ? 'Uploading...' : 'Upload Selected Images' }}
       </button>
     </div>
 
@@ -80,7 +80,12 @@
                 :alt="image.description"
                 @click.stop="openImage(image)"
               />
-              <p class="image-time">{{ formatTime(image.date) }}</p>
+              <div class="image-overlay">
+                <p class="image-time">{{ formatTime(image.timestamp) }}</p>
+                <button @click.stop="deleteImage(image)" class="delete-btn">
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
           <p v-else class="no-images">No images uploaded on this day</p>
@@ -106,34 +111,48 @@
 </template>
 
 <script>
-export default {
+import { useNexusStore } from '../stores/nexus';
+import { defineComponent } from 'vue';
+
+export default defineComponent({
   data() {
     return {
+      store: null,
       isExpanded: false,
       selectedImages: [],
       currentImage: null,
       zoomLevel: 1,
       selectedFiles: [],
+      selectedFilePreviews: [],
       isUploading: false,
       weekStart: new Date(),
       weekEnd: new Date(),
       expandedDays: [],
       weekDays: [],
-      selectedDate: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+      selectedDate: new Date().toISOString().split('T')[0]
     };
   },
   created() {
-    this.initializeWeek();
-    this.fetchWeekImages();
+    this.store = useNexusStore();
+    this.checkAuthentication();
   },
   methods: {
+    async checkAuthentication() {
+      // Check if user is logged in before initializing
+      if (!this.store.user.loggedIn) {
+        alert('Please log in to access drone images');
+        // You might want to redirect to login page here
+        return;
+      }
+      this.initializeWeek();
+      await this.fetchWeekImages();
+    },
     initializeWeek(startDate = null) {
       if (startDate) {
         this.weekStart = new Date(startDate);
       } else {
         this.weekStart = new Date();
       }
-      // Set to the start of the week (Sunday)
       this.weekStart.setDate(this.weekStart.getDate() - this.weekStart.getDay());
       this.weekEnd = new Date(this.weekStart);
       this.weekEnd.setDate(this.weekStart.getDate() + 6);
@@ -166,22 +185,33 @@ export default {
     },
     async fetchWeekImages() {
       try {
-        // TODO: Replace with your actual API endpoint
-        const response = await fetch(
-          `/api/drone/images/week?start=${this.weekStart.toISOString()}&end=${this.weekEnd.toISOString()}`
-        );
-        if (!response.ok) throw new Error('Failed to fetch images');
+        if (!this.store.user.loggedIn) {
+          console.warn('User not logged in, skipping fetch');
+          return;
+        }
+
+        // Ensure we have valid dates
+        const start = new Date(this.weekStart);
+        const end = new Date(this.weekEnd);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+
+        const images = await this.store.user.getDroneImages(start, end);
         
-        const data = await response.json();
         // Group images by day
         this.weekDays = this.weekDays.map(day => ({
           ...day,
-          images: data.images.filter(img => 
-            new Date(img.date).toISOString().split('T')[0] === day.date
+          images: images.filter(img => 
+            new Date(img.timestamp).toISOString().split('T')[0] === day.date
           )
         }));
       } catch (error) {
-        console.error('Error fetching week images:', error);
+        console.error('Error fetching drone images:', error);
+        if (error.message.includes('401')) {
+          alert('Please log in to view drone images');
+        } else {
+          alert('Failed to fetch drone images. Please try again later.');
+        }
       }
     },
     previousWeek() {
@@ -256,23 +286,37 @@ export default {
     async uploadImages() {
       if (!this.selectedFiles.length || this.isUploading) return;
       
+      if (!this.store.user.loggedIn) {
+        alert('Please log in to upload images');
+        return;
+      }
+
       this.isUploading = true;
+      const failedUploads = [];
+
       try {
-        const formData = new FormData();
-        this.selectedFiles.forEach((file, index) => {
-          formData.append(`image${index}`, file);
-        });
+        for (const file of this.selectedFiles) {
+          const metadata = {
+            location: 'Farm Location',
+            timestamp: new Date().toISOString()
+          };
+          
+          try {
+            await this.store.user.uploadDroneImage(file, metadata);
+          } catch (error) {
+            console.error(`Failed to upload ${file.name}:`, error);
+            failedUploads.push(file.name);
+          }
+        }
 
-        // TODO: Replace with your actual API endpoint
-        const response = await fetch('/api/drone/upload', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!response.ok) throw new Error('Upload failed');
-
-        const result = await response.json();
-        // Refresh the current week's images after upload
+        // Show results to user
+        if (failedUploads.length > 0) {
+          alert(`Failed to upload the following images:\n${failedUploads.join('\n')}`);
+        } else {
+          alert('All images uploaded successfully!');
+        }
+        
+        // Refresh the current week's images
         await this.fetchWeekImages();
         
         // Clean up previews and reset
@@ -284,9 +328,22 @@ export default {
         this.$refs.fileInput.value = '';
         
       } catch (error) {
-        console.error('Error uploading images:', error);
+        console.error('Error during upload process:', error);
+        alert('An error occurred during the upload process. Please try again.');
       } finally {
         this.isUploading = false;
+      }
+    },
+    async deleteImage(image) {
+      if (!confirm('Are you sure you want to delete this image?')) {
+        return;
+      }
+      
+      try {
+        await this.store.user.deleteDroneImage(image.id);
+        await this.fetchWeekImages();
+      } catch (error) {
+        console.error('Error deleting image:', error);
       }
     },
     toggleExpand() {
@@ -294,6 +351,7 @@ export default {
     },
     openImage(image) {
       this.currentImage = image;
+      this.isExpanded = true;
       this.zoomLevel = 1;
     },
     zoomIn() {
@@ -307,7 +365,7 @@ export default {
       }
     }
   }
-};
+});
 </script>
 
 <style scoped>
@@ -500,19 +558,37 @@ export default {
   transform: scale(1.05);
 }
 
-.image-time {
+.image-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   background: rgba(0,0,0,0.7);
-  color: white;
   padding: 5px;
-  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.delete-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
   font-size: 0.8em;
-  text-align: center;
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.delete-btn:hover {
+  background: #ff0000;
+}
+
+.image-time {
+  margin: 0;
+  color: white;
+  font-size: 0.8em;
 }
 
 .full-screen-view {
