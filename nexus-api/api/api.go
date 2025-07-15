@@ -126,3 +126,23 @@ type SensorCoordinates struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 }
+
+// DroneImage represents a drone image record
+type DroneImage struct {
+	ID          string                 `json:"id"`
+	FileName    string                 `json:"file_name"`
+	FilePath    string                 `json:"file_path"`
+	UploadDate  time.Time              `json:"upload_date"`
+	FileSize    int64                  `json:"file_size"`
+	MimeType    string                 `json:"mime_type"`
+	Description string                 `json:"description"`
+	Metadata    map[string]interface{} `json:"metadata"`
+}
+
+type GetDroneImagesResponse struct {
+	Images []DroneImage `json:"images"`
+}
+
+type UploadDroneImagesResponse struct {
+	UploadedImages []DroneImage `json:"uploaded_images"`
+}

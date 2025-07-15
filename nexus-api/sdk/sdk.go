@@ -7,7 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"time"
 
 	"nexus-api/api"
 	"nexus-api/logging"
@@ -472,6 +475,180 @@ func (nc *NexusClient) GetAllSensors(ctx context.Context) ([]api.Sensor, error) 
 	}
 
 	return sensors, nil
+}
+
+// GetDroneImages retrieves drone images within a date range
+func (nc *NexusClient) GetDroneImages(ctx context.Context, startDate, endDate time.Time) (api.GetDroneImagesResponse, error) {
+	endpoint := fmt.Sprintf("%s/drone_images?start_date=%s&end_date=%s",
+		nc.Config.NexusAPIEndpoint,
+		startDate.Format(time.RFC3339),
+		endDate.Format(time.RFC3339))
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return api.GetDroneImagesResponse{}, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return api.GetDroneImagesResponse{}, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return api.GetDroneImagesResponse{}, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return api.GetDroneImagesResponse{}, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var result api.GetDroneImagesResponse
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return api.GetDroneImagesResponse{}, err
+	}
+
+	return result, nil
+}
+
+// GetDroneImage retrieves a specific drone image by ID
+func (nc *NexusClient) GetDroneImage(ctx context.Context, imageID string) (*api.DroneImage, error) {
+	endpoint := fmt.Sprintf("%s/drone_images/%s", nc.Config.NexusAPIEndpoint, imageID)
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("image not found")
+	}
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return nil, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var image api.DroneImage
+	err = json.NewDecoder(response.Body).Decode(&image)
+	if err != nil {
+		return nil, err
+	}
+
+	return &image, nil
+}
+
+// UploadDroneImages uploads multiple drone images
+func (nc *NexusClient) UploadDroneImages(ctx context.Context, files [][]byte, fileNames []string, description string, metadata map[string]interface{}) (api.UploadDroneImagesResponse, error) {
+	endpoint := fmt.Sprintf("%s/drone_images", nc.Config.NexusAPIEndpoint)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add files
+	for i, fileData := range files {
+		part, err := writer.CreateFormFile("images", fileNames[i])
+		if err != nil {
+			return api.UploadDroneImagesResponse{}, err
+		}
+		if _, err := io.Copy(part, bytes.NewReader(fileData)); err != nil {
+			return api.UploadDroneImagesResponse{}, err
+		}
+	}
+
+	// Add description if provided
+	if description != "" {
+		if err := writer.WriteField("description", description); err != nil {
+			return api.UploadDroneImagesResponse{}, err
+		}
+	}
+
+	// Add metadata if provided
+	if metadata != nil {
+		metadataJSON, err := json.Marshal(metadata)
+		if err != nil {
+			return api.UploadDroneImagesResponse{}, err
+		}
+		if err := writer.WriteField("metadata", string(metadataJSON)); err != nil {
+			return api.UploadDroneImagesResponse{}, err
+		}
+	}
+
+	if err := writer.Close(); err != nil {
+		return api.UploadDroneImagesResponse{}, err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, body)
+	if err != nil {
+		return api.UploadDroneImagesResponse{}, err
+	}
+
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return api.UploadDroneImagesResponse{}, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return api.UploadDroneImagesResponse{}, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return api.UploadDroneImagesResponse{}, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var result api.UploadDroneImagesResponse
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return api.UploadDroneImagesResponse{}, err
+	}
+
+	return result, nil
+}
+
+// DeleteDroneImage deletes a specific drone image by ID
+func (nc *NexusClient) DeleteDroneImage(ctx context.Context, imageID string) error {
+	endpoint := fmt.Sprintf("%s/drone_images/%s", nc.Config.NexusAPIEndpoint, imageID)
+
+	request, err := http.NewRequestWithContext(ctx, "DELETE", endpoint, nil)
+	if err != nil {
+		return err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("image not found")
+	}
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
 }
 
 // SetAuthHeaders sets the headers needed to authenticate requests

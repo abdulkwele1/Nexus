@@ -211,24 +211,60 @@ func CreateChangePasswordHandler(apiService *APIService) http.HandlerFunc {
 	}
 }
 
-func LocationsHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value("username").(string)
-	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
+func CreateLocationsHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rawUsername := r.Context().Value(UsernameContextKey)
+		username, ok := rawUsername.(string)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: fmt.Sprintf("Locations page for user: %s", username)})
+	}
 }
 
-func SolarHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value("username").(string)
-	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
+func CreateSolarHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rawUsername := r.Context().Value(UsernameContextKey)
+		username, ok := rawUsername.(string)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: fmt.Sprintf("Solar page for user: %s", username)})
+	}
 }
 
-func SettingsHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value("username").(string)
-	fmt.Fprintf(w, "Settings page - only accessible with a valid cookie! User: %s", username)
+func CreateSettingsHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rawUsername := r.Context().Value(UsernameContextKey)
+		username, ok := rawUsername.(string)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: fmt.Sprintf("Settings page for user: %s", username)})
+	}
 }
 
-func HomeHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value("username").(string)
-	fmt.Fprintf(w, "Home page - only accessible with a valid cookie! User: %s", username)
+func CreateHomeHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rawUsername := r.Context().Value(UsernameContextKey)
+		username, ok := rawUsername.(string)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: fmt.Sprintf("Home page for user: %s", username)})
+	}
 }
 
 func CreateGetPanelYieldDataHandler(apiService *APIService) http.HandlerFunc {
@@ -645,5 +681,241 @@ func CreateGetAllSensorsHandler(apiService *APIService) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+func CreateGetDroneImagesHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse date range from query parameters
+		startDate := r.URL.Query().Get("start_date")
+		endDate := r.URL.Query().Get("end_date")
+
+		var start, end time.Time
+		var err error
+
+		if startDate != "" {
+			start, err = time.Parse(time.RFC3339, startDate)
+			if err != nil {
+				apiService.Error().Msgf("Invalid start_date format: %s", startDate)
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid start_date format. Use RFC3339"})
+				return
+			}
+		}
+
+		if endDate != "" {
+			end, err = time.Parse(time.RFC3339, endDate)
+			if err != nil {
+				apiService.Error().Msgf("Invalid end_date format: %s", endDate)
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid end_date format. Use RFC3339"})
+				return
+			}
+		}
+
+		// If no dates provided, use a default range (e.g., last 30 days)
+		if startDate == "" && endDate == "" {
+			end = time.Now()
+			start = end.AddDate(0, -1, 0) // Last 30 days
+		}
+
+		dbImages, err := database.GetDroneImagesByDateRange(r.Context(), apiService.DatabaseClient.DB, start, end)
+		if err != nil {
+			apiService.Error().Msgf("Error retrieving drone images: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to retrieve drone images"})
+			return
+		}
+
+		response := api.GetDroneImagesResponse{
+			Images: make([]api.DroneImage, len(dbImages)),
+		}
+
+		// Convert database.DroneImage to api.DroneImage
+		for i, img := range dbImages {
+			response.Images[i] = api.DroneImage{
+				ID:          img.ID.String(),
+				FileName:    img.FileName,
+				FilePath:    img.FilePath,
+				UploadDate:  img.UploadDate,
+				FileSize:    img.FileSize,
+				MimeType:    img.MimeType,
+				Description: img.Description,
+				Metadata:    img.Metadata,
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func CreateUploadDroneImagesHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse multipart form with 32MB max memory
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			apiService.Error().Msgf("Error parsing multipart form: %s", err)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to parse form data"})
+			return
+		}
+
+		files := r.MultipartForm.File["images"]
+		if len(files) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No images provided"})
+			return
+		}
+
+		var uploadedImages []api.DroneImage
+
+		for _, fileHeader := range files {
+			file, err := fileHeader.Open()
+			if err != nil {
+				apiService.Error().Msgf("Error opening file %s: %s", fileHeader.Filename, err)
+				continue
+			}
+			defer file.Close()
+
+			// Generate unique ID for the image
+			imageID := uuid.New()
+
+			// Create database DroneImage record
+			dbImage := database.DroneImage{
+				ID:          imageID,
+				FileName:    fileHeader.Filename,
+				FilePath:    fmt.Sprintf("/drone_images/%s", imageID), // Store path relative to storage root
+				UploadDate:  time.Now(),
+				FileSize:    fileHeader.Size,
+				MimeType:    fileHeader.Header.Get("Content-Type"),
+				Description: r.FormValue("description"),
+				Metadata: map[string]interface{}{
+					"original_name": fileHeader.Filename,
+				},
+			}
+
+			// Save image metadata to database
+			err = dbImage.Save(r.Context(), apiService.DatabaseClient.DB)
+			if err != nil {
+				apiService.Error().Msgf("Error saving drone image metadata: %s", err)
+				continue
+			}
+
+			// Convert to API type
+			apiImage := api.DroneImage{
+				ID:          dbImage.ID.String(),
+				FileName:    dbImage.FileName,
+				FilePath:    dbImage.FilePath,
+				UploadDate:  dbImage.UploadDate,
+				FileSize:    dbImage.FileSize,
+				MimeType:    dbImage.MimeType,
+				Description: dbImage.Description,
+				Metadata:    dbImage.Metadata,
+			}
+
+			uploadedImages = append(uploadedImages, apiImage)
+		}
+
+		if len(uploadedImages) == 0 {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to upload any images"})
+			return
+		}
+
+		response := api.UploadDroneImagesResponse{
+			UploadedImages: uploadedImages,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func CreateGetDroneImageHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		imageIDStr := vars["image_id"]
+
+		if imageIDStr == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Image ID is required"})
+			return
+		}
+
+		imageID, err := uuid.Parse(imageIDStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid image ID format"})
+			return
+		}
+
+		dbImage, err := database.GetDroneImageByID(r.Context(), apiService.DatabaseClient.DB, imageID)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoDroneImage) {
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Image not found"})
+				return
+			}
+			apiService.Error().Msgf("Error retrieving drone image: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to retrieve image"})
+			return
+		}
+
+		// Convert to API type
+		apiImage := api.DroneImage{
+			ID:          dbImage.ID.String(),
+			FileName:    dbImage.FileName,
+			FilePath:    dbImage.FilePath,
+			UploadDate:  dbImage.UploadDate,
+			FileSize:    dbImage.FileSize,
+			MimeType:    dbImage.MimeType,
+			Description: dbImage.Description,
+			Metadata:    dbImage.Metadata,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(apiImage)
+	}
+}
+
+func CreateDeleteDroneImageHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		imageIDStr := vars["image_id"]
+
+		if imageIDStr == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Image ID is required"})
+			return
+		}
+
+		imageID, err := uuid.Parse(imageIDStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid image ID format"})
+			return
+		}
+
+		// Delete from database
+		err = database.DeleteDroneImage(r.Context(), apiService.DatabaseClient.DB, imageID)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoDroneImage) {
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Image not found"})
+				return
+			}
+			apiService.Error().Msgf("Error deleting drone image: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to delete image"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Image deleted successfully"})
 	}
 }

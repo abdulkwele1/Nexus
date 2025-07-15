@@ -75,10 +75,10 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/logout", CorsMiddleware(AuthMiddleware(CreateLogoutHandler(&nexusAPI), &nexusAPI)))
 	router.HandleFunc("/change-password", CorsMiddleware(AuthMiddleware(CreateChangePasswordHandler(&nexusAPI), &nexusAPI)))
 
-	router.HandleFunc("/settings", CorsMiddleware(AuthMiddleware(SettingsHandler, &nexusAPI)))   // Protect the settings route
-	router.HandleFunc("/home", CorsMiddleware(AuthMiddleware(HomeHandler, &nexusAPI)))           // Protect the home route
-	router.HandleFunc("/solar", CorsMiddleware(AuthMiddleware(SolarHandler, &nexusAPI)))         //protects solar route
-	router.HandleFunc("/locations", CorsMiddleware(AuthMiddleware(LocationsHandler, &nexusAPI))) //p protects location route
+	router.HandleFunc("/settings", CorsMiddleware(AuthMiddleware(CreateSettingsHandler(&nexusAPI), &nexusAPI)))
+	router.HandleFunc("/home", CorsMiddleware(AuthMiddleware(CreateHomeHandler(&nexusAPI), &nexusAPI)))
+	router.HandleFunc("/solar", CorsMiddleware(AuthMiddleware(CreateSolarHandler(&nexusAPI), &nexusAPI)))
+	router.HandleFunc("/locations", CorsMiddleware(AuthMiddleware(CreateLocationsHandler(&nexusAPI), &nexusAPI)))
 
 	//new routes for Kwh logging + retrieval
 	router.HandleFunc("/panels/{panel_id}/yield_data", CorsMiddleware(AuthMiddleware(CreateGetPanelYieldDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
@@ -98,6 +98,12 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 
 	// Route to get all sensors
 	router.HandleFunc("/sensors", CorsMiddleware(AuthMiddleware(CreateGetAllSensorsHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+
+	// Drone image routes
+	router.HandleFunc("/drone_images", CorsMiddleware(AuthMiddleware(CreateGetDroneImagesHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/drone_images", CorsMiddleware(AuthMiddleware(CreateUploadDroneImagesHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
+	router.HandleFunc("/drone_images/{image_id}", CorsMiddleware(AuthMiddleware(CreateGetDroneImageHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/drone_images/{image_id}", CorsMiddleware(AuthMiddleware(CreateDeleteDroneImageHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodDelete)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),
