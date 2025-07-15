@@ -77,8 +77,9 @@
             <div v-for="image in day.images" :key="image.id" class="image-item">
               <img
                 :src="image.url"
-                :alt="image.description"
+                :alt="image.description || image.file_name"
                 @click.stop="openImage(image)"
+                @error="handleImageError($event, image)"
               />
               <div class="image-overlay">
                 <p class="image-time">{{ formatTime(image.timestamp) }}</p>
@@ -97,9 +98,10 @@
       <button @click="toggleExpand" class="close-btn">Close</button>
       <img 
         :src="currentImage?.url" 
-        alt="Zoomed Image" 
+        :alt="currentImage?.description || currentImage?.file_name" 
         class="zoomable" 
         :style="{ transform: `scale(${zoomLevel})` }"
+        @error="handleImageError($event, currentImage)"
       />
       <div class="zoom-controls">
         <button @click="zoomOut" class="zoom-btn">-</button>
@@ -129,8 +131,16 @@ export default defineComponent({
       weekEnd: new Date(),
       expandedDays: [],
       weekDays: [],
-      selectedDate: new Date().toISOString().split('T')[0]
+      selectedDate: new Date().toISOString().split('T')[0],
+      objectUrls: new Set() // Track object URLs for cleanup
     };
+  },
+  beforeUnmount() {
+    // Clean up all object URLs
+    this.objectUrls.forEach(url => {
+      URL.revokeObjectURL(url);
+    });
+    this.objectUrls.clear();
   },
   created() {
     this.store = useNexusStore();
@@ -140,8 +150,8 @@ export default defineComponent({
     async checkAuthentication() {
       // Check if user is logged in before initializing
       if (!this.store.user.loggedIn) {
-        alert('Please log in to access drone images');
-        // You might want to redirect to login page here
+        console.warn('User not logged in, redirecting to login');
+        window.location.href = '/';
         return;
       }
       this.initializeWeek();
@@ -198,12 +208,30 @@ export default defineComponent({
 
         const images = await this.store.user.getDroneImages(start, end);
         
+        // Clean up old object URLs before assigning new ones
+        this.objectUrls.forEach(url => {
+          URL.revokeObjectURL(url);
+        });
+        this.objectUrls.clear();
+
+        // Track new object URLs
+        images.forEach(img => {
+          if (img.url && img.url.startsWith('blob:')) {
+            this.objectUrls.add(img.url);
+          }
+        });
+        
         // Group images by day
         this.weekDays = this.weekDays.map(day => ({
           ...day,
-          images: images.filter(img => 
-            new Date(img.timestamp).toISOString().split('T')[0] === day.date
-          )
+          images: (images || []).filter(img => {
+            if (!img.upload_date) return false;
+            const imgDate = new Date(img.upload_date).toISOString().split('T')[0];
+            return imgDate === day.date;
+          }).map(img => ({
+            ...img,
+            timestamp: img.upload_date
+          }))
         }));
       } catch (error) {
         console.error('Error fetching drone images:', error);
@@ -302,7 +330,10 @@ export default defineComponent({
           };
           
           try {
-            await this.store.user.uploadDroneImage(file, metadata);
+            const result = await this.store.user.uploadDroneImage(file, metadata);
+            if (result.url && result.url.startsWith('blob:')) {
+              this.objectUrls.add(result.url);
+            }
           } catch (error) {
             console.error(`Failed to upload ${file.name}:`, error);
             failedUploads.push(file.name);
@@ -350,6 +381,10 @@ export default defineComponent({
       this.isExpanded = !this.isExpanded;
     },
     openImage(image) {
+      // If the current image has an object URL, keep track of it
+      if (image.url && image.url.startsWith('blob:')) {
+        this.objectUrls.add(image.url);
+      }
       this.currentImage = image;
       this.isExpanded = true;
       this.zoomLevel = 1;
@@ -363,6 +398,10 @@ export default defineComponent({
       if (this.zoomLevel > 0.3) {
         this.zoomLevel -= 0.1;
       }
+    },
+    handleImageError(event, image) {
+      console.error(`Failed to load image: ${image.file_name}`, event);
+      event.target.src = '/src/assets/droneIcon.png'; // Fallback image
     }
   }
 });
