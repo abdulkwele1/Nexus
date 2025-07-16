@@ -1,112 +1,117 @@
 <template>
-  <div class="drone-container">
-    <div class="upload-section">
-      <h2>Upload Drone Images</h2>
-      <input 
-        type="file" 
-        @change="handleFileUpload" 
-        accept="image/*" 
-        multiple 
-        class="file-input"
-        ref="fileInput"
-      />
-      
-      <!-- Preview Section -->
-      <div v-if="selectedFiles.length" class="preview-section">
-        <h3>Selected Images ({{ selectedFiles.length }})</h3>
-        <div class="preview-grid">
-          <div v-for="(file, index) in selectedFilePreviews" :key="index" class="preview-item">
-            <img :src="file.preview" :alt="file.name" class="preview-image" />
-            <button @click="removeFile(index)" class="remove-btn" title="Remove image">
-              <span>×</span>
-            </button>
-            <span class="file-name">{{ file.name }}</span>
-          </div>
-        </div>
-      </div>
-
-      <button @click="uploadImages" class="upload-btn" :disabled="!selectedFiles.length || isUploading">
-        {{ isUploading ? 'Uploading...' : 'Upload Selected Images' }}
-      </button>
-    </div>
-
-    <div class="date-navigation">
-      <div class="calendar-select">
+  <div>
+    <nav class="top-nav" :class="{ 'nav-hidden': !showNavbar }">
+      <button class="nav-button" @click="goTo('/home')">Home</button>
+    </nav>
+    <div class="drone-container">
+      <div class="upload-section">
+        <h2>Upload Drone Images</h2>
         <input 
-          type="date" 
-          v-model="selectedDate"
-          @change="jumpToDate"
-          class="calendar-input"
+          type="file" 
+          @change="handleFileUpload" 
+          accept="image/*" 
+          multiple 
+          class="file-input"
+          ref="fileInput"
         />
-        <button @click="goToToday" class="today-btn">Today</button>
-      </div>
-
-      <div class="week-selector">
-        <button @click="previousWeek" class="week-nav-btn">&lt; Previous Week</button>
-        <span class="week-display">
-          {{ formatDateRange(weekStart, weekEnd) }}
-        </span>
-        <button @click="nextWeek" class="week-nav-btn">Next Week &gt;</button>
-      </div>
-    </div>
-
-    <div class="days-container">
-      <div v-for="day in weekDays" :key="day.date" class="day-section">
-        <div 
-          class="day-header" 
-          @click="toggleDayExpanded(day.date)"
-          :class="{ 
-            'has-images': day.images.length > 0,
-            'is-selected': isSelectedDay(day.date)
-          }"
-        >
-          <div class="day-info">
-            <span class="day-name">{{ formatDayName(day.date) }}</span>
-            <span class="day-date">{{ formatDate(day.date) }}</span>
-          </div>
-          <div class="day-summary">
-            <span class="image-count" v-if="day.images.length">
-              {{ day.images.length }} image{{ day.images.length !== 1 ? 's' : '' }}
-            </span>
-            <span class="expand-icon">{{ expandedDays.includes(day.date) ? '▼' : '▶' }}</span>
-          </div>
-        </div>
-
-        <div v-if="expandedDays.includes(day.date)" class="day-content">
-          <div v-if="day.images.length" class="image-grid">
-            <div v-for="image in day.images" :key="image.id" class="image-item">
-              <img
-                :src="image.url"
-                :alt="image.description || image.file_name"
-                @click.stop="openImage(image)"
-                @error="handleImageError($event, image)"
-              />
-              <div class="image-overlay">
-                <p class="image-time">{{ formatTime(image.timestamp) }}</p>
-                <button @click.stop="deleteImage(image)" class="delete-btn">
-                  Delete
-                </button>
-              </div>
+        
+        <!-- Preview Section -->
+        <div v-if="selectedFiles.length" class="preview-section">
+          <h3>Selected Images ({{ selectedFiles.length }})</h3>
+          <div class="preview-grid">
+            <div v-for="(file, index) in selectedFilePreviews" :key="index" class="preview-item">
+              <img :src="file.preview" :alt="file.name" class="preview-image" />
+              <button @click="removeFile(index)" class="remove-btn" title="Remove image">
+                <span>×</span>
+              </button>
+              <span class="file-name">{{ file.name }}</span>
             </div>
           </div>
-          <p v-else class="no-images">No images uploaded on this day</p>
+        </div>
+
+        <button @click="uploadImages" class="upload-btn" :disabled="!selectedFiles.length || isUploading">
+          {{ isUploading ? 'Uploading...' : 'Upload Selected Images' }}
+        </button>
+      </div>
+
+      <div class="date-navigation">
+        <div class="calendar-select">
+          <input 
+            type="date" 
+            v-model="selectedDate"
+            @change="jumpToDate"
+            class="calendar-input"
+          />
+          <button @click="goToToday" class="today-btn">Today</button>
+        </div>
+
+        <div class="week-selector">
+          <button @click="previousWeek" class="week-nav-btn">&lt; Previous Week</button>
+          <span class="week-display">
+            {{ formatDateRange(weekStart, weekEnd) }}
+          </span>
+          <button @click="nextWeek" class="week-nav-btn">Next Week &gt;</button>
         </div>
       </div>
-    </div>
 
-    <div v-if="isExpanded" class="full-screen-view">
-      <button @click="toggleExpand" class="close-btn">Close</button>
-      <img 
-        :src="currentImage?.url" 
-        :alt="currentImage?.description || currentImage?.file_name" 
-        class="zoomable" 
-        :style="{ transform: `scale(${zoomLevel})` }"
-        @error="handleImageError($event, currentImage)"
-      />
-      <div class="zoom-controls">
-        <button @click="zoomOut" class="zoom-btn">-</button>
-        <span>{{ Math.round(zoomLevel * 100) }}%</span>
-        <button @click="zoomIn" class="zoom-btn">+</button>
+      <div class="days-container">
+        <div v-for="day in weekDays" :key="day.date" class="day-section">
+          <div 
+            class="day-header" 
+            @click="toggleDayExpanded(day.date)"
+            :class="{ 
+              'has-images': day.images.length > 0,
+              'is-selected': isSelectedDay(day.date)
+            }"
+          >
+            <div class="day-info">
+              <span class="day-name">{{ formatDayName(day.date) }}</span>
+              <span class="day-date">{{ formatDate(day.date) }}</span>
+            </div>
+            <div class="day-summary">
+              <span class="image-count" v-if="day.images.length">
+                {{ day.images.length }} image{{ day.images.length !== 1 ? 's' : '' }}
+              </span>
+              <span class="expand-icon">{{ expandedDays.includes(day.date) ? '▼' : '▶' }}</span>
+            </div>
+          </div>
+
+          <div v-if="expandedDays.includes(day.date)" class="day-content">
+            <div v-if="day.images.length" class="image-grid">
+              <div v-for="image in day.images" :key="image.id" class="image-item">
+                <img
+                  :src="image.url"
+                  :alt="image.description || image.file_name"
+                  @click.stop="openImage(image)"
+                  @error="handleImageError($event, image)"
+                />
+                <div class="image-overlay">
+                  <p class="image-time">{{ formatTime(image.timestamp) }}</p>
+                  <button @click.stop="deleteImage(image)" class="delete-btn">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p v-else class="no-images">No images uploaded on this day</p>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="isExpanded" class="full-screen-view">
+        <button @click="toggleExpand" class="close-btn">Close</button>
+        <img 
+          :src="currentImage?.url" 
+          :alt="currentImage?.description || currentImage?.file_name" 
+          class="zoomable" 
+          :style="{ transform: `scale(${zoomLevel})` }"
+          @error="handleImageError($event, currentImage)"
+        />
+        <div class="zoom-controls">
+          <button @click="zoomOut" class="zoom-btn">-</button>
+          <span>{{ Math.round(zoomLevel * 100) }}%</span>
+          <button @click="zoomIn" class="zoom-btn">+</button>
+        </div>
       </div>
     </div>
   </div>
@@ -115,11 +120,13 @@
 <script>
 import { useNexusStore } from '../stores/nexus';
 import { defineComponent } from 'vue';
+import { useRouter } from 'vue-router';
 
 export default defineComponent({
   data() {
     return {
       store: null,
+      router: null,
       isExpanded: false,
       selectedImages: [],
       currentImage: null,
@@ -132,21 +139,39 @@ export default defineComponent({
       expandedDays: [],
       weekDays: [],
       selectedDate: new Date().toISOString().split('T')[0],
-      objectUrls: new Set() // Track object URLs for cleanup
+      objectUrls: new Set(), // Track object URLs for cleanup
+      showNavbar: true,
+      lastScrollPosition: 0
     };
   },
+  mounted() {
+    window.addEventListener('scroll', this.handleScroll);
+  },
   beforeUnmount() {
-    // Clean up all object URLs
+    // Clean up all object URLs and remove scroll listener
     this.objectUrls.forEach(url => {
       URL.revokeObjectURL(url);
     });
     this.objectUrls.clear();
+    window.removeEventListener('scroll', this.handleScroll);
   },
   created() {
     this.store = useNexusStore();
+    this.router = useRouter();
     this.checkAuthentication();
   },
   methods: {
+    goTo(path) {
+      this.router.push(path);
+    },
+    handleScroll() {
+      const currentScrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+      
+      // Show navbar when scrolling up, hide when scrolling down
+      this.showNavbar = currentScrollPosition < this.lastScrollPosition || currentScrollPosition < 50;
+      
+      this.lastScrollPosition = currentScrollPosition;
+    },
     async checkAuthentication() {
       // Check if user is logged in before initializing
       if (!this.store.user.loggedIn) {
@@ -408,10 +433,63 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.top-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transition: transform 0.3s ease-in-out;
+}
+
+.nav-hidden {
+  transform: translateY(-100%);
+}
+
+.nav-button {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nav-button:hover {
+  color: #007bff;
+}
+
 .drone-container {
+  margin-top: 60px;
   padding: 20px;
   max-width: 1200px;
   margin: 80px auto 0;
+}
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.navbar-hidden {
+  transform: translateY(-100%);
 }
 
 .upload-section {
