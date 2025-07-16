@@ -1,139 +1,193 @@
 <template>
-  <div class="drone-container">
-    <div class="upload-section">
-      <h2>Upload Drone Images</h2>
-      <input 
-        type="file" 
-        @change="handleFileUpload" 
-        accept="image/*" 
-        multiple 
-        class="file-input"
-        ref="fileInput"
-      />
-      
-      <!-- Preview Section -->
-      <div v-if="selectedFiles.length" class="preview-section">
-        <h3>Selected Images ({{ selectedFiles.length }})</h3>
-        <div class="preview-grid">
-          <div v-for="(file, index) in selectedFilePreviews" :key="index" class="preview-item">
-            <img :src="file.preview" :alt="file.name" class="preview-image" />
-            <button @click="removeFile(index)" class="remove-btn" title="Remove image">
-              <span>×</span>
-            </button>
-            <span class="file-name">{{ file.name }}</span>
-          </div>
-        </div>
-      </div>
-
-      <button @click="uploadImages" class="upload-btn" :disabled="!selectedFiles.length">
-        Upload Selected Images
-      </button>
-    </div>
-
-    <div class="date-navigation">
-      <div class="calendar-select">
+  <div>
+    <nav class="top-nav" :class="{ 'nav-hidden': !showNavbar }">
+      <button class="nav-button" @click="goTo('/home')">Home</button>
+    </nav>
+    <div class="drone-container">
+      <div class="upload-section">
+        <h2>Upload Drone Images</h2>
         <input 
-          type="date" 
-          v-model="selectedDate"
-          @change="jumpToDate"
-          class="calendar-input"
+          type="file" 
+          @change="handleFileUpload" 
+          accept="image/*" 
+          multiple 
+          class="file-input"
+          ref="fileInput"
         />
-        <button @click="goToToday" class="today-btn">Today</button>
-      </div>
-
-      <div class="week-selector">
-        <button @click="previousWeek" class="week-nav-btn">&lt; Previous Week</button>
-        <span class="week-display">
-          {{ formatDateRange(weekStart, weekEnd) }}
-        </span>
-        <button @click="nextWeek" class="week-nav-btn">Next Week &gt;</button>
-      </div>
-    </div>
-
-    <div class="days-container">
-      <div v-for="day in weekDays" :key="day.date" class="day-section">
-        <div 
-          class="day-header" 
-          @click="toggleDayExpanded(day.date)"
-          :class="{ 
-            'has-images': day.images.length > 0,
-            'is-selected': isSelectedDay(day.date)
-          }"
-        >
-          <div class="day-info">
-            <span class="day-name">{{ formatDayName(day.date) }}</span>
-            <span class="day-date">{{ formatDate(day.date) }}</span>
-          </div>
-          <div class="day-summary">
-            <span class="image-count" v-if="day.images.length">
-              {{ day.images.length }} image{{ day.images.length !== 1 ? 's' : '' }}
-            </span>
-            <span class="expand-icon">{{ expandedDays.includes(day.date) ? '▼' : '▶' }}</span>
-          </div>
-        </div>
-
-        <div v-if="expandedDays.includes(day.date)" class="day-content">
-          <div v-if="day.images.length" class="image-grid">
-            <div v-for="image in day.images" :key="image.id" class="image-item">
-              <img
-                :src="image.url"
-                :alt="image.description"
-                @click.stop="openImage(image)"
-              />
-              <p class="image-time">{{ formatTime(image.date) }}</p>
+        
+        <!-- Preview Section -->
+        <div v-if="selectedFiles.length" class="preview-section">
+          <h3>Selected Images ({{ selectedFiles.length }})</h3>
+          <div class="preview-grid">
+            <div v-for="(file, index) in selectedFilePreviews" :key="index" class="preview-item">
+              <img :src="file.preview" :alt="file.name" class="preview-image" />
+              <button @click="removeFile(index)" class="remove-btn" title="Remove image">
+                <span>×</span>
+              </button>
+              <span class="file-name">{{ file.name }}</span>
             </div>
           </div>
-          <p v-else class="no-images">No images uploaded on this day</p>
+        </div>
+
+        <button @click="uploadImages" class="upload-btn" :disabled="!selectedFiles.length || isUploading">
+          {{ isUploading ? 'Uploading...' : 'Upload Selected Images' }}
+        </button>
+      </div>
+
+      <div class="date-navigation">
+        <div class="calendar-select">
+          <input 
+            type="date" 
+            v-model="selectedDate"
+            @change="jumpToDate"
+            class="calendar-input"
+          />
+          <button @click="goToToday" class="today-btn">Today</button>
+        </div>
+
+        <div class="week-selector">
+          <button @click="previousWeek" class="week-nav-btn">&lt; Previous Week</button>
+          <span class="week-display">
+            {{ formatDateRange(weekStart, weekEnd) }}
+          </span>
+          <button @click="nextWeek" class="week-nav-btn">Next Week &gt;</button>
         </div>
       </div>
-    </div>
 
-    <div v-if="isExpanded" class="full-screen-view">
-      <button @click="toggleExpand" class="close-btn">Close</button>
-      <img 
-        :src="currentImage?.url" 
-        alt="Zoomed Image" 
-        class="zoomable" 
-        :style="{ transform: `scale(${zoomLevel})` }"
-      />
-      <div class="zoom-controls">
-        <button @click="zoomOut" class="zoom-btn">-</button>
-        <span>{{ Math.round(zoomLevel * 100) }}%</span>
-        <button @click="zoomIn" class="zoom-btn">+</button>
+      <div class="days-container">
+        <div v-for="day in weekDays" :key="day.date" class="day-section">
+          <div 
+            class="day-header" 
+            @click="toggleDayExpanded(day.date)"
+            :class="{ 
+              'has-images': day.images.length > 0,
+              'is-selected': isSelectedDay(day.date)
+            }"
+          >
+            <div class="day-info">
+              <span class="day-name">{{ formatDayName(day.date) }}</span>
+              <span class="day-date">{{ formatDate(day.date) }}</span>
+            </div>
+            <div class="day-summary">
+              <span class="image-count" v-if="day.images.length">
+                {{ day.images.length }} image{{ day.images.length !== 1 ? 's' : '' }}
+              </span>
+              <span class="expand-icon">{{ expandedDays.includes(day.date) ? '▼' : '▶' }}</span>
+            </div>
+          </div>
+
+          <div v-if="expandedDays.includes(day.date)" class="day-content">
+            <div v-if="day.images.length" class="image-grid">
+              <div v-for="image in day.images" :key="image.id" class="image-item">
+                <img
+                  :src="image.url"
+                  :alt="image.description || image.file_name"
+                  @click.stop="openImage(image)"
+                  @error="handleImageError($event, image)"
+                />
+                <div class="image-overlay">
+                  <p class="image-time">{{ formatTime(image.timestamp) }}</p>
+                  <button @click.stop="deleteImage(image)" class="delete-btn">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p v-else class="no-images">No images uploaded on this day</p>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="isExpanded" class="full-screen-view">
+        <button @click="toggleExpand" class="close-btn">Close</button>
+        <img 
+          :src="currentImage?.url" 
+          :alt="currentImage?.description || currentImage?.file_name" 
+          class="zoomable" 
+          :style="{ transform: `scale(${zoomLevel})` }"
+          @error="handleImageError($event, currentImage)"
+        />
+        <div class="zoom-controls">
+          <button @click="zoomOut" class="zoom-btn">-</button>
+          <span>{{ Math.round(zoomLevel * 100) }}%</span>
+          <button @click="zoomIn" class="zoom-btn">+</button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-export default {
+import { useNexusStore } from '../stores/nexus';
+import { defineComponent } from 'vue';
+import { useRouter } from 'vue-router';
+
+export default defineComponent({
   data() {
     return {
+      store: null,
+      router: null,
       isExpanded: false,
       selectedImages: [],
       currentImage: null,
       zoomLevel: 1,
       selectedFiles: [],
+      selectedFilePreviews: [],
       isUploading: false,
       weekStart: new Date(),
       weekEnd: new Date(),
       expandedDays: [],
       weekDays: [],
-      selectedDate: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+      selectedDate: new Date().toISOString().split('T')[0],
+      objectUrls: new Set(), // Track object URLs for cleanup
+      showNavbar: true,
+      lastScrollPosition: 0
     };
   },
+  mounted() {
+    window.addEventListener('scroll', this.handleScroll);
+  },
+  beforeUnmount() {
+    // Clean up all object URLs and remove scroll listener
+    this.objectUrls.forEach(url => {
+      URL.revokeObjectURL(url);
+    });
+    this.objectUrls.clear();
+    window.removeEventListener('scroll', this.handleScroll);
+  },
   created() {
-    this.initializeWeek();
-    this.fetchWeekImages();
+    this.store = useNexusStore();
+    this.router = useRouter();
+    this.checkAuthentication();
   },
   methods: {
+    goTo(path) {
+      this.router.push(path);
+    },
+    handleScroll() {
+      const currentScrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+      
+      // Show navbar when scrolling up, hide when scrolling down
+      this.showNavbar = currentScrollPosition < this.lastScrollPosition || currentScrollPosition < 50;
+      
+      this.lastScrollPosition = currentScrollPosition;
+    },
+    async checkAuthentication() {
+      // Check if user is logged in before initializing
+      if (!this.store.user.loggedIn) {
+        console.warn('User not logged in, redirecting to login');
+        window.location.href = '/';
+        return;
+      }
+      this.initializeWeek();
+      await this.fetchWeekImages();
+    },
     initializeWeek(startDate = null) {
       if (startDate) {
         this.weekStart = new Date(startDate);
       } else {
         this.weekStart = new Date();
       }
-      // Set to the start of the week (Sunday)
       this.weekStart.setDate(this.weekStart.getDate() - this.weekStart.getDay());
       this.weekEnd = new Date(this.weekStart);
       this.weekEnd.setDate(this.weekStart.getDate() + 6);
@@ -166,22 +220,51 @@ export default {
     },
     async fetchWeekImages() {
       try {
-        // TODO: Replace with your actual API endpoint
-        const response = await fetch(
-          `/api/drone/images/week?start=${this.weekStart.toISOString()}&end=${this.weekEnd.toISOString()}`
-        );
-        if (!response.ok) throw new Error('Failed to fetch images');
+        if (!this.store.user.loggedIn) {
+          console.warn('User not logged in, skipping fetch');
+          return;
+        }
+
+        // Ensure we have valid dates
+        const start = new Date(this.weekStart);
+        const end = new Date(this.weekEnd);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+
+        const images = await this.store.user.getDroneImages(start, end);
         
-        const data = await response.json();
+        // Clean up old object URLs before assigning new ones
+        this.objectUrls.forEach(url => {
+          URL.revokeObjectURL(url);
+        });
+        this.objectUrls.clear();
+
+        // Track new object URLs
+        images.forEach(img => {
+          if (img.url && img.url.startsWith('blob:')) {
+            this.objectUrls.add(img.url);
+          }
+        });
+        
         // Group images by day
         this.weekDays = this.weekDays.map(day => ({
           ...day,
-          images: data.images.filter(img => 
-            new Date(img.date).toISOString().split('T')[0] === day.date
-          )
+          images: (images || []).filter(img => {
+            if (!img.upload_date) return false;
+            const imgDate = new Date(img.upload_date).toISOString().split('T')[0];
+            return imgDate === day.date;
+          }).map(img => ({
+            ...img,
+            timestamp: img.upload_date
+          }))
         }));
       } catch (error) {
-        console.error('Error fetching week images:', error);
+        console.error('Error fetching drone images:', error);
+        if (error.message.includes('401')) {
+          alert('Please log in to view drone images');
+        } else {
+          alert('Failed to fetch drone images. Please try again later.');
+        }
       }
     },
     previousWeek() {
@@ -256,23 +339,40 @@ export default {
     async uploadImages() {
       if (!this.selectedFiles.length || this.isUploading) return;
       
+      if (!this.store.user.loggedIn) {
+        alert('Please log in to upload images');
+        return;
+      }
+
       this.isUploading = true;
+      const failedUploads = [];
+
       try {
-        const formData = new FormData();
-        this.selectedFiles.forEach((file, index) => {
-          formData.append(`image${index}`, file);
-        });
+        for (const file of this.selectedFiles) {
+          const metadata = {
+            location: 'Farm Location',
+            timestamp: new Date().toISOString()
+          };
+          
+          try {
+            const result = await this.store.user.uploadDroneImage(file, metadata);
+            if (result.url && result.url.startsWith('blob:')) {
+              this.objectUrls.add(result.url);
+            }
+          } catch (error) {
+            console.error(`Failed to upload ${file.name}:`, error);
+            failedUploads.push(file.name);
+          }
+        }
 
-        // TODO: Replace with your actual API endpoint
-        const response = await fetch('/api/drone/upload', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!response.ok) throw new Error('Upload failed');
-
-        const result = await response.json();
-        // Refresh the current week's images after upload
+        // Show results to user
+        if (failedUploads.length > 0) {
+          alert(`Failed to upload the following images:\n${failedUploads.join('\n')}`);
+        } else {
+          alert('All images uploaded successfully!');
+        }
+        
+        // Refresh the current week's images
         await this.fetchWeekImages();
         
         // Clean up previews and reset
@@ -284,16 +384,34 @@ export default {
         this.$refs.fileInput.value = '';
         
       } catch (error) {
-        console.error('Error uploading images:', error);
+        console.error('Error during upload process:', error);
+        alert('An error occurred during the upload process. Please try again.');
       } finally {
         this.isUploading = false;
+      }
+    },
+    async deleteImage(image) {
+      if (!confirm('Are you sure you want to delete this image?')) {
+        return;
+      }
+      
+      try {
+        await this.store.user.deleteDroneImage(image.id);
+        await this.fetchWeekImages();
+      } catch (error) {
+        console.error('Error deleting image:', error);
       }
     },
     toggleExpand() {
       this.isExpanded = !this.isExpanded;
     },
     openImage(image) {
+      // If the current image has an object URL, keep track of it
+      if (image.url && image.url.startsWith('blob:')) {
+        this.objectUrls.add(image.url);
+      }
       this.currentImage = image;
+      this.isExpanded = true;
       this.zoomLevel = 1;
     },
     zoomIn() {
@@ -305,16 +423,73 @@ export default {
       if (this.zoomLevel > 0.3) {
         this.zoomLevel -= 0.1;
       }
+    },
+    handleImageError(event, image) {
+      console.error(`Failed to load image: ${image.file_name}`, event);
+      event.target.src = '/src/assets/droneIcon.png'; // Fallback image
     }
   }
-};
+});
 </script>
 
 <style scoped>
+.top-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transition: transform 0.3s ease-in-out;
+}
+
+.nav-hidden {
+  transform: translateY(-100%);
+}
+
+.nav-button {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nav-button:hover {
+  color: #007bff;
+}
+
 .drone-container {
+  margin-top: 60px;
   padding: 20px;
   max-width: 1200px;
   margin: 80px auto 0;
+}
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.navbar-hidden {
+  transform: translateY(-100%);
 }
 
 .upload-section {
@@ -500,19 +675,37 @@ export default {
   transform: scale(1.05);
 }
 
-.image-time {
+.image-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   background: rgba(0,0,0,0.7);
-  color: white;
   padding: 5px;
-  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.delete-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
   font-size: 0.8em;
-  text-align: center;
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.delete-btn:hover {
+  background: #ff0000;
+}
+
+.image-time {
+  margin: 0;
+  color: white;
+  font-size: 0.8em;
 }
 
 .full-screen-view {

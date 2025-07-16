@@ -21,7 +21,8 @@ class User {
     constructor(baseURL: any) {
         this.baseURL = baseURL
         this.userName = ""
-        this.loggedIn = false
+        // Initialize loggedIn state from cookie
+        this.loggedIn = this.getCookie() ? true : false
     }
 
     async login(userName: any, password: any): Promise<any> {
@@ -244,9 +245,16 @@ class User {
       return response
 }
 
-  async getDroneImages(): Promise<any> {
+  async getDroneImages(startDate?: Date, endDate?: Date): Promise<any> {
     try {
-      const response = await fetch(`${this.baseURL}/drone/images`, {
+      let url = `${this.baseURL}/drone_images`;
+      
+      // Add date range parameters if provided
+      if (startDate && endDate) {
+        url += `?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`;
+      }
+
+      const response = await fetch(url, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -259,33 +267,95 @@ class User {
       }
 
       const jsonData = await response.json();
-      return Array.isArray(jsonData) ? jsonData : [];
+      const images = Array.isArray(jsonData.images) ? jsonData.images : [];
+      
+      // Process each image to create object URLs
+      const processedImages = await Promise.all(images.map(async (img: any) => {
+        try {
+          const blob = await this.getImageContent(img.id);
+          return {
+            ...img,
+            url: URL.createObjectURL(blob)
+          };
+        } catch (error) {
+          console.error(`Failed to load image ${img.id}:`, error);
+          return img;
+        }
+      }));
+
+      return processedImages;
     } catch (error) {
       console.error('Error fetching drone images:', error);
       return [];
     }
   }
 
+  private async getImageContent(imageId: string): Promise<Blob> {
+    const response = await fetch(`${this.baseURL}/drone_images/${imageId}/content`, {
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image content: ${response.status}`);
+    }
+    return await response.blob();
+  }
+
   async uploadDroneImage(imageFile: File, metadata: { location: string, timestamp: string }): Promise<any> {
     try {
       const formData = new FormData();
-      formData.append('image', imageFile);
-      formData.append('location', metadata.location);
-      formData.append('timestamp', metadata.timestamp);
+      formData.append('images', imageFile);
+      formData.append('description', metadata.location);
+      formData.append('metadata', JSON.stringify({
+        location: metadata.location,
+        timestamp: metadata.timestamp,
+        original_name: imageFile.name,
+        mime_type: imageFile.type // Add MIME type
+      }));
 
-      const response = await fetch(`${this.baseURL}/drone/images`, {
+      const response = await fetch(`${this.baseURL}/drone_images`, {
         credentials: 'include',
         method: 'POST',
-        body: formData,
+        body: formData
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      // Return the result with a temporary URL for immediate display
+      if (result.uploaded_images && result.uploaded_images.length > 0) {
+        const image = result.uploaded_images[0];
+        return {
+          ...image,
+          url: URL.createObjectURL(imageFile) // Create temporary URL for immediate display
+        };
+      }
+      return result;
     } catch (error) {
       console.error('Error uploading drone image:', error);
+      throw error;
+    }
+  }
+
+  async deleteDroneImage(imageId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/drone_images/${imageId}`, {
+        credentials: 'include',
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting drone image:', error);
       throw error;
     }
   }
@@ -295,9 +365,14 @@ class User {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; session_id=`);
         if (parts.length === 2) {
-            return parts?.pop()?.split(';')?.shift();
+            const sessionId = parts?.pop()?.split(';')?.shift();
+            if (sessionId) {
+                this.loggedIn = true;
+                return sessionId;
+            }
         }
-        return false
+        this.loggedIn = false;
+        return false;
   }
 
   async getAllSensors() {

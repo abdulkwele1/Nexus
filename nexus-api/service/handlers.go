@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"nexus-api/api"
 	"nexus-api/clients/database"
 	"nexus-api/password"
+	"os"
 	"strconv"
 	"time"
 
@@ -770,6 +772,15 @@ func CreateUploadDroneImagesHandler(apiService *APIService) http.HandlerFunc {
 
 		var uploadedImages []api.DroneImage
 
+		// Ensure storage directory exists
+		storageDir := "storage/drone_images"
+		if err := os.MkdirAll(storageDir, 0755); err != nil {
+			apiService.Error().Msgf("Error creating storage directory: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to prepare storage"})
+			return
+		}
+
 		for _, fileHeader := range files {
 			file, err := fileHeader.Open()
 			if err != nil {
@@ -781,11 +792,29 @@ func CreateUploadDroneImagesHandler(apiService *APIService) http.HandlerFunc {
 			// Generate unique ID for the image
 			imageID := uuid.New()
 
+			// Create storage path
+			storagePath := fmt.Sprintf("%s/%s", storageDir, imageID)
+
+			// Create storage file
+			dst, err := os.Create(storagePath)
+			if err != nil {
+				apiService.Error().Msgf("Error creating storage file: %s", err)
+				continue
+			}
+			defer dst.Close()
+
+			// Copy file content to storage
+			if _, err := io.Copy(dst, file); err != nil {
+				apiService.Error().Msgf("Error copying file content: %s", err)
+				os.Remove(storagePath) // Clean up on error
+				continue
+			}
+
 			// Create database DroneImage record
 			dbImage := database.DroneImage{
 				ID:          imageID,
 				FileName:    fileHeader.Filename,
-				FilePath:    fmt.Sprintf("/drone_images/%s", imageID), // Store path relative to storage root
+				FilePath:    storagePath, // Store absolute path
 				UploadDate:  time.Now(),
 				FileSize:    fileHeader.Size,
 				MimeType:    fileHeader.Header.Get("Content-Type"),
@@ -795,10 +824,21 @@ func CreateUploadDroneImagesHandler(apiService *APIService) http.HandlerFunc {
 				},
 			}
 
+			// Parse and merge additional metadata if provided
+			if metadataStr := r.FormValue("metadata"); metadataStr != "" {
+				var metadata map[string]interface{}
+				if err := json.Unmarshal([]byte(metadataStr), &metadata); err == nil {
+					for k, v := range metadata {
+						dbImage.Metadata[k] = v
+					}
+				}
+			}
+
 			// Save image metadata to database
 			err = dbImage.Save(r.Context(), apiService.DatabaseClient.DB)
 			if err != nil {
 				apiService.Error().Msgf("Error saving drone image metadata: %s", err)
+				os.Remove(storagePath) // Clean up on error
 				continue
 			}
 
@@ -882,6 +922,60 @@ func CreateGetDroneImageHandler(apiService *APIService) http.HandlerFunc {
 	}
 }
 
+func CreateGetDroneImageContentHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		imageIDStr := vars["image_id"]
+
+		if imageIDStr == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Image ID is required"})
+			return
+		}
+
+		imageID, err := uuid.Parse(imageIDStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid image ID format"})
+			return
+		}
+
+		// Get image metadata from database
+		dbImage, err := database.GetDroneImageByID(r.Context(), apiService.DatabaseClient.DB, imageID)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoDroneImage) {
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Image not found"})
+				return
+			}
+			apiService.Error().Msgf("Error retrieving drone image metadata: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to retrieve image metadata"})
+			return
+		}
+
+		// Open and serve the image file
+		file, err := os.Open(dbImage.FilePath)
+		if err != nil {
+			apiService.Error().Msgf("Error opening image file: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to read image file"})
+			return
+		}
+		defer file.Close()
+
+		// Set content type header based on stored mime type
+		w.Header().Set("Content-Type", dbImage.MimeType)
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", dbImage.FileSize))
+
+		// Stream the file content
+		if _, err := io.Copy(w, file); err != nil {
+			apiService.Error().Msgf("Error streaming image content: %s", err)
+			return
+		}
+	}
+}
+
 func CreateDeleteDroneImageHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
@@ -898,6 +992,26 @@ func CreateDeleteDroneImageHandler(apiService *APIService) http.HandlerFunc {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid image ID format"})
 			return
+		}
+
+		// Get image metadata to find file path
+		dbImage, err := database.GetDroneImageByID(r.Context(), apiService.DatabaseClient.DB, imageID)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoDroneImage) {
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Image not found"})
+				return
+			}
+			apiService.Error().Msgf("Error retrieving drone image metadata: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to retrieve image metadata"})
+			return
+		}
+
+		// Delete the image file
+		if err := os.Remove(dbImage.FilePath); err != nil && !os.IsNotExist(err) {
+			apiService.Error().Msgf("Error deleting image file: %s", err)
+			// Continue with database deletion even if file deletion fails
 		}
 
 		// Delete from database

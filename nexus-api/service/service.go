@@ -104,6 +104,7 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/drone_images", CorsMiddleware(AuthMiddleware(CreateUploadDroneImagesHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
 	router.HandleFunc("/drone_images/{image_id}", CorsMiddleware(AuthMiddleware(CreateGetDroneImageHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc("/drone_images/{image_id}", CorsMiddleware(AuthMiddleware(CreateDeleteDroneImageHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodDelete)
+	router.HandleFunc("/drone_images/{image_id}/content", CorsMiddleware(AuthMiddleware(CreateGetDroneImageContentHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),
