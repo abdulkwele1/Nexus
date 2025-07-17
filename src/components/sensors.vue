@@ -174,6 +174,8 @@
         :dynamicTimeWindow="dynamicTimeWindow"
         :dataType="currentSensorType"
         :sensorConfigs="SENSOR_CONFIGS"
+        :droneImages="droneImages"
+        @showDroneImages="handleShowDroneImages"
       />
       <SoilTemperatureGraph
         v-else
@@ -183,7 +185,22 @@
         :dynamicTimeWindow="dynamicTimeWindow"
         :dataType="currentSensorType"
         :sensorConfigs="SENSOR_CONFIGS"
+        :droneImages="droneImages"
+        @showDroneImages="handleShowDroneImages"
       />
+    </div>
+
+    <!-- Add drone image modal -->
+    <div v-if="showDroneModal" class="drone-modal">
+      <div class="drone-modal-content">
+        <button class="close-btn" @click="showDroneModal = false">&times;</button>
+        <h3>Drone Images for {{ selectedDate }}</h3>
+        <div class="drone-image-grid">
+          <div v-for="image in selectedDroneImages" :key="image.id" class="drone-image-item">
+            <img :src="image.url" :alt="image.description || image.file_name" />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -873,6 +890,67 @@ const resetToDefault = () => {
     }
   });
 };
+
+// Add new refs for drone images
+const droneImages = ref<Array<{ date: string; count: number }>>([]);
+const showDroneModal = ref(false);
+const selectedDate = ref<string | null>(null);
+const selectedDroneImages = ref<Array<any>>([]);
+
+// Add function to fetch drone images
+const fetchDroneImages = async () => {
+  try {
+    const start = new Date(queryParams.value.startDate);
+    const end = new Date(queryParams.value.endDate);
+    end.setDate(end.getDate() + 1); // Include end date
+
+    const images = await nexusStore.user.getDroneImages(start, end);
+    
+    // Group images by date with proper type checking
+    const groupedImages = images.reduce((acc: { [key: string]: number }, img: any) => {
+      const date = new Date(img.upload_date).toISOString().split('T')[0];
+      const count = typeof acc[date] === 'number' ? acc[date] + 1 : 1;
+      acc[date] = count;
+      return acc;
+    }, {});
+
+    // Convert to array format with explicit number type
+    droneImages.value = Object.entries(groupedImages).map(([date, count]) => ({
+      date,
+      count: count as number
+    }));
+
+    console.log('[sensors] Fetched drone images:', droneImages.value);
+  } catch (error) {
+    console.error('Error fetching drone images:', error);
+  }
+};
+
+// Add function to handle showing drone images
+const handleShowDroneImages = async (date: string) => {
+  selectedDate.value = date;
+  
+  try {
+    const start = new Date(date);
+    const end = new Date(date);
+    end.setDate(end.getDate() + 1);
+
+    const images = await nexusStore.user.getDroneImages(start, end);
+    selectedDroneImages.value = images;
+    showDroneModal.value = true;
+  } catch (error) {
+    console.error('Error fetching drone images for date:', error);
+  }
+};
+
+// Update watchers to include drone image fetching
+watch(() => queryParams.value, async (newParams) => {
+  console.log(`[sensors] Query params changed. New resolution: ${newParams.resolution}`);
+  await fetchDroneImages();
+  // The graph components will handle their own data fetching based on queryParams
+}, { deep: true });
+
+// Add template for drone image modal
 </script>
 
 <style>
@@ -1280,5 +1358,53 @@ select {
 
 .retry-btn:hover {
   background: #c82333;
+}
+
+.drone-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.drone-modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #333;
+}
+
+.drone-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.drone-image-item img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 4px;
 }
 </style>
