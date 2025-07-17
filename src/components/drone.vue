@@ -61,7 +61,7 @@
             @click="toggleDayExpanded(day.date)"
             :class="{ 
               'has-images': day.images.length > 0,
-              'is-selected': isSelectedDay(day.date)
+              'is-today': isToday(day.date)
             }"
           >
             <div class="day-info">
@@ -186,8 +186,11 @@ export default defineComponent({
       if (startDate) {
         this.weekStart = new Date(startDate);
       } else {
-        this.weekStart = new Date();
+        // Ensure we're using the local timezone
+        const now = new Date();
+        this.weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       }
+      // Set to beginning of week (Sunday)
       this.weekStart.setDate(this.weekStart.getDate() - this.weekStart.getDay());
       this.weekEnd = new Date(this.weekStart);
       this.weekEnd.setDate(this.weekStart.getDate() + 6);
@@ -211,12 +214,18 @@ export default defineComponent({
       this.expandedDays = [this.selectedDate];
     },
     goToToday() {
-      const today = new Date().toISOString().split('T')[0];
-      this.selectedDate = today;
+      // Ensure we're using the local timezone for today's date
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      this.selectedDate = today.toISOString().split('T')[0];
       this.jumpToDate();
     },
-    isSelectedDay(date) {
-      return date === this.selectedDate;
+    isToday(date) {
+      const today = new Date();
+      const checkDate = new Date(date);
+      return today.getFullYear() === checkDate.getFullYear() &&
+             today.getMonth() === checkDate.getMonth() &&
+             today.getDate() === checkDate.getDate();
     },
     async fetchWeekImages() {
       try {
@@ -233,7 +242,7 @@ export default defineComponent({
 
         const images = await this.store.user.getDroneImages(start, end);
         
-        // Clean up old object URLs before assigning new ones
+        // Clean up old object URLs
         this.objectUrls.forEach(url => {
           URL.revokeObjectURL(url);
         });
@@ -246,18 +255,28 @@ export default defineComponent({
           }
         });
         
-        // Group images by day
+        // Group images by day with more precise date comparison
         this.weekDays = this.weekDays.map(day => ({
           ...day,
           images: (images || []).filter(img => {
             if (!img.upload_date) return false;
-            const imgDate = new Date(img.upload_date).toISOString().split('T')[0];
-            return imgDate === day.date;
+            const imgDate = new Date(img.upload_date);
+            const dayDate = new Date(day.date);
+            return imgDate.getFullYear() === dayDate.getFullYear() &&
+                   imgDate.getMonth() === dayDate.getMonth() &&
+                   imgDate.getDate() === dayDate.getDate();
           }).map(img => ({
             ...img,
             timestamp: img.upload_date
           }))
         }));
+
+        console.log('Week days after mapping:', this.weekDays.map(day => ({
+          date: day.date,
+          dayOfWeek: new Date(day.date).toLocaleString('en-US', { weekday: 'long' }),
+          imageCount: day.images.length
+        })));
+
       } catch (error) {
         console.error('Error fetching drone images:', error);
         if (error.message.includes('401')) {
@@ -349,9 +368,13 @@ export default defineComponent({
 
       try {
         for (const file of this.selectedFiles) {
+          const now = new Date();
           const metadata = {
             location: 'Farm Location',
-            timestamp: new Date().toISOString()
+            timestamp: now.toISOString(),
+            // Add day of week to help debug
+            dayOfWeek: now.toLocaleString('en-US', { weekday: 'long' }),
+            localTime: now.toLocaleString()
           };
           
           try {
@@ -612,7 +635,7 @@ export default defineComponent({
   background-color: #f0f7ff;
 }
 
-.day-header.is-selected {
+.day-header.is-today {
   background-color: #e3f2fd;
   border-left: 4px solid #2196F3;
 }
