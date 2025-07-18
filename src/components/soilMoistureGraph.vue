@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineExpose } from 'vue';
+import { ref, onMounted, watch, defineExpose, computed } from 'vue';
 import * as d3 from 'd3';
 import type { Selection } from 'd3';
 import { useNexusStore } from '@/stores/nexus';
@@ -50,6 +50,7 @@ interface Props {
   dynamicTimeWindow?: 'none' | 'lastHour' | 'last24Hours' | 'last7Days' | 'last30Days';
   dataType: 'moisture' | 'temperature';
   sensorConfigs: Array<{ id: string; name: string }>;
+  droneImages?: Array<{ date: string; count: number }>; // Add this prop
 }
 
 const props = defineProps<Props>();
@@ -498,6 +499,87 @@ const createChart = () => {
     .attr("dy", "0.32em")
     .text((d: Sensor) => d.name);
 
+  // Add drone image indicators if we have them
+  if (props.droneImages && props.droneImages.length > 0) {
+    console.log('[soilMoistureGraph] Adding drone image indicators');
+    
+    // Create a group for drone indicators
+    const droneGroup = svg.value.append("g")
+      .attr("class", "drone-indicators");
+
+    props.droneImages.forEach(imageData => {
+      const imageDate = new Date(imageData.date);
+      const xPos = x(imageDate);
+      
+      // Only draw if the date falls within our visible range
+      if (xPos >= marginLeft && xPos <= width - marginRight) {
+        // Add drone icon/indicator
+        const indicator = droneGroup.append("g")
+          .attr("transform", `translate(${xPos}, ${marginTop})`)
+          .style("cursor", "pointer");
+
+        // Add drone icon (using a simple triangle for now)
+        indicator.append("path")
+          .attr("d", "M-6,-6 L6,-6 L0,6 Z")
+          .attr("fill", "#FF5722")
+          .attr("stroke", "white")
+          .attr("stroke-width", 1);
+
+        // Add count badge if more than 1 image
+        if (imageData.count > 1) {
+          indicator.append("circle")
+            .attr("cx", 6)
+            .attr("cy", -6)
+            .attr("r", 6)
+            .attr("fill", "#FF5722");
+
+          indicator.append("text")
+            .attr("x", 6)
+            .attr("y", -4)
+            .attr("text-anchor", "middle")
+            .attr("fill", "white")
+            .attr("font-size", "8px")
+            .text(imageData.count);
+        }
+
+        // Add hover effect
+        indicator
+          .on("mouseenter", function(event) {
+            d3.select(this)
+              .transition()
+              .duration(200)
+              .attr("transform", `translate(${xPos}, ${marginTop}) scale(1.2)`);
+
+            // Update tooltip
+            tooltipData.value = {
+              date: formatDate(imageDate),
+              value: `${imageData.count} drone image${imageData.count > 1 ? 's' : ''}`
+            };
+
+            const rect = chartContainer.value!.getBoundingClientRect();
+            tooltipStyle.value = {
+              left: `${event.clientX - rect.left + 10}px`,
+              top: `${event.clientY - rect.top - 10}px`
+            };
+
+            activeTooltip.value = true;
+          })
+          .on("mouseleave", function() {
+            d3.select(this)
+              .transition()
+              .duration(200)
+              .attr("transform", `translate(${xPos}, ${marginTop}) scale(1)`);
+
+            activeTooltip.value = false;
+          })
+          .on("click", () => {
+            // Emit event to parent to show drone images for this date
+            emit('showDroneImages', imageData.date);
+          });
+      }
+    });
+  }
+
   // Add the chart to the container
   if (chartContainer.value && svg.value.node()) {
     chartContainer.value.appendChild(svg.value.node()!);
@@ -755,6 +837,9 @@ onMounted(async () => {
   await fetchAllSensorData();
   // createChart(); // createChart is now called within fetchAllSensorData -> processAndDrawChart -> updateChart
 });
+
+// Add emits
+const emit = defineEmits(['showDroneImages']);
 </script>
 
 <style scoped>
