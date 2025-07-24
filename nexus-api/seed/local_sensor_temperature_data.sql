@@ -10,12 +10,7 @@ WHERE a.sensor_id = b.sensor_id
   AND a.date = b.date 
   AND a.id < b.max_id;
 
--- Now add the unique constraint
-ALTER TABLE sensor_temperature_data 
-ADD CONSTRAINT unique_sensor_temperature_data 
-UNIQUE (sensor_id, date);
-
--- Generate 6 months of hourly data for sensor_id 444574498032128
+-- Generate 6 months of hourly data for sensor B3
 -- This uses generate_series to create timestamps and a function for temperature values
 WITH hourly_timestamps AS (
   SELECT 
@@ -27,7 +22,7 @@ WITH hourly_timestamps AS (
 )
 INSERT INTO sensor_temperature_data (sensor_id, date, soil_temperature)
 SELECT
-  444574498032128 AS sensor_id,  -- The specific sensor ID
+  '2CF7F1C0649007B3' AS sensor_id,  -- Updated to new sensor ID (B3)
   timestamp,
   -- Generate realistic soil temperature values that vary over time:
   -- Base temperature (15-25°C range) + daily cycle (±5°C) + seasonal variation (±10°C) + random noise (±2°C)

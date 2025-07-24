@@ -231,10 +231,17 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 		return
 	}
 
-	// Extract sensor information
+	// Extract sensor information from MQTT topic
 	deviceID := parts[2]
-	sensorID := parts[3] // Use the hex sensor ID directly
+	sensorID := parts[3] // This is already in hex format (e.g., 2CF7F1C0649007B3)
 	valueIdentifier := parts[6]
+
+	// Log the received topic parts for debugging
+	m.logger.Debug().
+		Str("deviceID", deviceID).
+		Str("sensorID", sensorID).
+		Str("valueIdentifier", valueIdentifier).
+		Msg("Processing MQTT message")
 
 	// Parse the payload
 	var reading SensorReading
