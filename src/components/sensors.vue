@@ -269,7 +269,7 @@ const colors = ['#2196F3', '#FF5722', '#4CAF50', '#9C27B0']; // Material Design 
 
 const nexusStore = useNexusStore();
 // Convert decimal 444574498032128 to hex string
-const REALTIME_SENSOR_ID = "2CF7F1C0627000C4";
+const REALTIME_SENSOR_ID = "2CF7F1C0649007B3"; // Updated to use sensor B3
 
 interface RealtimeSensorDisplay {
   name: string;
