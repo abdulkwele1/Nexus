@@ -18,6 +18,18 @@
         </RouterLink>
       </div>
       <img src="../assets/farmMap.png" alt="Farm Map" class="farm-map" />
+      <!-- Sensor B3 point with tooltip -->
+      <div
+        class="map-point sensor sensor-b3"
+        :style="pointStyle(20, 40)"
+        @click="goTo('sensors')"
+        @mouseenter="handleMouseEnter($event, 'B3')"
+        @mouseleave="handleMouseLeave"
+        title="Sensor B3"
+      >
+        <i class="fas fa-thermometer-half"></i>
+      </div>
+
       <!-- Sensor BC point with tooltip -->
       <div
         class="map-point sensor sensor-bc"
@@ -314,6 +326,11 @@
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.map-point.sensor-b3 {
+  border-color: #4CAF50;
+  background: #E8F5E9;
+}
+
 .map-point.sensor-bc {
   border-color: #2196F3;
   background: #E3F2FD;
@@ -334,13 +351,18 @@ const router = useRouter();
 const nexusStore = useNexusStore();
 
 const SENSORS = {
+  B3: {
+    id: '2CF7F1C0649007B3',
+    name: 'Sensor B3',
+    color: '#4CAF50'
+  },
   BC: {
-    id: '2CF7F1C0627000BC',
+    id: '2CF7F1C064900792',
     name: 'Sensor BC',
     color: '#2196F3'
   },
   C4: {
-    id: '2CF7F1C0627000C4',
+    id: '2CF7F1C064900787',
     name: 'Sensor C4',
     color: '#FF5722'
   }
