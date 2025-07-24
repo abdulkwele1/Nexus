@@ -1,2 +1,1 @@
--- Removed mock data generation for sensor 444574498032128
--- Add new sensor moisture data generation below if needed
+-- No mock data - only real-time sensor data will be stored
