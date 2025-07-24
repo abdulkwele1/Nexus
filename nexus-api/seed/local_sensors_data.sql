@@ -4,9 +4,9 @@ INSERT INTO sensors (id, name, location, installation_date, latitude, longitude)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO sensors (id, name, location, installation_date, latitude, longitude) VALUES
-('2CF7F1C064900792', 'Sensor BC', 'Farm Sensor Location 2', NOW(), 37.7749, -122.4194)
+('2CF7F1C064900792', 'Sensor 92', 'Farm Sensor Location 2', NOW(), 37.7749, -122.4194)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO sensors (id, name, location, installation_date, latitude, longitude) VALUES
-('2CF7F1C064900787', 'Sensor C4', 'Farm Sensor Location 3', NOW(), 37.7749, -122.4194)
+('2CF7F1C064900787', 'Sensor 87', 'Farm Sensor Location 3', NOW(), 37.7749, -122.4194)
 ON CONFLICT (id) DO NOTHING;

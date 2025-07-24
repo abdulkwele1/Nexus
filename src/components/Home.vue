@@ -30,26 +30,26 @@
         <i class="fas fa-thermometer-half"></i>
       </div>
 
-      <!-- Sensor BC point with tooltip -->
+      <!-- Sensor 92 point with tooltip -->
       <div
-        class="map-point sensor sensor-bc"
+        class="map-point sensor sensor-92"
         :style="pointStyle(30, 70)"
         @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, 'BC')"
+        @mouseenter="handleMouseEnter($event, '92')"
         @mouseleave="handleMouseLeave"
-        title="Sensor BC"
+        title="Sensor 92"
       >
         <i class="fas fa-thermometer-half"></i>
       </div>
 
-      <!-- Sensor C4 point with tooltip -->
+      <!-- Sensor 87 point with tooltip -->
       <div
-        class="map-point sensor sensor-c4"
+        class="map-point sensor sensor-87"
         :style="pointStyle(40, 60)"
         @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, 'C4')"
+        @mouseenter="handleMouseEnter($event, '87')"
         @mouseleave="handleMouseLeave"
-        title="Sensor C4"
+        title="Sensor 87"
       >
         <i class="fas fa-thermometer-half"></i>
       </div>
@@ -331,12 +331,12 @@
   background: #E8F5E9;
 }
 
-.map-point.sensor-bc {
+.map-point.sensor-92 {
   border-color: #2196F3;
   background: #E3F2FD;
 }
 
-.map-point.sensor-c4 {
+.map-point.sensor-87 {
   border-color: #FF5722;
   background: #FBE9E7;
 }
@@ -356,14 +356,14 @@ const SENSORS = {
     name: 'Sensor B3',
     color: '#4CAF50'
   },
-  BC: {
+  '92': {
     id: '2CF7F1C064900792',
-    name: 'Sensor BC',
+    name: 'Sensor 92',
     color: '#2196F3'
   },
-  C4: {
+  '87': {
     id: '2CF7F1C064900787',
-    name: 'Sensor C4',
+    name: 'Sensor 87',
     color: '#FF5722'
   }
 };
