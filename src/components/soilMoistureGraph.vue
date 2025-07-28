@@ -61,14 +61,12 @@ const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(
 
 // Update colors to be more distinguishable
 const colors = [
-  '#2196F3',  // Bright Blue
-  '#FF5722',  // Deep Orange
-  '#4CAF50',  // Green
-  '#9C27B0',  // Purple
-  '#FFC107',  // Amber
-  '#E91E63',  // Pink
-  '#00BCD4',  // Cyan
-  '#FF9800'   // Orange
+  '#4CAF50',  // Green (B3)
+  '#2196F3',  // Blue (92)
+  '#FF5722',  // Deep Orange (87)
+  '#9C27B0',  // Purple (9D)
+  '#FFC107',  // Amber (B9)
+  '#00BCD4',  // Cyan (C6)
 ];
 
 // Remove hardcoded SENSOR_CONFIGS and use props
@@ -154,6 +152,11 @@ const processAndDrawChart = () => {
   updateChart(processedData);
 }
 
+// Add conversion function
+const celsiusToFahrenheit = (celsius: number) => {
+  return (celsius * 9/5) + 32;
+};
+
 const formatDate = (date: Date) => {
   return date.toLocaleString('en-US', {
     month: 'short',
@@ -164,9 +167,13 @@ const formatDate = (date: Date) => {
   });
 };
 
-const formatValue = (value: number) => {
-  return props.dataType === 'moisture' ? `${value.toFixed(1)}%` : `${value.toFixed(1)}°C`;
-};
+// Format functions
+function formatValue(value: number, type: 'moisture' | 'temperature') {
+  if (value === null) return 'Loading...';
+  return type === 'temperature' 
+    ? `${celsiusToFahrenheit(value).toFixed(1)}°F`
+    : `${value.toFixed(1)}%`;
+}
 
 const createChart = () => {
   if (!chartContainer.value) return;
@@ -407,7 +414,7 @@ const createChart = () => {
       // Update tooltip data
       tooltipData.value = {
         date: formatDate(d.time),
-        value: formatValue(d.moisture)
+        value: formatValue(d.moisture, props.dataType)
       };
 
       // Position tooltip
