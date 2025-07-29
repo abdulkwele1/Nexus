@@ -95,9 +95,14 @@ const createChart = () => {
   if (!chartContainer.value) return;
   d3.select(chartContainer.value).select("svg").remove();
 
-  const width = 960;
-  const height = 500;
-  const margin = { top: 30, right: 20, bottom: 50, left: 150 };
+  const width = 900;
+  const height = 600;
+  const margin = { 
+    top: 40, 
+    right: 40, 
+    bottom: 60, 
+    left: 130 // Further increased left margin
+  };
 
   // Sort data by date
   const sortedData = [...props.solarData].sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -105,92 +110,149 @@ const createChart = () => {
   const x = d3.scaleBand()
     .domain(sortedData.map(d => d3.timeFormat("%Y-%m-%d")(d.date)))
     .range([margin.left, width - margin.right])
-    .padding(0.1);
+    .padding(0.2);
 
   const y = d3.scaleLinear()
     .domain([0, d3.max(sortedData, d => d.kwh_yield) || 1])
-    .range([height - margin.bottom, margin.top]);
+    .range([height - margin.bottom, margin.top])
+    .nice();
 
   const svg = d3.select(chartContainer.value)
     .append("svg")
     .attr("width", width)
-    .attr("height", height);
+    .attr("height", height)
+    .attr("viewBox", `0 0 ${width} ${height}`);
+
+  // Add gradient definition
+  const gradient = svg.append("defs")
+    .append("linearGradient")
+    .attr("id", "yield-gradient")
+    .attr("x1", "0%")
+    .attr("y1", "0%")
+    .attr("x2", "0%")
+    .attr("y2", "100%");
+
+  gradient.append("stop")
+    .attr("offset", "0%")
+    .attr("stop-color", "#90EE90")
+    .attr("stop-opacity", 0.3);
+
+  gradient.append("stop")
+    .attr("offset", "100%")
+    .attr("stop-color", "#90EE90")
+    .attr("stop-opacity", 0.05);
+
+  // Add grid lines
+  svg.append("g")
+    .attr("class", "grid-lines")
+    .attr("transform", `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y)
+      .tickSize(-width + margin.left + margin.right)
+      .tickFormat(() => ""));
 
   // Add x-axis
   svg.append("g")
     .attr("transform", `translate(0,${height - margin.bottom})`)
     .call(d3.axisBottom(x))
     .selectAll("text")
-    .attr("transform", "rotate(-45)")
-    .style("text-anchor", "end");
+    .attr("y", 10) // Move text slightly down for better spacing
+    .style("text-anchor", "middle") // Center the text under each tick
+    .style("fill", "rgba(255, 255, 255, 0.8)")
+    .text(d => {
+      // Parse the date string that's in "YYYY-MM-DD" format
+      const [year, month, day] = (d as string).split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    });
 
-  // Add y-axis
+  // Add y-axis with better spacing
   svg.append("g")
     .attr("transform", `translate(${margin.left},0)`)
-    .call(d3.axisLeft(y));
+    .call(d3.axisLeft(y)
+      .ticks(5)
+      .tickFormat((d: d3.NumberValue) => `${d.valueOf()} kWh`))
+    .selectAll("text")
+    .attr("x", -10); // Move tick labels further from axis
 
-  // Render chart based on type
-    if (props.isLineChart) {
-    // Create a time scale for the line chart
+  // Add y-axis label with better positioning
+  svg.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", margin.left/4) // Moved label even more to the left
+    .attr("x", -(height/2))
+    .attr("dy", "1em")
+    .style("text-anchor", "middle")
+    .style("fill", "rgba(255, 255, 255, 0.8)")
+    .style("font-size", "14px")
+    .text("Energy Yield (kWh)");
+
+  if (props.isLineChart) {
     const timeScale = d3.scaleTime()
       .domain(d3.extent(sortedData, d => d.date) as [Date, Date])
       .range([margin.left, width - margin.right]);
 
-    // Create the line generator
     const line = d3.line<DataPoint>()
       .x(d => timeScale(d.date))
       .y(d => y(d.kwh_yield))
-      .curve(d3.curveLinear);
+      .curve(d3.curveMonotoneX);
 
-    // Add the line path
-      svg.append("path")
+    // Add area under the line
+    const area = d3.area<DataPoint>()
+      .x(d => timeScale(d.date))
+      .y0(height - margin.bottom)
+      .y1(d => y(d.kwh_yield))
+      .curve(d3.curveMonotoneX);
+
+    // Add the area
+    svg.append("path")
       .datum(sortedData)
-        .attr("fill", "none")
-        .attr("stroke", "#69b3a2")
-        .attr("stroke-width", 2)
-        .attr("d", line);
+      .attr("class", "area")
+      .attr("d", area);
+
+    // Add the line
+    svg.append("path")
+      .datum(sortedData)
+      .attr("class", "line")
+      .attr("fill", "none")
+      .attr("d", line);
 
     // Add points
-      svg.selectAll(".hover-circle")
+    svg.selectAll(".data-point")
       .data(sortedData)
-        .enter()
-        .append("circle")
-        .attr("class", "hover-circle")
+      .enter()
+      .append("circle")
+      .attr("class", "data-point")
       .attr("cx", d => timeScale(d.date))
-        .attr("cy", d => y(d.kwh_yield))
-        .attr("r", 4)
-        .attr("fill", "#69b3a2")
+      .attr("cy", d => y(d.kwh_yield))
+      .attr("r", 6)
+      .attr("fill", "#90EE90")
       .on("mouseover", (event, d) => showTooltip(event, d))
-        .on("mousemove", moveTooltip)
-        .on("mouseout", hideTooltip);
-
-    // Update x-axis for line chart
-    const xAxis = d3.axisBottom(timeScale)
-      .ticks(d3.timeDay.every(1))
-      .tickFormat(d3.timeFormat("%Y-%m-%d") as any);
-
-    svg.select("g")
-      .attr("transform", `translate(0,${height - margin.bottom})`)
-      .call(xAxis as any)
-      .selectAll("text")
-      .attr("transform", "rotate(-45)")
-      .style("text-anchor", "end");
-    } else {
+      .on("mousemove", moveTooltip)
+      .on("mouseout", hideTooltip);
+  } else {
     // Bar chart
-      svg.selectAll(".bar")
+    svg.selectAll(".bar")
       .data(sortedData)
-        .enter()
-        .append("rect")
-        .attr("class", "bar")
+      .enter()
+      .append("rect")
+      .attr("class", "bar")
       .attr("x", d => x(d3.timeFormat("%Y-%m-%d")(d.date)) || 0)
-        .attr("y", d => y(d.kwh_yield))
-        .attr("width", x.bandwidth())
-        .attr("height", d => y(0) - y(d.kwh_yield))
-        .attr("fill", "#69b3a2")
+      .attr("y", height - margin.bottom)
+      .attr("width", x.bandwidth())
+      .attr("height", 0)
+      .attr("fill", "url(#yield-gradient)")
+      .attr("rx", 4)
       .on("mouseover", (event, d) => showTooltip(event, d))
-        .on("mousemove", moveTooltip)
-        .on("mouseout", hideTooltip);
-    }
+      .on("mousemove", moveTooltip)
+      .on("mouseout", hideTooltip)
+      .transition()
+      .duration(800)
+      .delay((d, i) => i * 50)
+      .attr("y", d => y(d.kwh_yield))
+      .attr("height", d => height - margin.bottom - y(d.kwh_yield));
+  }
 };
 
 const fetchLatestData = async () => {
@@ -265,46 +327,111 @@ onMounted(() => {
 
 <style scoped>
 .chart-container {
-  width: 100%;
-  height: 100%;
+  width: 900px;
+  height: 600px;
   position: relative;
+  padding: 32px;
+  background: #1a1a1a;
+  border-radius: 16px;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(144, 238, 144, 0.05);
+  margin: 100px auto;
+  margin-left: 180px;
+  transition: all 0.3s ease;
+}
+
+/* Make sure the graph container is visible on smaller screens */
+@media (max-width: 1400px) {
+  .chart-container {
+    width: calc(100% - 320px);
+    min-width: 600px;
+  }
 }
 
 .tooltip-container {
   position: absolute;
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(26, 26, 26, 0.98);
+  border: 1px solid rgba(144, 238, 144, 0.2);
   border-radius: 12px;
-  padding: 12px 16px;
+  padding: 16px 20px;
   box-shadow: 
-    0 4px 24px -1px rgba(0, 0, 0, 0.08),
-    0 0 1px 0 rgba(0, 0, 0, 0.06),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(144, 238, 144, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   pointer-events: none;
   z-index: 1000;
-  min-width: 120px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  min-width: 140px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transform: translateY(-4px);
+  transition: all 0.2s ease;
 }
 
 .tooltip-content {
-  font-size: 12px;
-  line-height: 1.5;
-  color: rgba(0, 0, 0, 0.8);
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 0.3px;
 }
 
 .tooltip-date {
-  color: rgba(0, 0, 0, 0.6);
-  margin-bottom: 6px;
-  font-weight: 500;
+  color: rgba(144, 238, 144, 0.9);
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .tooltip-value {
-  color: rgba(0, 0, 0, 0.9);
+  color: white;
   font-weight: 600;
+  font-size: 16px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.points circle {
-  transition: r 0.2s, stroke-width 0.2s;
+/* Style the axis lines and text */
+:deep(.domain),
+:deep(.tick line) {
+  stroke: rgba(144, 238, 144, 0.2);
+  stroke-width: 1px;
+}
+
+:deep(.tick text) {
+  fill: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Add grid lines */
+:deep(.grid-lines line) {
+  stroke: rgba(144, 238, 144, 0.05);
+  stroke-dasharray: 4,4;
+}
+
+/* Style the data points */
+:deep(circle) {
+  transition: all 0.2s ease;
+  stroke: #1a1a1a;
+  stroke-width: 2;
+}
+
+:deep(circle):hover {
+  stroke: rgba(144, 238, 144, 1);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 8px rgba(144, 238, 144, 0.4));
+}
+
+/* Style the line/area */
+:deep(path.line) {
+  stroke: #90EE90;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 2px 4px rgba(144, 238, 144, 0.2));
+}
+
+:deep(path.area) {
+  fill: url(#yield-gradient);
+  opacity: 0.2;
 }
 </style>

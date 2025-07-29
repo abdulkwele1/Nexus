@@ -1,9 +1,25 @@
 <template>
   <div class="settings-container">
-    <button class="home-button" @click="goHome">Home</button>
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="max-w-screen-xl flex flex-wrap items-center justify-center mx-auto py-2 px-4">
+        <div class="flex items-center justify-center w-full">
+          <a @click="goHome" class="flex items-center space-x-3 rtl:space-x-reverse cursor-pointer">
+            <img alt="Vue logo" class="logo" src="@/assets/nexus.png" width="80" height="32" />
+          </a>
+          <div class="ml-8">
+            <ul class="font-medium flex flex-row space-x-8">
+              <li>
+                <a @click="goHome" class="text-white hover:text-[#90EE90] cursor-pointer">Home</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Settings Content -->
     <div class="settings-content">
-      <div class="option" @click="optionOne">Change email</div>
-      <div class="divider"></div>
       <div class="option" @click="showChangePasswordModal = true">Change password</div>
       <div class="divider"></div>
       <div class="option" @click="logout">Log Out</div>
@@ -120,47 +136,65 @@ const logout = async () => {
 </script>
 
 <style scoped>
-/* Container for settings page */
+/* Navbar styles */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+  margin-top: -1px;
+  height: 60px;
+  background-color: #000000; /* Pure black for navbar */
+  border-bottom: 2px solid #90EE90;
+  box-shadow: 0 0 10px rgba(144, 238, 144, 0.3);
+}
+
+.max-w-screen-xl {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  width: 80px;
+  height: 32px;
+  object-fit: contain;
+}
+
+/* Settings container adjustments */
 .settings-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh; /* Full viewport height */
-  padding: 20px;
+  min-height: 100vh;
+  padding: 80px 20px 20px;
   box-sizing: border-box;
+  background-color: #121212; /* Slightly lighter than black for main background */
 }
 
-/* Style for the home button */
+/* Remove the home button styles since it's now in the navbar */
 .home-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  padding: 10px 20px;
-  font-size: 16px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s;
+  display: none;
 }
 
-.home-button:hover {
-  background-color: #0056b3;
-}
-
-/* Container for settings options */
+/* Settings content adjustments */
 .settings-content {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-width: 600px; /* Optional: limit the width */
+  max-width: 600px;
+  background: #1a1a1a; /* Even lighter for the content area */
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-/* Style for each option */
 .option {
   padding: 20px;
   font-size: 18px;
@@ -168,18 +202,20 @@ const logout = async () => {
   text-align: center;
   cursor: pointer;
   transition: background-color 0.3s;
+  border-radius: 4px;
+  color: white;
 }
 
 .option:hover {
-  background-color: #f0f0f0;
+  background-color: #242424; /* Slightly lighter on hover */
 }
 
-/* Divider between options */
 .divider {
   width: 100%;
-  height: 1px;
-  background-color: #ddd;
+  height: 2px;
+  background-color: #90EE90; /* Light green color */
   margin: 10px 0;
+  box-shadow: 0 0 8px rgba(144, 238, 144, 0.5); /* Subtle glow effect */
 }
 
 /* Modal styling */
@@ -189,30 +225,100 @@ const logout = async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 1001;
 }
 
 .modal-content {
-  background: white;
-  padding: 20px;
+  background: #1a1a1a;
+  padding: 30px;
   border-radius: 8px;
   width: 300px;
+  box-shadow: 0 4px 20px rgba(144, 238, 144, 0.1);
+  border: 1px solid rgba(144, 238, 144, 0.2);
 }
 
-/* Button container styling */
+.modal-content h2 {
+  margin-bottom: 20px;
+  color: white;
+  font-size: 24px;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-size: 16px;
+  background: #2a2a2a;
+  color: white;
+}
+
+.modal-content input:focus {
+  outline: none;
+  border-color: #90EE90;
+  box-shadow: 0 0 5px rgba(144, 238, 144, 0.3);
+}
+
 .button-container {
   display: flex;
-  justify-content: space-between; /* Align buttons to opposite sides */
+  justify-content: space-between;
   margin-top: 20px;
 }
 
-/* Error message styling */
+.submit-button, .cancel-button {
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.submit-button {
+  background-color: #90EE90;
+  color: black;
+  border: none;
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #7CCD7C;
+  box-shadow: 0 0 10px rgba(144, 238, 144, 0.3);
+}
+
+.submit-button:disabled {
+  background-color: #444;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.cancel-button {
+  background-color: transparent;
+  border: 1px solid #90EE90;
+  color: #90EE90;
+}
+
+.cancel-button:hover {
+  background-color: rgba(144, 238, 144, 0.1);
+  box-shadow: 0 0 10px rgba(144, 238, 144, 0.2);
+}
+
 .error {
-  color: red;
+  color: #ff6b6b;
   font-size: 14px;
-  margin-top: 10px;
+  margin-top: 15px;
+  text-align: center;
+}
+
+/* Navigation text color */
+.navbar a {
+  color: white;
+}
+
+.navbar a:hover {
+  color: #90EE90;
 }
 </style>
