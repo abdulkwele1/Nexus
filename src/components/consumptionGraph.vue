@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onUnmounted } from 'vue';
 import { Chart } from 'chart.js/auto';
-import type { ChartType, TooltipItem } from 'chart.js';
+import type { ChartConfiguration, ChartData, ChartType, TooltipItem } from 'chart.js';
 import { useNexusStore } from '@/stores/nexus'
 const store = useNexusStore()
 
@@ -44,7 +44,7 @@ const props = defineProps<{
   isPieChart?: boolean;
 }>();
 
-// Add type for chart instance
+// Add proper type for chart instance
 let chartInstance: Chart | null = null;
 
 // Function to render the chart
@@ -57,7 +57,6 @@ const renderChart = () => {
 
   // Destroy previous chart if it exists
   if (chartInstance) {
-    console.log('[consumptionGraph] Destroying previous chart instance');
     chartInstance.destroy();
     chartInstance = null;
   }
@@ -82,63 +81,79 @@ const renderChart = () => {
     const avgElectricity = totalData.reduce((sum, point) => sum + point.electricity, 0) / totalData.length;
     const avgDirect = totalData.reduce((sum, point) => sum + point.direct, 0) / totalData.length;
     
-    console.log('[consumptionGraph] Calculated averages for pie chart:', {
-      electricity: avgElectricity,
-      direct: avgDirect,
-      dataPoints: totalData.length
-    });
-
-    chartInstance = new Chart(ctx, {
+    // Update the chart configuration
+    const config: ChartConfiguration = {
       type: 'pie',
       data: {
         labels: ['Avg. Electricity Stored', 'Avg. Direct Usage'],
         datasets: [{
           data: [avgElectricity || 0, avgDirect || 0],
-          backgroundColor: ['#007bff', '#ffc107'],
-          borderColor: ['rgba(0, 123, 255, 0.2)', 'rgba(255, 193, 7, 0.2)'],
-          borderWidth: 1
+          backgroundColor: ['rgba(144, 238, 144, 0.8)', 'rgba(255, 193, 7, 0.8)'],
+          borderColor: ['rgba(144, 238, 144, 0.2)', 'rgba(255, 193, 7, 0.2)'],
+          borderWidth: 2,
+          hoverBackgroundColor: ['rgba(144, 238, 144, 1)', 'rgba(255, 193, 7, 1)'],
+          hoverBorderColor: ['rgba(144, 238, 144, 0.4)', 'rgba(255, 193, 7, 0.4)'],
+          hoverBorderWidth: 3
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+          duration: 750,
+          easing: 'easeOutQuart'
+        },
         plugins: {
           title: {
             display: true,
             text: `Average Energy Distribution (${totalData.length} days)`,
+            color: 'rgba(255, 255, 255, 0.9)',
             font: {
-              size: 16
-            }
+              size: 16,
+              weight: 500
+            },
+            padding: 20
           },
           tooltip: {
             callbacks: {
-              label: function(context: TooltipItem<'pie'>) {
+              label: function(context) {
                 const value = context.raw as number;
                 return `${context.label}: ${value.toFixed(1)}kWh`;
               }
-            }
+            },
+            backgroundColor: 'rgba(26, 26, 26, 0.98)',
+            titleColor: 'rgba(144, 238, 144, 0.9)',
+            bodyColor: 'white',
+            borderColor: 'rgba(144, 238, 144, 0.2)',
+            borderWidth: 1,
+            padding: 12,
+            boxPadding: 6,
+            usePointStyle: true
           },
           legend: {
             position: 'bottom',
             labels: {
+              color: 'rgba(255, 255, 255, 0.8)',
               padding: 20,
               font: {
                 size: 14
-              }
+              },
+              usePointStyle: true
             }
           }
         }
       }
-    } as any);
-    console.log('[consumptionGraph] Pie chart rendered with averages:', [avgElectricity || 0, avgDirect || 0]);
+    };
+
+    chartInstance = new Chart(ctx, config);
   } else {
-    // Existing bar chart configuration
+    // Bar chart configuration
     const maxElectricity = Math.max(...electricityUsageData.value);
     const maxDirectUsage = Math.max(...directUsageData.value);
     const maxValue = Math.max(maxElectricity, maxDirectUsage);
     const yAxisMax = Math.ceil(maxValue / 100) * 100;
 
-    chartInstance = new Chart(ctx, {
+    const config: ChartConfiguration = {
       type: 'bar',
       data: {
         labels: labels.value,
@@ -146,12 +161,24 @@ const renderChart = () => {
           {
             label: 'Electricity Stored (kWh)',
             data: electricityUsageData.value,
-            backgroundColor: '#007bff',
+            backgroundColor: 'rgba(144, 238, 144, 0.8)',
+            borderColor: 'rgba(144, 238, 144, 0.2)',
+            borderWidth: 2,
+            borderRadius: 4,
+            hoverBackgroundColor: 'rgba(144, 238, 144, 1)',
+            hoverBorderColor: 'rgba(144, 238, 144, 0.4)',
+            hoverBorderWidth: 3
           },
           {
             label: 'Direct Usage (kWh)',
             data: directUsageData.value,
-            backgroundColor: '#ffc107',
+            backgroundColor: 'rgba(255, 193, 7, 0.8)',
+            borderColor: 'rgba(255, 193, 7, 0.2)',
+            borderWidth: 2,
+            borderRadius: 4,
+            hoverBackgroundColor: 'rgba(255, 193, 7, 1)',
+            hoverBorderColor: 'rgba(255, 193, 7, 0.4)',
+            hoverBorderWidth: 3
           },
         ],
       },
@@ -162,13 +189,35 @@ const renderChart = () => {
           y: {
             beginAtZero: true,
             max: yAxisMax,
+            grid: {
+              color: 'rgba(144, 238, 144, 0.05)',
+              display: true
+            },
+            border: {
+              display: false
+            },
             ticks: {
-              stepSize: Math.max(10, Math.floor(yAxisMax / 10))
+              stepSize: Math.max(10, Math.floor(yAxisMax / 10)),
+              color: 'rgba(255, 255, 255, 0.8)',
+              font: {
+                size: 12
+              }
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            },
+            border: {
+              display: false
+            },
+            ticks: {
+              color: 'rgba(255, 255, 255, 0.8)',
+              font: {
+                size: 12
+              }
             }
           }
-        },
-        animation: {
-          duration: 0
         },
         plugins: {
           tooltip: {
@@ -193,8 +242,8 @@ const renderChart = () => {
               tooltipData.value = {
                 date: formattedDate,
                 value: directValue !== undefined 
-                  ? `Electricity: ${electricityValue}kWh\nDirect: ${directValue}kWh`
-                  : `Electricity: ${electricityValue}kWh`
+                  ? `Electricity: ${electricityValue.toFixed(1)}kWh\nDirect: ${directValue.toFixed(1)}kWh`
+                  : `Electricity: ${electricityValue.toFixed(1)}kWh`
               };
 
               // Position tooltip at mouse position
@@ -211,10 +260,22 @@ const renderChart = () => {
 
               activeTooltip.value = true;
             }
+          },
+          legend: {
+            labels: {
+              color: 'rgba(255, 255, 255, 0.8)',
+              font: {
+                size: 14
+              },
+              padding: 20,
+              usePointStyle: true
+            }
           }
         }
       },
-    });
+    };
+
+    chartInstance = new Chart(ctx, config);
   }
 };
 
@@ -342,41 +403,92 @@ const tooltipStyle = ref({
 .consumption-graph {
   width: 900px;
   height: 600px;
-  margin: auto;
   position: relative;
+  padding: 32px;
+  background: #1a1a1a;
+  border-radius: 16px;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(144, 238, 144, 0.05);
+  margin: 100px auto;
+  margin-left: 180px;
+  transition: all 0.3s ease;
 }
 
+/* Make sure the graph container is visible on smaller screens */
+@media (max-width: 1400px) {
+  .consumption-graph {
+    width: calc(100% - 320px);
+    min-width: 600px;
+  }
+}
+
+/* Style the chart elements */
+:deep(.chart-js-render-monitor) {
+  border-radius: 12px;
+}
+
+:deep(.chartjs-tooltip) {
+  background: rgba(26, 26, 26, 0.98) !important;
+  border: 1px solid rgba(144, 238, 144, 0.2) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(144, 238, 144, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+:deep(.chartjs-render-monitor) {
+  filter: drop-shadow(0 4px 12px rgba(144, 238, 144, 0.1));
+}
+
+/* Style the axes and grid */
+:deep(.chartjs-render-monitor) {
+  & > canvas {
+    border-radius: 12px;
+  }
+}
+
+/* Custom tooltip styling */
 .tooltip-container {
   position: absolute;
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(26, 26, 26, 0.98);
+  border: 1px solid rgba(144, 238, 144, 0.2);
   border-radius: 12px;
-  padding: 12px 16px;
+  padding: 16px 20px;
   box-shadow: 
-    0 4px 24px -1px rgba(0, 0, 0, 0.08),
-    0 0 1px 0 rgba(0, 0, 0, 0.06),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(144, 238, 144, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   pointer-events: none;
   z-index: 1000;
-  min-width: 120px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  min-width: 140px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transform: translateY(-4px);
+  transition: all 0.2s ease;
 }
 
 .tooltip-content {
-  font-size: 12px;
-  line-height: 1.5;
-  color: rgba(0, 0, 0, 0.8);
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 0.3px;
 }
 
 .tooltip-date {
-  color: rgba(0, 0, 0, 0.6);
-  margin-bottom: 6px;
-  font-weight: 500;
+  color: rgba(144, 238, 144, 0.9);
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .tooltip-value {
-  color: rgba(0, 0, 0, 0.9);
+  color: white;
   font-weight: 600;
+  font-size: 16px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  white-space: pre-line;
 }
 </style>

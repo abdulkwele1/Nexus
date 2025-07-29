@@ -265,14 +265,7 @@ const dynamicTimeWindow = ref<'none' | 'lastHour' | 'last24Hours' | 'last7Days' 
 // Real-time data setup
 const currentTime = ref(new Date());
 const currentSensorIndex = ref(0);
-const colors = [
-  '#4CAF50',  // B3 - Green
-  '#2196F3',  // 92 - Blue
-  '#FF5722',  // 87 - Deep Orange
-  '#9C27B0',  // 9D - Purple
-  '#FFC107',  // B9 - Amber
-  '#00BCD4'   // C6 - Cyan
-]; // Material Design colors matching Home.vue SENSORS config
+const colors = ['#2196F3', '#FF5722', '#4CAF50', '#9C27B0']; // Material Design colors: Blue, Deep Orange, Green, Purple
 
 const nexusStore = useNexusStore();
 // Convert decimal 444574498032128 to hex string
@@ -960,7 +953,7 @@ watch(() => queryParams.value, async (newParams) => {
 // Add template for drone image modal
 </script>
 
-<style scoped>
+<style>
 .navbar {
   position: fixed;
   left: 0;
@@ -1009,126 +1002,101 @@ watch(() => queryParams.value, async (newParams) => {
 
 .query-panel {
   width: 300px;
-  background: #1a1a1a;
-  padding: 24px;
-  border-right: 2px solid #90EE90;
+  background: #f8f9fa;
+  padding: 20px;
+  border-right: 1px solid #dee2e6;
   height: calc(100vh - 60px);
   position: fixed;
   overflow-y: auto;
-  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
 }
 
 .panel-section {
-  margin-bottom: 28px;
-  background: #242424;
-  padding: 20px;
-  border-radius: 8px;
-  border: 1px solid rgba(144, 238, 144, 0.1);
+  margin-bottom: 24px;
 }
 
 .panel-section h3 {
-  margin: 0 0 16px 0;
+  margin: 0 0 12px 0;
   font-size: 1rem;
-  color: #90EE90;
-  letter-spacing: 0.5px;
-  font-weight: 500;
+  color: #333;
 }
 
-/* Sensor Selection Styling */
-.sensor-checkbox label {
+.date-inputs, .range-inputs {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  padding: 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  background: #1a1a1a;
-  transition: all 0.3s ease;
-  color: white;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.sensor-checkbox label:hover {
-  background: #2f2f2f;
-  border-color: #90EE90;
-  transform: translateX(4px);
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.sensor-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #90EE90;
+.input-group label {
+  font-size: 0.875rem;
+  color: #666;
 }
 
-.sensor-checkbox .sensor-name {
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+.input-group input,
+select {
+  padding: 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 0.875rem;
 }
 
-/* Quick Filters Styling */
 .quick-filters {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .quick-filters button {
-  padding: 10px;
-  background: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.9);
+  padding: 8px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 0.9rem;
+  transition: all 0.2s;
 }
 
 .quick-filters button:hover {
-  background: #2f2f2f;
-  border-color: #90EE90;
-  transform: translateX(4px);
-  color: #90EE90;
+  background: #f0f0f0;
+  border-color: #adb5bd;
 }
 
 .apply-btn {
   width: 100%;
   padding: 12px;
-  background: #1a1a1a;
-  color: #90EE90;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  border-radius: 6px;
+  background: #0056b3;
+  color: white;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
+  font-weight: bold;
+  transition: background-color 0.2s;
   margin-bottom: 0;
 }
 
 .apply-btn:hover {
-  background: #2f2f2f;
-  border-color: #90EE90;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(144, 238, 144, 0.1);
+  background: #004494;
 }
 
 .export-btn {
   width: 100%;
   padding: 12px;
-  background: #1a1a1a;
-  color: #90EE90;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  border-radius: 6px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
+  font-weight: bold;
+  transition: background-color 0.2s;
   margin-top: 12px;
 }
 
 .export-btn:hover {
-  background: #2f2f2f;
-  border-color: #90EE90;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(144, 238, 144, 0.1);
+  background: #218838;
 }
 
 .sensors-content {
@@ -1142,10 +1110,9 @@ watch(() => queryParams.value, async (newParams) => {
 
 .realtime-container {
   padding: 20px;
-  background: #1a1a1a;
+  background: #f8f9fa;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(144, 238, 144, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   max-width: 928px; /* Align with graph */
   margin-left: auto;   /* Center container */
   margin-right: auto;  /* Center container */
@@ -1166,38 +1133,31 @@ watch(() => queryParams.value, async (newParams) => {
 }
 
 .sensor-card {
-  background: #242424;
+  background: white;
   padding: 20px;
   border-radius: 8px;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  width: 100%;
-  box-sizing: border-box;
+  border-left: 4px solid var(--sensor-color);
+  /* min-width: 200px; */ /* Replaced by width */
+  width: 100%; /* Make card fill carousel */
+  box-sizing: border-box; /* Include padding in width calculation */
   text-align: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.sensor-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(144, 238, 144, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .sensor-card h3 {
   margin: 0 0 10px 0;
-  color: #90EE90;
+  color: var(--sensor-color);
 }
 
 .sensor-value {
   font-size: 2rem;
   font-weight: bold;
   margin: 10px 0;
-  color: white;
-  text-shadow: 0 0 10px rgba(144, 238, 144, 0.2);
 }
 
 .sensor-time {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #666;
 }
 
 /* Responsive adjustments */
@@ -1231,37 +1191,38 @@ watch(() => queryParams.value, async (newParams) => {
 }
 
 /* Add styles for the slideshow control */
-.resolution-slideshow,
-.sensor-type-slideshow {
+.resolution-slideshow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  border-radius: 6px;
-  padding: 12px;
+  align-items: center; /* Vertically align buttons and label */
+  justify-content: space-between; /* Space out buttons and label */
+  border: 1px solid #dee2e6; /* Optional border */
+  border-radius: 4px;
+  padding: 5px 10px; /* Add some padding */
+  background-color: white; /* Optional background */
 }
 
 .slideshow-btn {
   background: transparent;
   border: none;
-  font-size: 1.2rem;
+  font-size: 1.5em; /* Make arrows bigger */
   cursor: pointer;
-  color: #90EE90;
-  padding: 0 8px;
-  transition: all 0.3s ease;
+  color: #555;
+  padding: 0 5px; /* Give arrows some space */
+  line-height: 1; /* Adjust line height for vertical centering */
+  transition: color 0.2s;
 }
 
 .slideshow-btn:hover {
-  color: white;
-  transform: scale(1.1);
+  color: #0056b3;
 }
 
 .slideshow-label {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
+  font-size: 0.9em;
+  color: #333; /* Make label text darker */
+  font-weight: 500; /* Slightly bolder */
   text-align: center;
+  flex-grow: 1; /* Allow label to take up space */
+  margin: 0 5px; /* Add margin around label */
 }
 
 /* Add styles for the sensor slideshow control */
@@ -1284,215 +1245,119 @@ watch(() => queryParams.value, async (newParams) => {
   margin: 0 5px; 
 }
 
-/* Update the sensor type slideshow styles */
+/* Add styles for the sensor type slideshow control */
 .sensor-type-slideshow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  border-radius: 6px;
-  padding: 12px;
-  position: relative;
-}
-
-.sensor-type-slideshow::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  background: linear-gradient(to right, transparent, #90EE90, transparent);
-  opacity: 0.5;
-}
-
-.sensor-type-slideshow .slideshow-btn {
-  background: #242424;
-  border: 1px solid rgba(144, 238, 144, 0.1);
+  align-items: center; 
+  justify-content: space-between; 
+  border: 1px solid #dee2e6; 
   border-radius: 4px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  cursor: pointer;
-  color: #90EE90;
-  transition: all 0.3s ease;
-  z-index: 1;
-}
-
-.sensor-type-slideshow .slideshow-btn:hover {
-  background: #2f2f2f;
-  border-color: #90EE90;
-  color: white;
-  transform: scale(1.1);
-}
-
-.sensor-type-slideshow .slideshow-label {
-  font-size: 1rem;
-  color: white;
-  font-weight: 500;
-  text-align: center;
-  padding: 0 16px;
-  flex-grow: 1;
-  text-shadow: 0 0 10px rgba(144, 238, 144, 0.2);
-  position: relative;
-}
-
-.sensor-type-slideshow .slideshow-label::before {
-  content: '';
-  position: absolute;
-  left: -8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  background: #90EE90;
-  border-radius: 50%;
-  box-shadow: 0 0 8px rgba(144, 238, 144, 0.4);
-}
-
-.sensor-type-slideshow .slideshow-label::after {
-  content: '';
-  position: absolute;
-  right: -8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  background: #90EE90;
-  border-radius: 50%;
-  box-shadow: 0 0 8px rgba(144, 238, 144, 0.4);
+  padding: 5px 10px; 
+  background-color: white; 
 }
 
 /* Styles for the sensor selection checkboxes */
 .sensor-selection {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.sensor-checkbox {
-  width: 100%;
+  gap: 10px;
 }
 
 .sensor-checkbox label {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   cursor: pointer;
-  padding: 12px 16px;
-  border-radius: 6px;
-  background: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  transition: all 0.3s ease;
-  width: 100%;
-  box-sizing: border-box;
-  position: relative; /* For the color indicator */
-}
-
-.sensor-checkbox label::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--sensor-color);
-  border-top-left-radius: 6px;
-  border-bottom-left-radius: 6px;
-  opacity: 0.8;
-  transition: all 0.3s ease;
+  padding: 8px;
+  border-radius: 4px;
+  border-left: 4px solid var(--sensor-color);
+  background: white;
+  transition: background-color 0.2s;
 }
 
 .sensor-checkbox label:hover {
-  background: #2f2f2f;
-  border-color: var(--sensor-color);
-  transform: translateX(4px);
-}
-
-.sensor-checkbox label:hover::before {
-  opacity: 1;
-  width: 6px;
+  background: #f0f0f0;
 }
 
 .sensor-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
-  accent-color: var(--sensor-color);
-  background-color: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-}
-
-.sensor-checkbox input[type="checkbox"]:checked {
-  background-color: var(--sensor-color);
-  border-color: var(--sensor-color);
 }
 
 .sensor-checkbox .sensor-name {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.95rem;
   font-weight: 500;
-  flex-grow: 1;
-  padding-left: 4px;
+  color: var(--sensor-color);
 }
 
-/* Add a small dot indicator next to the name */
-.sensor-checkbox .sensor-name::after {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--sensor-color);
-  margin-left: 8px;
-  vertical-align: middle;
-  opacity: 0.8;
+.sensor-card-header {
+  display: flex;
+  justify-content: space-between; /* Pushes h3 and svg apart */
+  align-items: center; /* Vertically aligns items */
+  margin-bottom: 10px; /* Add space below header */
 }
 
-/* Loading, error, and no-sensors states */
+.sensor-card-header h3 {
+  margin: 0; /* Remove default margin from h3 */
+}
+
+.trend-indicator path {
+  transition: d 0.4s ease-in-out; /* Animate the path data change */
+}
+
+.reset-btn {
+  grid-column: 1 / -1; /* Make reset button span full width */
+  background: #f8f9fa !important;
+  border-color: #dc3545 !important;
+  color: #dc3545;
+  font-weight: 500;
+}
+
+.reset-btn:hover {
+  background: #dc3545 !important;
+  color: white !important;
+}
+
+/* Sensor loading and error states */
 .loading-state, .error-state, .no-sensors-state {
-  padding: 16px;
+  padding: 12px;
   text-align: center;
-  border-radius: 6px;
+  border-radius: 4px;
   margin: 8px 0;
-  background: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
 }
 
 .loading-state {
-  color: rgba(255, 255, 255, 0.7);
+  background: #f8f9fa;
+  color: #666;
+  font-style: italic;
 }
 
 .error-state {
-  color: #ff6b6b;
-  border-color: rgba(255, 107, 107, 0.2);
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
 .no-sensors-state {
-  color: rgba(255, 255, 255, 0.7);
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
 }
 
 .retry-btn {
-  background: #1a1a1a;
-  color: #90EE90;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  padding: 8px 16px;
-  border-radius: 6px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 3px;
   cursor: pointer;
-  font-size: 0.9rem;
-  margin-left: 12px;
-  transition: all 0.3s ease;
+  font-size: 0.8rem;
+  margin-left: 8px;
+  transition: background-color 0.2s;
 }
 
 .retry-btn:hover {
-  background: #2f2f2f;
-  border-color: #90EE90;
-  transform: translateX(4px);
+  background: #c82333;
 }
 
 .drone-modal {
@@ -1509,21 +1374,13 @@ watch(() => queryParams.value, async (newParams) => {
 }
 
 .drone-modal-content {
-  background: #1a1a1a;
-  padding: 24px;
+  background: white;
+  padding: 20px;
   border-radius: 8px;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  color: white;
   max-width: 90vw;
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
-}
-
-.drone-modal-content h3 {
-  color: #90EE90;
-  margin-bottom: 20px;
-  font-size: 1.2rem;
 }
 
 .close-btn {
@@ -1534,13 +1391,7 @@ watch(() => queryParams.value, async (newParams) => {
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #90EE90;
-  transition: all 0.3s ease;
-}
-
-.close-btn:hover {
-  color: white;
-  transform: scale(1.1);
+  color: #333;
 }
 
 .drone-image-grid {
@@ -1555,179 +1406,5 @@ watch(() => queryParams.value, async (newParams) => {
   height: 200px;
   object-fit: cover;
   border-radius: 4px;
-}
-
-/* Scrollbar Styling */
-.query-panel::-webkit-scrollbar {
-  width: 8px;
-}
-
-.query-panel::-webkit-scrollbar-track {
-  background: #1a1a1a;
-}
-
-.query-panel::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 4px;
-}
-
-.query-panel::-webkit-scrollbar-thumb:hover {
-  background: #444;
-}
-
-/* Date inputs styling */
-.date-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.input-group label {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 4px;
-}
-
-.input-group input {
-  color: white;
-}
-
-.input-group input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.input-group input[type="date"] {
-  padding: 10px;
-  background: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  border-radius: 6px;
-  color: white;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.input-group input[type="date"]:focus {
-  outline: none;
-  border-color: #90EE90;
-  box-shadow: 0 0 10px rgba(144, 238, 144, 0.1);
-}
-
-.input-group input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) hue-rotate(180deg);
-  opacity: 0.6;
-  cursor: pointer;
-}
-
-.input-group input[type="date"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-}
-
-/* Range inputs styling */
-.range-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.input-group input[type="number"] {
-  padding: 10px;
-  background: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-  border-radius: 6px;
-  color: white;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.input-group input[type="number"]:focus {
-  outline: none;
-  border-color: #90EE90;
-  box-shadow: 0 0 10px rgba(144, 238, 144, 0.1);
-}
-
-/* Make sure all selects and options are readable */
-select {
-  color: white;
-  background: #1a1a1a;
-  border: 1px solid rgba(144, 238, 144, 0.1);
-}
-
-select option {
-  color: white;
-  background: #1a1a1a;
-}
-
-/* Ensure disabled states are visible */
-button:disabled,
-input:disabled,
-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-/* Make sure links are visible */
-a {
-  color: #90EE90;
-  text-decoration: none;
-  transition: color 0.3s ease;
-}
-
-a:hover {
-  color: white;
-}
-
-/* Ensure text selection is visible */
-::selection {
-  background: rgba(144, 238, 144, 0.2);
-  color: white;
-}
-
-.sensor-type-select {
-  background: #1a1a1a;
-  color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(144, 238, 144, 0.2);
-  border-radius: 6px;
-  padding: 8px 12px;
-  width: 100%;
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  outline: none;
-  margin-bottom: 16px;
-}
-
-.sensor-type-select:hover {
-  border-color: #90EE90;
-  box-shadow: 0 0 8px rgba(144, 238, 144, 0.2);
-}
-
-.sensor-type-select:focus {
-  border-color: #90EE90;
-  box-shadow: 0 0 12px rgba(144, 238, 144, 0.3);
-}
-
-/* Style the options */
-.sensor-type-select option {
-  background: #242424;
-  color: rgba(255, 255, 255, 0.9);
-  padding: 12px;
-}
-
-/* Style for selected option */
-.sensor-type-select option:checked {
-  background: #90EE90;
-  color: #000000;
-}
-
-/* Style for option hover */
-.sensor-type-select option:hover {
-  background: #2f2f2f;
 }
 </style>
