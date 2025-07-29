@@ -18,26 +18,74 @@
         </RouterLink>
       </div>
       <img src="../assets/farmMap.png" alt="Farm Map" class="farm-map" />
-      <!-- Sensor BC point with tooltip -->
+      <!-- Sensor B3 point with tooltip -->
       <div
-        class="map-point sensor sensor-bc"
-        :style="pointStyle(30, 70)"
+        class="map-point sensor sensor-b3"
+        :style="pointStyle(59, 32)"
         @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, 'BC')"
+        @mouseenter="handleMouseEnter($event, 'B3')"
         @mouseleave="handleMouseLeave"
-        title="Sensor BC"
+        title="Sensor B3"
       >
         <i class="fas fa-thermometer-half"></i>
       </div>
 
-      <!-- Sensor C4 point with tooltip -->
+      <!-- Sensor 92 point with tooltip -->
       <div
-        class="map-point sensor sensor-c4"
-        :style="pointStyle(40, 60)"
+        class="map-point sensor sensor-92"
+        :style="pointStyle(59, 40)"
         @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, 'C4')"
+        @mouseenter="handleMouseEnter($event, '92')"
         @mouseleave="handleMouseLeave"
-        title="Sensor C4"
+        title="Sensor 92"
+      >
+        <i class="fas fa-thermometer-half"></i>
+      </div>
+
+      <!-- Sensor 87 point with tooltip -->
+      <div
+        class="map-point sensor sensor-87"
+        :style="pointStyle(45, 90)"
+        @click="goTo('sensors')"
+        @mouseenter="handleMouseEnter($event, '87')"
+        @mouseleave="handleMouseLeave"
+        title="Sensor 87"
+      >
+        <i class="fas fa-thermometer-half"></i>
+      </div>
+
+      <!-- Sensor 9D point with tooltip -->
+      <div
+        class="map-point sensor sensor-9d"
+        :style="pointStyle(30, 85)"
+        @click="goTo('sensors')"
+        @mouseenter="handleMouseEnter($event, '9D')"
+        @mouseleave="handleMouseLeave"
+        title="Sensor 9D"
+      >
+        <i class="fas fa-thermometer-half"></i>
+      </div>
+
+      <!-- Sensor B9 point with tooltip -->
+      <div
+        class="map-point sensor sensor-b9"
+        :style="pointStyle(35, 90)"
+        @click="goTo('sensors')"
+        @mouseenter="handleMouseEnter($event, 'B9')"
+        @mouseleave="handleMouseLeave"
+        title="Sensor B9"
+      >
+        <i class="fas fa-thermometer-half"></i>
+      </div>
+
+      <!-- Sensor C6 point with tooltip -->
+      <div
+        class="map-point sensor sensor-c6"
+        :style="pointStyle(18, 90)"
+        @click="goTo('sensors')"
+        @mouseenter="handleMouseEnter($event, 'C6')"
+        @mouseleave="handleMouseLeave"
+        title="Sensor C6"
       >
         <i class="fas fa-thermometer-half"></i>
       </div>
@@ -49,7 +97,7 @@
         :style="{
           left: `${tooltipPosition.x}px`,
           top: `${tooltipPosition.y - 120}px`,
-          '--sensor-color': activeSensor === 'BC' ? '#2196F3' : '#FF5722'
+          '--sensor-color': SENSORS[activeSensor]?.color || '#4CAF50'
         }"
       >
         <div class="tooltip-header">{{ sensorData.name }}</div>
@@ -314,14 +362,34 @@
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.map-point.sensor-bc {
+.map-point.sensor-b3 {
+  border-color: #4CAF50;
+  background: #E8F5E9;
+}
+
+.map-point.sensor-92 {
   border-color: #2196F3;
   background: #E3F2FD;
 }
 
-.map-point.sensor-c4 {
+.map-point.sensor-87 {
   border-color: #FF5722;
   background: #FBE9E7;
+}
+
+.map-point.sensor-9d {
+  border-color: #9C27B0;
+  background: #F3E5F5;
+}
+
+.map-point.sensor-b9 {
+  border-color: #FFC107;
+  background: #FFF8E1;
+}
+
+.map-point.sensor-c6 {
+  border-color: #00BCD4;
+  background: #E0F7FA;
 }
 </style>
 
@@ -334,15 +402,35 @@ const router = useRouter();
 const nexusStore = useNexusStore();
 
 const SENSORS = {
-  BC: {
-    id: '2CF7F1C0627000BC',
-    name: 'Sensor BC',
+  B3: {
+    id: '2CF7F1C0649007B3',
+    name: 'Sensor B3',
+    color: '#4CAF50'
+  },
+  '92': {
+    id: '2CF7F1C064900792',
+    name: 'Sensor 92',
     color: '#2196F3'
   },
-  C4: {
-    id: '2CF7F1C0627000C4',
-    name: 'Sensor C4',
+  '87': {
+    id: '2CF7F1C064900787',
+    name: 'Sensor 87',
     color: '#FF5722'
+  },
+  '9D': {
+    id: '2CF7F1C06490079D',
+    name: 'Sensor 9D',
+    color: '#9C27B0'
+  },
+  'B9': {
+    id: '2CF7F1C0649007B9',
+    name: 'Sensor B9',
+    color: '#FFC107'
+  },
+  'C6': {
+    id: '2CF7F1C0649007C6',
+    name: 'Sensor C6',
+    color: '#00BCD4'
   }
 };
 
@@ -361,6 +449,11 @@ const activeSensor = ref(null);
 const showTooltip = ref(false);
 const tooltipPosition = ref({ x: 0, y: 0 });
 
+// Add conversion function
+const celsiusToFahrenheit = (celsius) => {
+  return (celsius * 9/5) + 32;
+};
+
 // Helper to position points by percentage (x, y)
 function pointStyle(xPercent, yPercent) {
   return {
@@ -377,7 +470,7 @@ function goTo(page) {
 function formatValue(value, type) {
   if (value === null) return 'Loading...';
   return type === 'temperature' 
-    ? `${value.toFixed(1)}°C`
+    ? `${celsiusToFahrenheit(value).toFixed(1)}°F`
     : `${value.toFixed(1)}%`;
 }
 

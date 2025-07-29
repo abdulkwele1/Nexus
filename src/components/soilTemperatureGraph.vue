@@ -68,14 +68,12 @@ const tooltipStyle = ref({
 
 // Update colors to be more distinguishable
 const colors = [
-  '#2196F3',  // Bright Blue
-  '#FF5722',  // Deep Orange
-  '#4CAF50',  // Green
-  '#9C27B0',  // Purple
-  '#FFC107',  // Amber
-  '#E91E63',  // Pink
-  '#00BCD4',  // Cyan
-  '#FF9800'   // Orange
+  '#4CAF50',  // Green (B3)
+  '#2196F3',  // Blue (92)
+  '#FF5722',  // Deep Orange (87)
+  '#9C27B0',  // Purple (9D)
+  '#FFC107',  // Amber (B9)
+  '#00BCD4',  // Cyan (C6)
 ];
 
 // Initialize sensors ref without internal visibility
@@ -218,15 +216,16 @@ const formatDate = (date: Date) => {
   }).replace(' ', ', ');
 };
 
-// Add conversion functions
+// Add conversion function
 const celsiusToFahrenheit = (celsius: number): number => {
   return (celsius * 9/5) + 32;
 };
 
-const formatValue = (value: number) => {
-  const fahrenheit = celsiusToFahrenheit(value);
-  return `${fahrenheit.toFixed(1)}°F`;
-};
+// Format functions
+function formatValue(value: number) {
+  if (value === null) return 'Loading...';
+  return `${celsiusToFahrenheit(value).toFixed(1)}°F`;
+}
 
 // Update the createChart function to handle empty data better
 const createChart = () => {
