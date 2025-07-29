@@ -443,7 +443,7 @@ const createChart = () => {
     });
   });
 
-  // Add legend
+  // Create legend
   const legend = svg.value.append("g")
     .attr("font-family", "sans-serif")
     .attr("font-size", 10)
@@ -451,7 +451,59 @@ const createChart = () => {
     .selectAll("g")
     .data(sensors.value.filter(s => props.sensorVisibility[s.name]))
     .join("g")
-    .attr("transform", (d: Sensor, i: number) => `translate(0,${i * 20})`);
+    .attr("transform", (d: Sensor, i: number) => `translate(${width + 20},${i * 25})`);
+
+  // Add colored rectangles
+  legend.append("rect")
+    .attr("x", 0)
+    .attr("y", -9)
+    .attr("width", 19)
+    .attr("height", 19)
+    .attr("fill", (d: Sensor) => {
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
+      return colors[sensorColorIndex % colors.length];
+    })
+    .attr("rx", 3)
+    .attr("ry", 3);
+
+  // Add text labels
+  legend.append("text")
+    .attr("x", 24)
+    .attr("y", 0)
+    .attr("dy", "0.32em")
+    .style("fill", "#333")
+    .text((d: Sensor) => d.name.replace('Sensor ', ''));
+
+  // Add hover effects
+  legend.style("cursor", "pointer")
+    .on("mouseenter", function() {
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .attr("transform", function() {
+          const [x, y] = d3.select(this).attr("transform").match(/\d+\.?\d*/g) || [];
+          return `translate(${x},${y}) scale(1.05)`;
+        });
+    })
+    .on("mouseleave", function() {
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .attr("transform", function() {
+          const [x, y] = d3.select(this).attr("transform").match(/\d+\.?\d*/g) || [];
+          return `translate(${x},${y}) scale(1)`;
+        });
+    });
+
+  // Add legend
+  // const legend = svg.value.append("g")
+  //   .attr("font-family", "sans-serif")
+  //   .attr("font-size", 10)
+  //   .attr("text-anchor", "start")
+  //   .selectAll("g")
+  //   .data(sensors.value.filter(s => props.sensorVisibility[s.name]))
+  //   .join("g")
+  //   .attr("transform", (d: Sensor, i: number) => `translate(0,${i * 20})`);
 
   // Add current filter information
   const filterInfo = svg.value.append("g")
@@ -490,21 +542,6 @@ const createChart = () => {
           props.queryParams.resolution === 'daily' ? 'Daily Average' :
           props.queryParams.resolution === 'weekly' ? 'Weekly Average' :
           'Monthly Average');
-
-  legend.append("rect")
-    .attr("x", width - 19)
-    .attr("width", 19)
-    .attr("height", 19)
-    .attr("fill", (d: Sensor) => {
-      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
-      return colors[sensorColorIndex % colors.length];
-    });
-
-  legend.append("text")
-    .attr("x", width - 24)
-    .attr("y", 9.5)
-    .attr("dy", "0.32em")
-    .text((d: Sensor) => d.name);
 
   // Add drone image indicators if we have them
   if (props.droneImages && props.droneImages.length > 0) {

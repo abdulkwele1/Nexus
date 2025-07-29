@@ -268,60 +268,110 @@ onUnmounted(() => {
   margin-top: 60px;
 }
 .sidebar {
-  width: 220px;
-  background: #f5f7fa;
-  padding: 24px 12px;
+  width: 250px;
+  background: #1a1a1a;
+  padding: 28px 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  border-right: 1px solid #e0e0e0;
+  gap: 18px;
+  border-right: 2px solid #90EE90;
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
 }
+
 .sidebar button {
   width: 100%;
-  padding: 10px;
+  padding: 12px 16px;
   margin-bottom: 4px;
-  border: none;
-  background: #e9ecef;
-  color: #333;
-  border-radius: 4px;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  background: #242424;
+  color: white;
+  border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
+  font-size: 15px;
+  letter-spacing: 0.3px;
 }
-.sidebar button.active,
-.sidebar button:hover {
-  background: #007bff;
-  color: #fff;
+
+.sidebar button.active {
+  background: #90EE90;
+  color: #000000;
+  box-shadow: 0 0 15px rgba(144, 238, 144, 0.2);
+  border: none;
 }
+
+.sidebar button:hover:not(.active) {
+  background: #2f2f2f;
+  border-color: #90EE90;
+  transform: translateX(4px);
+}
+
 .date-range {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   margin-top: 12px;
+  padding: 16px;
+  background: #242424;
+  border-radius: 8px;
+  border: 1px solid rgba(144, 238, 144, 0.1);
 }
-.main-content {
-  flex: 1;
-  padding: 32px;
-  overflow-y: auto;
+
+.date-range label {
+  color: #90EE90;
+  font-size: 14px;
+  margin-bottom: 4px;
 }
+
+.date-range input {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(144, 238, 144, 0.2);
+  background: #1a1a1a;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.date-range input:focus {
+  outline: none;
+  border-color: #90EE90;
+  box-shadow: 0 0 10px rgba(144, 238, 144, 0.1);
+}
+
 .quick-filters {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   margin-top: 16px;
 }
+
 .filter-btn {
   width: 100%;
-  padding: 8px;
-  background: #e9ecef;
-  border: none;
-  border-radius: 4px;
+  padding: 10px 14px;
+  background: #242424;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.2s;
+  color: white;
+  transition: all 0.3s ease;
 }
+
 .filter-btn:hover {
-  background: #007bff;
-  color: #fff;
+  background: #2f2f2f;
+  border-color: #90EE90;
+  transform: translateX(4px);
+}
+
+hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    rgba(144, 238, 144, 0.05),
+    rgba(144, 238, 144, 0.2),
+    rgba(144, 238, 144, 0.05)
+  );
+  margin: 8px 0;
 }
 </style>

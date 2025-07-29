@@ -12,8 +12,15 @@
           <i class="fas fa-solar-panel"></i>
           <span>Solar Panels</span>
         </RouterLink>
-        <RouterLink to="/drone" class="header-tile">
-          <i class="fas fa-drone"></i>
+        <RouterLink to="/drone" class="header-tile drone-tile">
+          <div class="drone-icon">
+            <div class="drone-body">
+              <div class="drone-arm arm-1"></div>
+              <div class="drone-arm arm-2"></div>
+              <div class="drone-arm arm-3"></div>
+              <div class="drone-arm arm-4"></div>
+            </div>
+          </div>
           <span>Drone</span>
         </RouterLink>
       </div>
@@ -390,6 +397,57 @@
 .map-point.sensor-c6 {
   border-color: #00BCD4;
   background: #E0F7FA;
+}
+
+/* Static Drone Icon Styles */
+.drone-tile {
+  position: relative;
+}
+
+.drone-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drone-body {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  background: #1976d2;
+  border-radius: 4px;
+}
+
+.drone-arm {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #64b5f6;
+  border-radius: 50%;
+}
+
+.arm-1 {
+  top: -10px;
+  left: -10px;
+}
+
+.arm-2 {
+  top: -10px;
+  right: -10px;
+}
+
+.arm-3 {
+  bottom: -10px;
+  left: -10px;
+}
+
+.arm-4 {
+  bottom: -10px;
+  right: -10px;
 }
 </style>
 
