@@ -3,6 +3,7 @@
     <!-- Navigation bar -->
     <nav class="navbar" :class="{ 'navbar--hidden': !navbarVisible }">
       <button class="nav-button" @click="goTo('/home')">Home</button>
+      <button v-if="$route.path === '/sensors'" class="nav-button" @click="showSensorInfo">Sensor Info</button>
     </nav>
   </div>
   
@@ -203,11 +204,29 @@
       </div>
     </div>
   </div>
+
+  <!-- Sensor Info Modal -->
+  <div v-if="showSensorInfoModal" class="sensor-info-modal">
+    <div class="sensor-info-modal-content">
+      <button class="close-btn" @click="showSensorInfoModal = false">&times;</button>
+      <h2>Sensor Information</h2>
+      <div class="sensor-info-grid">
+        <div v-for="sensor in SENSOR_CONFIGS" :key="sensor.id" class="sensor-info-item">
+          <h3>{{ sensor.name }}</h3>
+          <p><strong>ID:</strong> {{ sensor.id }}</p>
+          <div class="sensor-status" :style="{ '--sensor-color': getSensorColor(sensor.name) }">
+            <span class="status-dot"></span>
+            <span>{{ sensorVisibility[sensor.name] ? 'Active' : 'Inactive' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import SoilMoistureGraph from './soilMoistureGraph.vue';
 import SoilTemperatureGraph from './soilTemperatureGraph.vue';
 import { useNexusStore } from '@/stores/nexus';
@@ -231,6 +250,7 @@ const celsiusToFahrenheit = (celsius: number | null): number | null => {
 };
 
 const router = useRouter();
+const route = useRoute();
 const goTo = (path: string) => {
   router.push(path);
 };
@@ -958,7 +978,16 @@ watch(() => queryParams.value, async (newParams) => {
   // The graph components will handle their own data fetching based on queryParams
 }, { deep: true });
 
-// Add template for drone image modal
+const showSensorInfoModal = ref(false);
+
+const showSensorInfo = () => {
+  showSensorInfoModal.value = true;
+};
+
+const getSensorColor = (sensorName: string): string => {
+  const index = SENSOR_CONFIGS.value.findIndex(s => s.name === sensorName);
+  return colors[index % colors.length];
+};
 </script>
 
 <style>
@@ -1323,12 +1352,63 @@ select:focus {
 /* Add styles for the sensor type slideshow control */
 .sensor-type-slideshow {
   display: flex;
-  align-items: center; 
-  justify-content: space-between; 
-  border: 1px solid #dee2e6; 
-  border-radius: 4px;
-  padding: 5px 10px; 
-  background-color: white; 
+  align-items: center;
+  justify-content: space-between;
+  background: #242424;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.slideshow-btn {
+  background: #1a1a1a;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  border-radius: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #90EE90;
+  padding: 8px 12px;
+  transition: all 0.3s ease;
+  min-width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slideshow-btn:hover {
+  background: #2f2f2f;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(144, 238, 144, 0.1);
+}
+
+.slideshow-label {
+  font-size: 1.1rem;
+  color: white;
+  font-weight: 500;
+  text-align: center;
+  padding: 0 20px;
+  flex-grow: 1;
+  position: relative;
+}
+
+.slideshow-label::before {
+  content: '•';
+  color: #90EE90;
+  position: absolute;
+  left: 8px;
+  opacity: 0.8;
+}
+
+.slideshow-label::after {
+  content: '•';
+  color: #90EE90;
+  position: absolute;
+  right: 8px;
+  opacity: 0.8;
 }
 
 /* Styles for the sensor selection checkboxes */
@@ -1505,5 +1585,95 @@ select:focus {
   height: 200px;
   object-fit: cover;
   border-radius: 4px;
+}
+
+.sensor-info-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.sensor-info-modal-content {
+  background: #1a1a1a;
+  padding: 32px;
+  border-radius: 12px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.sensor-info-modal-content h2 {
+  color: #90EE90;
+  margin: 0 0 24px 0;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.sensor-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.sensor-info-item {
+  background: #242424;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+}
+
+.sensor-info-item h3 {
+  color: white;
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+}
+
+.sensor-info-item p {
+  color: rgba(255, 255, 255, 0.8);
+  margin: 8px 0;
+  font-size: 0.95rem;
+}
+
+.sensor-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sensor-color);
+}
+
+.close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+  color: white;
+  transform: scale(1.1);
 }
 </style>
