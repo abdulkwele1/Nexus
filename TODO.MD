@@ -16,6 +16,7 @@
 
 -Update the solar panel dashboard
 
+-Creat a case:#### for battery levels in mqtt to subscribe to the topic
 
 ## Nice To Have
 
@@ -26,6 +27,8 @@
 - graph only focus mode, able to zoom into the graph similar to a map
 
 - Improve the navbar so it dissapears as the user scrolls down the the app
+
+
 
 
 

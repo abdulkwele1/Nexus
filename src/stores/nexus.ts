@@ -317,4 +317,53 @@ class User {
             return [];
         }
     }
+
+    async getSensorBatteryData(sensorId: string, startDate?: string, endDate?: string) {
+        try {
+            let url = `${this.baseURL}/sensors/${sensorId}/battery`;
+            
+            // Add date range parameters if provided
+            if (startDate && endDate) {
+                url += `?start_date=${startDate}&end_date=${endDate}`;
+            }
+            
+            const response = await apiFetch(url, {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                method: 'GET',
+            });
+            
+            const jsonData = await response.json();
+            
+            if (jsonData && Array.isArray(jsonData.battery_level_data)) {
+                return jsonData.battery_level_data;
+            }
+            
+            console.warn(`Battery data for sensor ${sensorId} received in unexpected format:`, jsonData);
+            return [];
+        } catch (error) {
+            console.error('Error fetching sensor battery data:', error);
+            return [];
+        }
+    }
+
+    async setSensorBatteryData(sensorId: string, batteryData: Array<{
+        date: string;
+        battery_level: number;
+        voltage: number;
+    }>) {
+        const url = `${this.baseURL}/sensors/${sensorId}/battery`;
+        return apiFetch(url, {
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            method: 'POST',
+            body: JSON.stringify({
+                battery_level_data: batteryData
+            }),
+        });
+    }
 }

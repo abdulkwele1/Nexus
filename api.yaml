@@ -551,6 +551,65 @@ paths:
         '500':
           description: Internal server error
 
+  /sensors/{sensor_id}/battery:
+    get:
+      summary: Get battery level data for a specific sensor
+      parameters:
+        - in: path
+          name: sensor_id
+          required: true
+          schema:
+            type: string
+          description: The unique ID of the sensor
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+          description: Gets data starting from this date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+          description: Gets data up to this date
+      responses:
+        '200':
+          description: Battery level data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatteryLevelData'
+        '404':
+          description: Sensor not found
+        '500':
+          description: Internal server error
+    
+    post:
+      summary: Update battery level data for a specific sensor
+      parameters:
+        - in: path
+          name: sensor_id
+          required: true
+          schema:
+            type: string
+          description: The unique ID of the sensor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatteryLevelData'
+      responses:
+        '200':
+          description: Battery level data updated successfully
+        '400':
+          description: Invalid input data
+        '404':
+          description: Sensor not found
+        '500':
+          description: Internal server error
+
 components:
   schemas:
     Panel:
@@ -638,6 +697,10 @@ components:
         soil_temperature:
           type: number
           format: float
+        battery_level:
+          type: number
+          format: float
+          description: Battery level percentage from 0 to 100
     SoilMoistureData:
       type: object
       properties:
@@ -756,4 +819,26 @@ components:
         metadata:
           type: object
           additionalProperties: true
+
+    BatteryLevelData:
+      type: object
+      properties:
+        battery_data:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              battery_level:
+                type: number
+                format: float
+                description: Battery level percentage from 0 to 100
+              voltage:
+                type: number
+                format: float
+                description: Battery voltage in volts
+      required:
+        - battery_data
 

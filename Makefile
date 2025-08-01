@@ -52,6 +52,7 @@ e2e-test:
 .PHONY: it
 # run any test matching the provided pattern, can pass a regex or a string
 # of the exact test to run
+# make it p=NAMEOFTEST RUNS ONLY THAT TEST
 it : lint
 	cd ${NEXUS_API_DIRECTORY} && \
 	go test -count=1 -v -cover -coverprofile cover.out --race ./... -run=".*${p}.*"

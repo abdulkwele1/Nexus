@@ -12,6 +12,7 @@ import (
 var (
 	ErrorNoSensorMoistureData    = errors.New("no sensor moisture data found")
 	ErrorNoSensorTemperatureData = errors.New("no sensor temperature data found")
+	ErrorNoSensorBatteryData     = errors.New("no sensor battery data found")
 )
 
 type SensorMoistureData struct {
@@ -173,4 +174,40 @@ func GetSensorByID(ctx context.Context, db *bun.DB, id string) (Sensor, error) {
 	var sensor Sensor
 	err := db.NewSelect().Model(&sensor).Where("id = ?", id).Scan(ctx)
 	return sensor, err
+}
+
+type SensorBatteryData struct {
+	ID           int       `bun:"id,pk,autoincrement"`
+	SensorID     string    `bun:"sensor_id"`
+	Date         time.Time `bun:"date"`
+	BatteryLevel float64   `bun:"battery_level"`
+	Voltage      float64   `bun:"voltage"`
+}
+
+func GetSensorBatteryDataForSensorID(ctx context.Context, db *bun.DB, sensorID string, startDate, endDate time.Time) ([]SensorBatteryData, error) {
+	var data []SensorBatteryData
+	query := db.NewSelect().Model(&data).Where("sensor_id = ?", sensorID)
+	
+	if !startDate.IsZero() {
+		query.Where("date >= ?", startDate)
+	}
+	if !endDate.IsZero() {
+		query.Where("date <= ?", endDate)
+	}
+	
+	err := query.Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	if len(data) == 0 {
+		return nil, ErrorNoSensorBatteryData
+	}
+	
+	return data, nil
+}
+
+func (d *SensorBatteryData) Save(ctx context.Context, db *bun.DB) error {
+	_, err := db.NewInsert().Model(d).Exec(ctx)
+	return err
 }

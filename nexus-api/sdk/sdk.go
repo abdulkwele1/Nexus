@@ -10,6 +10,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 
 	"nexus-api/api"
@@ -671,6 +672,86 @@ func SetAuthHeaders(request *http.Request, cookie *http.Cookie) error {
 
 // NewClient creates a new client using the provided configuration
 // returning the client and error (if any)
+// GetSensorBatteryData retrieves battery data for a specific sensor
+func (nc *NexusClient) GetSensorBatteryData(ctx context.Context, sensorID string, startDate, endDate string) (api.GetBatteryLevelDataResponse, error) {
+	endpoint := fmt.Sprintf("%s/sensors/%s/battery", nc.Config.NexusAPIEndpoint, sensorID)
+
+	// Add query parameters for date range if provided
+	if startDate != "" || endDate != "" {
+		params := make([]string, 0, 2)
+		if startDate != "" {
+			params = append(params, fmt.Sprintf("start_date=%s", startDate))
+		}
+		if endDate != "" {
+			params = append(params, fmt.Sprintf("end_date=%s", endDate))
+		}
+		if len(params) > 0 {
+			endpoint = fmt.Sprintf("%s?%s", endpoint, strings.Join(params, "&"))
+		}
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return api.GetBatteryLevelDataResponse{}, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return api.GetBatteryLevelDataResponse{}, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return api.GetBatteryLevelDataResponse{}, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return api.GetBatteryLevelDataResponse{}, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var result api.GetBatteryLevelDataResponse
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return api.GetBatteryLevelDataResponse{}, err
+	}
+
+	return result, nil
+}
+
+// SetSensorBatteryData saves battery data for a specific sensor
+func (nc *NexusClient) SetSensorBatteryData(ctx context.Context, sensorID string, batteryData api.SetBatteryLevelDataResponse) error {
+	endpoint := fmt.Sprintf("%s/sensors/%s/battery", nc.Config.NexusAPIEndpoint, sensorID)
+
+	body, err := json.Marshal(batteryData)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
 func NewClient(config SDKConfig) (*NexusClient, error) {
 	client := NexusClient{
 		http:          http.Client{},

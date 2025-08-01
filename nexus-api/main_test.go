@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"nexus-api/api"
 	"nexus-api/clients/database"
@@ -524,6 +525,97 @@ func TestE2EGetAllSensors(t *testing.T) {
 		assert.NotEmpty(t, firstSensor.Name, "Sensor should have a name")
 		assert.NotEmpty(t, firstSensor.Location, "Sensor should have a location")
 		assert.NotZero(t, firstSensor.ID, "Sensor should have a non-zero ID")
+	}
+}
+
+func TestE2ESetAndGetSensorBatteryData(t *testing.T) {
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+
+	assert.NoError(t, err)
+
+	// Generate unique sensor ID for test (using shorter format)
+	sensorID := fmt.Sprintf("TS%s", uuid.NewString()[:8])
+
+	// add sensor to database
+	testSensor := database.Sensor{
+		ID:               sensorID,
+		Name:             "Test Battery Sensor",
+		Location:         "Test Location",
+		InstallationDate: time.Now(),
+	}
+
+	err = testSensor.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// Test payload for setting battery data
+	expectedBatteryData := api.SetBatteryLevelDataResponse{
+		BatteryLevelData: []api.BatteryLevelData{
+			{
+				Date:         time.Now().Add(1 * time.Second).UTC(),
+				BatteryLevel: 85.5,
+				Voltage:      3.7,
+			},
+			{
+				Date:         time.Now().Add(2 * time.Second).UTC(),
+				BatteryLevel: 90.0,
+				Voltage:      3.8,
+			},
+		},
+	}
+
+	// Step 1: POST (Set) battery data
+	err = testClient.SetSensorBatteryData(testCtx, sensorID, expectedBatteryData)
+	assert.NoError(t, err, "Setting battery data should succeed")
+
+	// Step 2: GET battery data
+	startDate := time.Now().AddDate(0, 0, -1).Format("2006-01-02") // Yesterday
+	endDate := time.Now().AddDate(0, 0, 1).Format("2006-01-02")    // Tomorrow
+	gotBatteryData, err := testClient.GetSensorBatteryData(testCtx, sensorID, startDate, endDate)
+	assert.NoError(t, err, "Retrieving battery data should succeed")
+
+	// Step 3: Compare battery data
+	assert.NotNil(t, gotBatteryData, "Response should not be nil")
+	assert.NotNil(t, gotBatteryData.BatteryLevelData, "Battery data array should not be nil")
+
+	assert.Equal(t, len(expectedBatteryData.BatteryLevelData), len(gotBatteryData.BatteryLevelData),
+		"Number of battery data entries should match")
+
+	if assert.GreaterOrEqual(t, len(gotBatteryData.BatteryLevelData), len(expectedBatteryData.BatteryLevelData),
+		"Should have at least as many entries as we sent") {
+
+		for i, expected := range expectedBatteryData.BatteryLevelData {
+			actual := gotBatteryData.BatteryLevelData[i]
+			assert.Equal(t, expected.BatteryLevel, actual.BatteryLevel, "Battery level should match")
+			assert.Equal(t, expected.Voltage, actual.Voltage, "Voltage should match")
+			// Compare dates with a small tolerance to account for potential time differences
+			assert.True(t, expected.Date.Sub(actual.Date) < time.Second,
+				"Date should be within 1 second of expected")
+		}
 	}
 }
 
