@@ -976,6 +976,126 @@ func CreateGetDroneImageContentHandler(apiService *APIService) http.HandlerFunc 
 	}
 }
 
+func CreateGetSensorBatteryDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		sensorID := vars["sensor_id"]
+
+		// Get query parameters for date range
+		startDate := r.URL.Query().Get("start_date")
+		endDate := r.URL.Query().Get("end_date")
+
+		var start, end time.Time
+		var err error
+
+		if startDate != "" {
+			start, err = time.Parse("2006-01-02", startDate)
+			if err != nil {
+				apiService.Error().Msgf("Invalid start_date format: %s", startDate)
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid start_date format. Use YYYY-MM-DD"})
+				return
+			}
+		}
+
+		if endDate != "" {
+			end, err = time.Parse("2006-01-02", endDate)
+			if err != nil {
+				apiService.Error().Msgf("Invalid end_date format: %s", endDate)
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid end_date format. Use YYYY-MM-DD"})
+				return
+			}
+		}
+
+		// Retrieve data for the sensorID
+		data, err := database.GetSensorBatteryDataForSensorID(r.Context(), apiService.DatabaseClient.DB, sensorID, start, end)
+		if err != nil {
+			if errors.Is(err, database.ErrorNoSensorBatteryData) {
+				apiService.Debug().Msgf("No battery data found for sensor_id: %s", sensorID)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No data found"})
+				return
+			}
+
+			apiService.Error().Msgf("Error retrieving battery data for sensor_id: %s, error: %s", sensorID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Convert database data to GetBatteryLevelDataResponse
+		response := api.GetBatteryLevelDataResponse{
+			BatteryLevelData: make([]api.BatteryLevelData, 0),
+		}
+		for _, d := range data {
+			response.BatteryLevelData = append(response.BatteryLevelData, api.BatteryLevelData{
+				Date:         d.Date,
+				BatteryLevel: d.BatteryLevel,
+				Voltage:      d.Voltage,
+			})
+		}
+
+		// Send the response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func CreateSetSensorBatteryDataHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		sensorID := vars["sensor_id"]
+
+		request := api.SetBatteryLevelDataResponse{}
+		err := json.NewDecoder(r.Body).Decode(&request)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request"})
+			return
+		}
+
+		// Ensure sensor exists before saving data
+		err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID)
+		if err != nil {
+			apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %s, error: %s", sensorID, err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
+			return
+		}
+
+		// Iterate over each BatteryLevelData item and save to the database
+		for _, batteryData := range request.BatteryLevelData {
+			sensorBatteryData := database.SensorBatteryData{
+				SensorID:     sensorID,
+				Date:         batteryData.Date,
+				BatteryLevel: batteryData.BatteryLevel,
+				Voltage:      batteryData.Voltage,
+			}
+
+			err = sensorBatteryData.Save(r.Context(), apiService.DatabaseClient.DB)
+			if err != nil {
+				apiService.Error().Msgf("Failed to save battery data for sensor_id: %s, data: %+v, error: %s", sensorID, sensorBatteryData, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to save battery data"})
+				return
+			}
+		}
+
+		// Send success response
+		apiService.Trace().Msgf("Successfully saved battery data for sensor_id: %s", sensorID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Battery data saved successfully"})
+	}
+}
+
 func CreateDeleteDroneImageHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
