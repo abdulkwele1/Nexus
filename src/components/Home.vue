@@ -481,7 +481,7 @@ const SENSORS = {
     color: '#9C27B0'
   },
   'B9': {
-    id: '2CF7F1C0649007B9',
+    id: '2CF7F1C064900792', // Changed to match the physical sensor's ID
     name: 'Sensor B9',
     color: '#FFC107'
   },

@@ -249,10 +249,10 @@ const createChart = () => {
   const marginBottom = 30;
   const marginLeft = 40;
 
-  // Create SVG container
+  // Create SVG container with extra width for legend
   svg.value = d3.create("svg")
-    .attr("viewBox", [0, 0, width, height])
-    .attr("width", width)
+    .attr("viewBox", [0, 0, width + 120, height]) // Add 120px for legend
+    .attr("width", width + 120)
     .attr("height", height)
     .attr("style", "max-width: 100%; height: auto; height: intrinsic; font: 10px sans-serif;")
     .style("-webkit-tap-highlight-color", "transparent")
@@ -446,6 +446,7 @@ const createChart = () => {
     }
     console.log(`[TEMP_GRAPH] Drawing line for visible sensor: ${sensor.name} with ${sensor.data.length} points.`);
 
+    // Get the correct color index based on the sensor's position in SENSOR_CONFIGS
     const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
     const color = colors[sensorColorIndex % colors.length];
 
@@ -508,19 +509,37 @@ const createChart = () => {
     });
   });
 
-  // Add legend
-  const legend = svg.value!.append("g")
+  // Add legend outside the graph area
+  const legend = svg.value.append("g")
     .attr("font-family", "sans-serif")
     .attr("font-size", 10)
     .attr("text-anchor", "start")
     .selectAll("g")
     .data(sensors.value.filter(s => props.sensorVisibility[s.name]))
     .join("g")
-    .attr("transform", (d, i) => `translate(0,${i * 20})`);
+    .attr("transform", (d: Sensor, i: number) => `translate(${width + 10},${marginTop + (i * 25)})`);
 
-  // Add current filter information
-  const filterInfo = svg.value!.append("g")
-    .attr("transform", `translate(${width - 200}, 20)`);
+  // Add colored rectangles
+  legend.append("rect")
+    .attr("width", 15)
+    .attr("height", 15)
+    .attr("fill", (d: Sensor) => {
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
+      return colors[sensorColorIndex % colors.length];
+    })
+    .attr("rx", 2); // Slightly rounded corners
+
+  // Add sensor names next to rectangles
+  legend.append("text")
+    .attr("x", 25) // Increased spacing between rectangle and text
+    .attr("y", 12)
+    .style("font-size", "12px")
+    .style("fill", "black") // Changed to black
+    .text((d: Sensor) => d.name.replace(/^Sensor\s+/i, ""));
+
+  // Move filter info below legend
+  const filterInfo = svg.value.append("g")
+    .attr("transform", `translate(${width + 10}, ${marginTop + (sensors.value.filter(s => props.sensorVisibility[s.name]).length * 25) + 20})`);
 
   // Add time window info
   filterInfo.append("text")
@@ -555,21 +574,6 @@ const createChart = () => {
           props.queryParams.resolution === 'daily' ? 'Daily Average' :
           props.queryParams.resolution === 'weekly' ? 'Weekly Average' :
           'Monthly Average');
-
-  legend.append("rect")
-    .attr("x", width - 19)
-    .attr("width", 19)
-    .attr("height", 19)
-    .attr("fill", (d) => {
-      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
-      return colors[sensorColorIndex % colors.length];
-    });
-
-  legend.append("text")
-    .attr("x", width - 24)
-    .attr("y", 9.5)
-    .attr("dy", "0.32em")
-    .text(d => d.name);
 
   // Add drone image indicators if we have them
   if (props.droneImages && props.droneImages.length > 0) {
