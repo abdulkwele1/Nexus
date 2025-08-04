@@ -5,11 +5,19 @@ import userSettings from '../components/userSettings.vue';
 import SolarPage from '../components/SolarPage.vue';
 import Sensors from '../components/sensors.vue';
 import Drone from '../components/drone.vue'
+import BatteryPage from '../components/BatteryPage.vue'
 import { useNexusStore } from '@/stores/nexus'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+
+    {
+      path: '/battery',
+      name: 'battery',
+      component: BatteryPage,
+      meta: { requiresAuth: true }
+    },
     
   {
       path: '/drone',
