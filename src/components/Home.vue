@@ -8,6 +8,10 @@
           <i class="fas fa-thermometer-half"></i>
           <span>Sensors</span>
         </RouterLink>
+        <RouterLink to="/battery" class="header-tile">
+          <i class="fas fa-battery-full"></i>
+          <span>Battery Status</span>
+        </RouterLink>
         <RouterLink to="/solar" class="header-tile">
           <i class="fas fa-solar-panel"></i>
           <span>Solar Panels</span>
