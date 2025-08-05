@@ -40,6 +40,13 @@
 
       <!-- Main Content -->
       <main class="main-content">
+        <!-- Battery Data Manager -->
+        <SensorBatteryUI
+          :sensors="SENSORS"
+          @dataAdded="handleDataAdded"
+        />
+        
+        <!-- Battery Graph -->
         <BatteryLevels
           :sensors="SENSORS"
           :startDate="startDate"
@@ -54,6 +61,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import BatteryLevels from './batteryLevelsGraph.vue';
+import SensorBatteryUI from './sensorBatteryUI.vue';
 
 const router = useRouter();
 // Set initial dates to match our mock data
@@ -133,6 +141,12 @@ const handleQuickFilter = (filterType: '7days' | '30days') => {
   
   startDate.value = start.toISOString().split('T')[0];
   endDate.value = end.toISOString().split('T')[0];
+};
+
+const handleDataAdded = (sensorId: string) => {
+  console.log(`[BatteryPage] Battery data added for sensor: ${sensorId}`);
+  // You can add additional logic here if needed
+  // For example, refresh the graph data
 };
 
 onMounted(async () => {
