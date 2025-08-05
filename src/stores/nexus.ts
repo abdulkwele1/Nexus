@@ -308,13 +308,25 @@ class User {
 
     async getAllSensors() {
         try {
+            console.log('[NexusStore] Fetching all sensors from:', `${this.baseURL}/sensors`);
             const response = await apiFetch(`${this.baseURL}/sensors`, {
                 credentials: 'include',
             });
-            return await response.json();
+            const data = await response.json();
+            console.log('[NexusStore] Got sensors response:', data);
+            // If data is an array, wrap it in the expected format
+            if (Array.isArray(data)) {
+                return { sensors: data };
+            }
+            // If data already has sensors property, return as is
+            if (data && Array.isArray(data.sensors)) {
+                return data;
+            }
+            console.warn('[NexusStore] Unexpected sensors response format:', data);
+            return { sensors: [] };
         } catch (error) {
-            console.error('Error fetching all sensors:', error);
-            return [];
+            console.error('[NexusStore] Error fetching all sensors:', error);
+            return { sensors: [] };
         }
     }
 
@@ -327,6 +339,8 @@ class User {
                 url += `?start_date=${startDate}&end_date=${endDate}`;
             }
             
+            console.log(`[NexusStore] Fetching battery data for sensor ${sensorId} from:`, url);
+            
             const response = await apiFetch(url, {
                 credentials: 'include',
                 headers: {
@@ -336,16 +350,23 @@ class User {
             });
             
             const jsonData = await response.json();
+            console.log(`[NexusStore] Got battery data for sensor ${sensorId}:`, jsonData);
             
             if (jsonData && Array.isArray(jsonData.battery_level_data)) {
-                return jsonData.battery_level_data;
+                return {
+                    battery_level_data: jsonData.battery_level_data
+                };
             }
             
-            console.warn(`Battery data for sensor ${sensorId} received in unexpected format:`, jsonData);
-            return [];
+            console.warn(`[NexusStore] Battery data for sensor ${sensorId} received in unexpected format:`, jsonData);
+            return {
+                battery_level_data: []
+            };
         } catch (error) {
-            console.error('Error fetching sensor battery data:', error);
-            return [];
+            console.error('[NexusStore] Error fetching sensor battery data:', error);
+            return {
+                battery_level_data: []
+            };
         }
     }
 
