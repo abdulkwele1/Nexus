@@ -38,21 +38,27 @@
         </div>
 
         <!-- Battery Data Manager moved into sidebar -->
-        <SensorBatteryUI
-          :sensors="SENSORS"
-          @dataAdded="handleDataAdded"
-        />
+        <transition name="fade-slide">
+          <SensorBatteryUI
+            :sensors="SENSORS"
+            @dataAdded="handleDataAdded"
+          />
+        </transition>
       </aside>
 
       <!-- Main Content -->
       <main class="main-content">
         <!-- Battery Data Manager -->
         <!-- Battery Graph -->
-        <BatteryLevels
-          :sensors="SENSORS"
-          :startDate="startDate"
-          :endDate="endDate"
-        />
+        <transition name="fade-slide">
+          <div class="graph-card">
+            <BatteryLevels
+              :sensors="SENSORS"
+              :startDate="startDate"
+              :endDate="endDate"
+            />
+          </div>
+        </transition>
       </main>
     </div>
   </div>
@@ -204,6 +210,14 @@ onMounted(async () => {
   gap: 24px;
   border-right: 2px solid #90EE90;
   box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+  /* Make sidebar scroll independently */
+  position: sticky;
+  top: 60px;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sensor-toggles {
@@ -301,9 +315,101 @@ onMounted(async () => {
   overflow-x: hidden;
 }
 
+/* Sidebar scrollbar styling for smoother feel */
+.sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background-color: rgba(144, 238, 144, 0.28);
+  border-radius: 8px;
+  border: 2px solid transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(144, 238, 144, 0.45);
+}
+
 @media (max-width: 1400px) {
   .main-content {
     padding: 16px;
   }
+}
+
+/* Smooth transitions for content blocks */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+/* Graph card styling for visual hierarchy */
+.graph-card {
+  background: #121212;
+  border: 1px solid rgba(144, 238, 144, 0.12);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* Dark theme overrides for SensorBatteryUI inside the sidebar */
+:deep(.battery-data-manager) {
+  background: #242424 !important;
+  border: 1px solid rgba(144, 238, 144, 0.12) !important;
+  color: #ffffff !important;
+}
+
+:deep(.battery-data-manager h2) {
+  color: #ffffff;
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+}
+
+:deep(.battery-data-manager .form-group) {
+  margin-bottom: 12px;
+}
+
+:deep(.battery-data-manager label) {
+  color: #90EE90 !important;
+}
+
+:deep(.battery-data-manager input),
+:deep(.battery-data-manager select) {
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(144, 238, 144, 0.2) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+:deep(.battery-data-manager input:focus),
+:deep(.battery-data-manager select:focus) {
+  outline: none !important;
+  border-color: #90EE90 !important;
+  box-shadow: 0 0 10px rgba(144, 238, 144, 0.15) !important;
+}
+
+:deep(.battery-data-manager .add-btn),
+:deep(.battery-data-manager .remove-btn) {
+  width: 100%;
+  background: #242424 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(144, 238, 144, 0.12) !important;
+  transition: all 0.2s ease !important;
+}
+
+:deep(.battery-data-manager .add-btn:hover),
+:deep(.battery-data-manager .remove-btn:hover) {
+  background: #2f2f2f !important;
+  border-color: #90EE90 !important;
+  transform: translateX(2px);
 }
 </style>
