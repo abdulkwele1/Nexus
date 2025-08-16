@@ -36,16 +36,17 @@
           <button class="filter-btn" @click="handleQuickFilter('7days')">Last 7 Days</button>
           <button class="filter-btn" @click="handleQuickFilter('30days')">Last 30 Days</button>
         </div>
+
+        <!-- Battery Data Manager moved into sidebar -->
+        <SensorBatteryUI
+          :sensors="SENSORS"
+          @dataAdded="handleDataAdded"
+        />
       </aside>
 
       <!-- Main Content -->
       <main class="main-content">
         <!-- Battery Data Manager -->
-        <SensorBatteryUI
-          :sensors="SENSORS"
-          @dataAdded="handleDataAdded"
-        />
-        
         <!-- Battery Graph -->
         <BatteryLevels
           :sensors="SENSORS"
