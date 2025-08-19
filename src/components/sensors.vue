@@ -389,21 +389,28 @@ const sensorsError = ref<string | null>(null);
 const sensorVisibility = ref<{ [key: string]: boolean }>({});
 
 // Function to fetch sensors from the API
+// Function to fetch sensors from the API
 const fetchSensors = async () => {
   try {
     sensorsLoading.value = true;
     sensorsError.value = null;
-    const sensors = await nexusStore.user.getAllSensors();
-    console.log('[sensors.vue] Fetched sensors:', JSON.stringify(sensors, null, 2));
-    
-    if (Array.isArray(sensors) && sensors.length > 0) {
-      SENSOR_CONFIGS.value = sensors.map((sensor: any) => ({
+
+    const result = await nexusStore.user.getAllSensors();
+    console.log('[sensors.vue] Fetched sensors:', JSON.stringify(result, null, 2));
+
+    // Normalize result to an array
+    const list = Array.isArray(result)
+      ? result
+      : (Array.isArray(result?.sensors) ? result.sensors : []);
+
+    if (list.length > 0) {
+      SENSOR_CONFIGS.value = list.map((sensor: any) => ({
         id: sensor.id,
         name: sensor.name || `Sensor ${sensor.id}`,
       }));
-      
-      // Initialize visibility state for all sensors
-      // By default, enable only the first sensor
+
+      // Initialize visibility state (enable first sensor by default)
+      sensorVisibility.value = {};
       SENSOR_CONFIGS.value.forEach((sensor, index) => {
         sensorVisibility.value[sensor.name] = index === 0;
       });
