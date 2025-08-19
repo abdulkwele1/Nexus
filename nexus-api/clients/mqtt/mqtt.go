@@ -224,6 +224,28 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 	m.logger.Info().Str("topic", topic).Msg("Received message")
 	m.logger.Trace().Str("topic", topic).Str("payload", string(payload)).Msg("Raw MQTT Payload")
 
+	// Function to handle auth refresh and retry
+	retryWithRefresh := func(operation func() error) error {
+		err := operation()
+		if err != nil && strings.Contains(err.Error(), "401") {
+			m.logger.Info().Msg("Auth failed, attempting to re-login SDK client...")
+
+			loginParams := api.LoginRequest{
+				Username: m.sdkClient.Config.UserName,
+				Password: m.sdkClient.Config.Password,
+			}
+
+			if _, err := m.sdkClient.Login(ctx, loginParams); err != nil {
+				m.logger.Error().Err(err).Msg("Failed to re-login SDK client")
+				return err
+			}
+
+			// Retry the operation with new cookie
+			return operation()
+		}
+		return err
+	}
+
 	// Parse topic parts
 	parts := strings.Split(topic, "/")
 	if len(parts) < 7 || parts[0] != "" || parts[1] != "device_sensor_data" {
@@ -273,7 +295,9 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 		sdkPayload := api.SetSensorTemperatureDataResponse{
 			SensorTemperatureData: []api.SensorTemperatureData{tempDetail},
 		}
-		err := m.sdkClient.SetSensorTemperatureData(ctx, sensorID, sdkPayload)
+		err := retryWithRefresh(func() error {
+			return m.sdkClient.SetSensorTemperatureData(ctx, sensorID, sdkPayload)
+		})
 		if err != nil {
 			m.logger.Error().Err(err).
 				Str("deviceID", deviceID).
@@ -296,7 +320,9 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 		sdkPayload := api.SetSensorMoistureDataResponse{
 			SensorMoistureData: []api.SensorMoistureData{moistureDetail},
 		}
-		err := m.sdkClient.SetSensorMoistureData(ctx, sensorID, sdkPayload)
+		err := retryWithRefresh(func() error {
+			return m.sdkClient.SetSensorMoistureData(ctx, sensorID, sdkPayload)
+		})
 		if err != nil {
 			m.logger.Error().Err(err).
 				Str("deviceID", deviceID).

@@ -656,17 +656,10 @@ func (nc *NexusClient) DeleteDroneImage(ctx context.Context, imageID string) err
 // to the Nexus API, returning error (if any)
 func SetAuthHeaders(request *http.Request, cookie *http.Cookie) error {
 	if cookie == nil || cookie.Value == "" {
-		// Log a warning if the cookie is missing or empty before attempting to add it
-		// This log might not have the full logger context available in NexusClient, so using fmt
-		fmt.Printf("[WARN] SetAuthHeaders called with nil or empty cookie. Name: %s, Value: %s\n", cookie.Name, cookie.Value)
-		// Potentially return an error here if a valid cookie is strictly required
-		// return fmt.Errorf("attempted to set auth headers with invalid cookie")
-	} else {
-		// Log the cookie being added
-		// This log might not have the full logger context available in NexusClient, so using fmt
-		fmt.Printf("[TRACE] SetAuthHeaders adding cookie: Name=%s, Value=%s\n", cookie.Name, cookie.Value)
+		return fmt.Errorf("invalid auth cookie (nil or empty)")
 	}
 	request.AddCookie(cookie)
+	fmt.Printf("[TRACE] SetAuthHeaders adding cookie: Name=%s, Value=%s\n", cookie.Name, cookie.Value)
 	return nil
 }
 
