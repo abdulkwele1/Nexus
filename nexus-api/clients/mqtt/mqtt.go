@@ -248,7 +248,7 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	// Parse topic parts
 	parts := strings.Split(topic, "/")
-	if len(parts) < 6 || parts[0] != "" || parts[1] != "device_sensor_data" {
+	if len(parts) < 7 || parts[0] != "" || parts[1] != "device_sensor_data" {
 		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format")
 		return
 	}
@@ -256,7 +256,7 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 	// Extract sensor information from MQTT topic
 	deviceID := parts[2]
 	sensorID := parts[3]        // This is already in hex format (e.g., 2CF7F1C0649007B3)
-	valueIdentifier := parts[5] // Last part contains the value identifier
+	valueIdentifier := parts[6] // Last part contains the value identifier
 
 	// Log the received topic parts for debugging
 	m.logger.Debug().
