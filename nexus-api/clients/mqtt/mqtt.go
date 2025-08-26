@@ -71,15 +71,15 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 		SetClientID(config.ClientID).
 		SetCleanSession(config.CleanSession).
 		SetAutoReconnect(config.AutoReconnect).
+		SetKeepAlive(30 * time.Second).    // Add keep-alive
+		SetPingTimeout(10 * time.Second).  // Add ping timeout
+		SetWriteTimeout(10 * time.Second). // Add write timeout
+		SetOrderMatters(false).            // Don't require strict message ordering
 		SetConnectionLostHandler(func(client mqtt.Client, err error) {
-
 			config.Logger.Error().Err(err).Msg("MQTT connection lost")
-
 		}).
 		SetOnConnectHandler(func(client mqtt.Client) {
-
 			config.Logger.Info().Msg("MQTT connected")
-
 		})
 
 	// Set credentials if provided
@@ -248,15 +248,15 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	// Parse topic parts
 	parts := strings.Split(topic, "/")
-	if len(parts) < 7 || parts[0] != "" || parts[1] != "device_sensor_data" {
+	if len(parts) < 6 || parts[0] != "" || parts[1] != "device_sensor_data" {
 		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format")
 		return
 	}
 
 	// Extract sensor information from MQTT topic
 	deviceID := parts[2]
-	sensorID := parts[3] // This is already in hex format (e.g., 2CF7F1C0649007B3)
-	valueIdentifier := parts[6]
+	sensorID := parts[3]        // This is already in hex format (e.g., 2CF7F1C0649007B3)
+	valueIdentifier := parts[5] // Last part contains the value identifier
 
 	// Log the received topic parts for debugging
 	m.logger.Debug().
