@@ -92,7 +92,7 @@ reset: lint
 .PHONY: refresh
 # rebuild from latest local sources and restart just the service containers
 # (preserving any volume state such as database tables & rows)
-refresh: lint
+refresh: 
 	docker compose up -d nexus-api --build --force-recreate
 
 .PHONY: logs
