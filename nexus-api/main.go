@@ -250,7 +250,7 @@ func main() {
 
 					if mqttTopics == "" {
 						// Subscribe to both sensor data and device status topics
-						mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+/+,/device_status_event/444574498032128/+/+/+/+"
+						mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+/+,/device_status_event/444574498032128/+/+/+"
 					}
 
 					topics := strings.Split(strings.TrimSpace(mqttTopics), ",")
