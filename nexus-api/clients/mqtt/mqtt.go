@@ -17,6 +17,8 @@ import (
 
 	"nexus-api/sdk"
 
+	"sync"
+
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -43,13 +45,21 @@ type MQTTConfig struct {
 }
 
 // MQTTClient wraps a connection to an MQTT broker
-
 type MQTTClient struct {
-	client mqtt.Client
-
-	logger *logging.ServiceLogger
-
+	client    mqtt.Client
+	logger    *logging.ServiceLogger
 	sdkClient *sdk.NexusClient
+
+	// Track subscriptions for automatic resubscription on reconnect
+	subscriptions     map[string]subscriptionInfo
+	subscriptionMutex sync.RWMutex
+}
+
+// subscriptionInfo tracks subscription details for resubscription
+type subscriptionInfo struct {
+	topic    string
+	qos      byte
+	callback mqtt.MessageHandler
 }
 
 // NewMQTTClient returns a new connection to the specified MQTT broker and error (if any)
@@ -62,6 +72,13 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 
 		config.ConnectTimeout = 10 * time.Second
 
+	}
+
+	// Create MQTT client instance first to reference in handlers
+	mqttClient := &MQTTClient{
+		logger:        config.Logger,
+		sdkClient:     config.SDKClient,
+		subscriptions: make(map[string]subscriptionInfo),
 	}
 
 	// Configure MQTT client options
@@ -79,6 +96,9 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 		SetOnConnectHandler(func(client mqtt.Client) {
 
 			config.Logger.Info().Msg("MQTT connected")
+
+			// Resubscribe to all tracked subscriptions
+			mqttClient.resubscribeAll()
 
 		})
 
@@ -106,15 +126,26 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 
 	}
 
-	return &MQTTClient{
+	// Set the client in the MQTT client instance
+	mqttClient.client = client
 
-		client: client,
+	return mqttClient, nil
 
-		logger: config.Logger,
+}
 
-		sdkClient: config.SDKClient,
-	}, nil
+// resubscribeAll resubscribes to all tracked subscriptions
+func (m *MQTTClient) resubscribeAll() {
+	m.subscriptionMutex.RLock()
+	defer m.subscriptionMutex.RUnlock()
 
+	for topic, info := range m.subscriptions {
+		token := m.client.Subscribe(topic, info.qos, info.callback)
+		if token.Wait() && token.Error() != nil {
+			m.logger.Error().Err(token.Error()).Msgf("Failed to resubscribe to topic: %s", topic)
+		} else {
+			m.logger.Info().Msgf("Resubscribed to topic: %s", topic)
+		}
+	}
 }
 
 // Subscribe subscribes to the specified topic with the given QoS level
@@ -122,6 +153,15 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 // and message handler
 
 func (m *MQTTClient) Subscribe(ctx context.Context, topic string, qos byte, callback mqtt.MessageHandler) error {
+
+	// Track the subscription for automatic resubscription
+	m.subscriptionMutex.Lock()
+	m.subscriptions[topic] = subscriptionInfo{
+		topic:    topic,
+		qos:      qos,
+		callback: callback,
+	}
+	m.subscriptionMutex.Unlock()
 
 	token := m.client.Subscribe(topic, qos, callback)
 
@@ -140,6 +180,11 @@ func (m *MQTTClient) Subscribe(ctx context.Context, topic string, qos byte, call
 // Unsubscribe unsubscribes from the specified topic
 
 func (m *MQTTClient) Unsubscribe(ctx context.Context, topic string) error {
+
+	// Remove from tracked subscriptions
+	m.subscriptionMutex.Lock()
+	delete(m.subscriptions, topic)
+	m.subscriptionMutex.Unlock()
 
 	token := m.client.Unsubscribe(topic)
 
