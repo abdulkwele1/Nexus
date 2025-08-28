@@ -293,15 +293,76 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	// Parse topic parts
 	parts := strings.Split(topic, "/")
-	if len(parts) < 7 || parts[0] != "" || parts[1] != "device_sensor_data" {
+	if parts[0] != "" {
 		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format")
 		return
 	}
 
-	// Extract sensor information from MQTT topic
+	// Extract common information
 	deviceID := parts[2]
-	sensorID := parts[3] // This is already in hex format (e.g., 2CF7F1C0649007B3)
-	valueIdentifier := parts[6]
+	sensorID := parts[3]
+
+	// Handle different topic types
+	var valueIdentifier string
+	if parts[1] == "device_sensor_data" {
+		// Handle sensor data topic
+		if len(parts) < 7 {
+			m.logger.Warn().Str("topic", topic).Msg("Invalid sensor data topic format")
+			return
+		}
+		valueIdentifier = parts[6]
+	} else if parts[1] == "device_status_event" {
+		// Handle device status topic format: /device_status_event/<OrgID>/<DeviceEUI>/<Reserved>/<StatusID>
+		if len(parts) < 6 {
+			m.logger.Warn().Str("topic", topic).Msg("Invalid device status topic format")
+			return
+		}
+
+		// Verify this is a battery status message (StatusID = 3000)
+		statusID := parts[5]
+		if statusID != "3000" {
+			m.logger.Warn().Str("topic", topic).Str("statusID", statusID).Msg("Unexpected status ID for device status event")
+			return
+		}
+
+		// Log raw payload for debugging
+		m.logger.Debug().
+			Str("topic", topic).
+			Str("payload", string(payload)).
+			Msg("Received battery status payload")
+
+		// Try to parse payload as standard sensor reading first
+		var reading SensorReading
+		if err := json.Unmarshal(payload, &reading); err != nil {
+			// If that fails, try the battery_level format
+			var statusPayload struct {
+				BatteryLevel float64 `json:"battery_level"`
+				Timestamp    int64   `json:"timestamp"`
+			}
+			if err := json.Unmarshal(payload, &statusPayload); err != nil {
+				m.logger.Error().Err(err).
+					Str("payload", string(payload)).
+					Msg("Failed to parse battery status payload in either format")
+				return
+			}
+			reading = SensorReading{
+				Value:     statusPayload.BatteryLevel,
+				Timestamp: statusPayload.Timestamp,
+			}
+		}
+
+		// Create standardized sensor reading format
+		var err error
+		payload, err = json.Marshal(reading)
+		if err != nil {
+			m.logger.Error().Err(err).Msg("Failed to marshal battery level reading")
+			return
+		}
+		valueIdentifier = "3000" // Battery level identifier
+	} else {
+		m.logger.Warn().Str("topic", topic).Msg("Unknown topic type")
+		return
+	}
 
 	// Log the received topic parts for debugging
 	m.logger.Debug().
@@ -331,6 +392,30 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	// Process based on sensor type
 	switch valueIdentifier {
+	case "3000": // Battery Level
+		batteryDetail := api.BatteryLevelData{
+			Date:         ts,
+			BatteryLevel: reading.Value,
+		}
+		sdkPayload := api.SetBatteryLevelDataResponse{
+			BatteryLevelData: []api.BatteryLevelData{batteryDetail},
+		}
+		err := retryWithRefresh(func() error {
+			return m.sdkClient.SetSensorBatteryData(ctx, sensorID, sdkPayload)
+		})
+		if err != nil {
+			m.logger.Error().Err(err).
+				Str("deviceID", deviceID).
+				Str("sensorID", sensorID).
+				Msg("Failed to set battery data")
+			return
+		}
+		m.logger.Info().
+			Str("deviceID", deviceID).
+			Str("sensorID", sensorID).
+			Float64("batteryLevel", reading.Value).
+			Msg("Successfully processed battery data")
+
 	case "4102": // Temperature
 		tempDetail := api.SensorTemperatureData{
 			SensorID:        sensorID, // Use hex ID directly
