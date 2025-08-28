@@ -34,20 +34,6 @@
         />
       </div>
 
-      <!-- Voltage Field -->
-      <div class="form-group">
-        <label for="voltage">Voltage (V):</label>
-        <input
-          type="number"
-          id="voltage"
-          v-model.number="formData.voltage"
-          min="0"
-          max="5"
-          step="0.1"
-          required
-        />
-      </div>
-
       <button type="submit" class="add-btn">
         Add Battery Data
       </button>
@@ -82,7 +68,6 @@ const formData = ref({
   sensorId: '',
   date: '',
   batteryLevel: 0,
-  voltage: 0,
 });
 
 const resetForm = () => {
@@ -90,7 +75,6 @@ const resetForm = () => {
     sensorId: '',
     date: '',
     batteryLevel: 0,
-    voltage: 0,
   };
 };
 
@@ -104,7 +88,6 @@ const addBatteryData = async () => {
     const batteryData = [{
       date: formattedDate,
       battery_level: formData.value.batteryLevel,
-      voltage: formData.value.voltage,
     }];
 
     const response = await nexusStore.user.setSensorBatteryData(

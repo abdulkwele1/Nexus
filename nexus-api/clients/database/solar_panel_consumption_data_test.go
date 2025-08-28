@@ -87,12 +87,12 @@ func TestE2ESaveAndGetConsumptionDataForPanelID(t *testing.T) {
 
 	for _, savedSolarPanelConsumptionDataRow := range savedSolarPanelConsumptionData {
 		// test if the first testSolarPanelConsumptionData is equal to this row
-		if savedSolarPanelConsumptionDataRow.Date == firstTestSolarPanelConsumptionData.Date && savedSolarPanelConsumptionDataRow.ConsumedKwh == firstTestSolarPanelConsumptionData.ConsumedKwh && savedSolarPanelConsumptionDataRow.CapacityKwh == firstTestSolarPanelConsumptionData.CapacityKwh && savedSolarPanelConsumptionDataRow.PanelID == firstTestSolarPanelConsumptionData.PanelID {
+		if savedSolarPanelConsumptionDataRow.Date.Equal(firstTestSolarPanelConsumptionData.Date) && savedSolarPanelConsumptionDataRow.ConsumedKwh == firstTestSolarPanelConsumptionData.ConsumedKwh && savedSolarPanelConsumptionDataRow.CapacityKwh == firstTestSolarPanelConsumptionData.CapacityKwh && savedSolarPanelConsumptionDataRow.PanelID == firstTestSolarPanelConsumptionData.PanelID {
 			matchedOne = true
 			continue
 		}
 		// test if the second testSolarPanelConsumptionData is equal to this row
-		if savedSolarPanelConsumptionDataRow.Date == secondTestSolarPanelConsumptionData.Date && savedSolarPanelConsumptionDataRow.ConsumedKwh == secondTestSolarPanelConsumptionData.ConsumedKwh && savedSolarPanelConsumptionDataRow.CapacityKwh == secondTestSolarPanelConsumptionData.CapacityKwh && savedSolarPanelConsumptionDataRow.PanelID == secondTestSolarPanelConsumptionData.PanelID {
+		if savedSolarPanelConsumptionDataRow.Date.Equal(secondTestSolarPanelConsumptionData.Date) && savedSolarPanelConsumptionDataRow.ConsumedKwh == secondTestSolarPanelConsumptionData.ConsumedKwh && savedSolarPanelConsumptionDataRow.CapacityKwh == secondTestSolarPanelConsumptionData.CapacityKwh && savedSolarPanelConsumptionDataRow.PanelID == secondTestSolarPanelConsumptionData.PanelID {
 			matchedTwo = true
 			continue
 		}

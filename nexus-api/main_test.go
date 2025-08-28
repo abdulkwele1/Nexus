@@ -578,12 +578,10 @@ func TestE2ESetAndGetSensorBatteryData(t *testing.T) {
 			{
 				Date:         time.Now().Add(1 * time.Second).UTC(),
 				BatteryLevel: 85.5,
-				Voltage:      3.7,
 			},
 			{
 				Date:         time.Now().Add(2 * time.Second).UTC(),
 				BatteryLevel: 90.0,
-				Voltage:      3.8,
 			},
 		},
 	}
@@ -610,9 +608,7 @@ func TestE2ESetAndGetSensorBatteryData(t *testing.T) {
 
 		for i, expected := range expectedBatteryData.BatteryLevelData {
 			actual := gotBatteryData.BatteryLevelData[i]
-			assert.Equal(t, expected.BatteryLevel, actual.BatteryLevel, "Battery level should match")
-			assert.Equal(t, expected.Voltage, actual.Voltage, "Voltage should match")
-			// Compare dates with a small tolerance to account for potential time differences
+			assert.Equal(t, expected.BatteryLevel, actual.BatteryLevel, "Battery level should match") // Compare dates with a small tolerance to account for potential time differences
 			assert.True(t, expected.Date.Sub(actual.Date) < time.Second,
 				"Date should be within 1 second of expected")
 		}

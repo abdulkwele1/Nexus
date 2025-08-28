@@ -149,7 +149,6 @@ type UploadDroneImagesResponse struct {
 type BatteryLevelData struct {
 	Date         time.Time `json:"date"`
 	BatteryLevel float64   `json:"battery_level"`
-	Voltage      float64   `json:"voltage"`
 }
 
 type GetBatteryLevelDataResponse struct {

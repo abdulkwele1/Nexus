@@ -835,10 +835,6 @@ components:
                 type: number
                 format: float
                 description: Battery level percentage from 0 to 100
-              voltage:
-                type: number
-                format: float
-                description: Battery voltage in volts
       required:
         - battery_data
 

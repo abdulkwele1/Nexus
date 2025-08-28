@@ -249,7 +249,7 @@ func main() {
 					mqttTopics := os.Getenv("MQTT_TOPICS")
 
 					if mqttTopics == "" {
-						mqttTopics = "/device_sensor_data/1001/+/+/+/+/+" // Subscribe to all device and sensor IDs
+						mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+/+" // Subscribe to all device and sensor IDs
 					}
 
 					topic := strings.Split(strings.TrimSpace(mqttTopics), ",")[0]
