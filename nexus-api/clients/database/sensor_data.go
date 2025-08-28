@@ -181,29 +181,28 @@ type SensorBatteryData struct {
 	SensorID     string    `bun:"sensor_id"`
 	Date         time.Time `bun:"date"`
 	BatteryLevel float64   `bun:"battery_level"`
-	Voltage      float64   `bun:"voltage"`
 }
 
 func GetSensorBatteryDataForSensorID(ctx context.Context, db *bun.DB, sensorID string, startDate, endDate time.Time) ([]SensorBatteryData, error) {
 	var data []SensorBatteryData
 	query := db.NewSelect().Model(&data).Where("sensor_id = ?", sensorID)
-	
+
 	if !startDate.IsZero() {
 		query.Where("date >= ?", startDate)
 	}
 	if !endDate.IsZero() {
 		query.Where("date <= ?", endDate)
 	}
-	
+
 	err := query.Scan(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if len(data) == 0 {
 		return nil, ErrorNoSensorBatteryData
 	}
-	
+
 	return data, nil
 }
 

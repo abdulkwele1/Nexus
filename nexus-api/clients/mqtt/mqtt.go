@@ -17,6 +17,8 @@ import (
 
 	"nexus-api/sdk"
 
+	"sync"
+
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -43,13 +45,21 @@ type MQTTConfig struct {
 }
 
 // MQTTClient wraps a connection to an MQTT broker
-
 type MQTTClient struct {
-	client mqtt.Client
-
-	logger *logging.ServiceLogger
-
+	client    mqtt.Client
+	logger    *logging.ServiceLogger
 	sdkClient *sdk.NexusClient
+
+	// Track subscriptions for automatic resubscription on reconnect
+	subscriptions     map[string]subscriptionInfo
+	subscriptionMutex sync.RWMutex
+}
+
+// subscriptionInfo tracks subscription details for resubscription
+type subscriptionInfo struct {
+	topic    string
+	qos      byte
+	callback mqtt.MessageHandler
 }
 
 // NewMQTTClient returns a new connection to the specified MQTT broker and error (if any)
@@ -62,6 +72,13 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 
 		config.ConnectTimeout = 10 * time.Second
 
+	}
+
+	// Create MQTT client instance first to reference in handlers
+	mqttClient := &MQTTClient{
+		logger:        config.Logger,
+		sdkClient:     config.SDKClient,
+		subscriptions: make(map[string]subscriptionInfo),
 	}
 
 	// Configure MQTT client options
@@ -79,6 +96,9 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 		SetOnConnectHandler(func(client mqtt.Client) {
 
 			config.Logger.Info().Msg("MQTT connected")
+
+			// Resubscribe to all tracked subscriptions
+			mqttClient.resubscribeAll()
 
 		})
 
@@ -106,15 +126,26 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 
 	}
 
-	return &MQTTClient{
+	// Set the client in the MQTT client instance
+	mqttClient.client = client
 
-		client: client,
+	return mqttClient, nil
 
-		logger: config.Logger,
+}
 
-		sdkClient: config.SDKClient,
-	}, nil
+// resubscribeAll resubscribes to all tracked subscriptions
+func (m *MQTTClient) resubscribeAll() {
+	m.subscriptionMutex.RLock()
+	defer m.subscriptionMutex.RUnlock()
 
+	for topic, info := range m.subscriptions {
+		token := m.client.Subscribe(topic, info.qos, info.callback)
+		if token.Wait() && token.Error() != nil {
+			m.logger.Error().Err(token.Error()).Msgf("Failed to resubscribe to topic: %s", topic)
+		} else {
+			m.logger.Info().Msgf("Resubscribed to topic: %s", topic)
+		}
+	}
 }
 
 // Subscribe subscribes to the specified topic with the given QoS level
@@ -122,6 +153,15 @@ func NewMQTTClient(config MQTTConfig) (*MQTTClient, error) {
 // and message handler
 
 func (m *MQTTClient) Subscribe(ctx context.Context, topic string, qos byte, callback mqtt.MessageHandler) error {
+
+	// Track the subscription for automatic resubscription
+	m.subscriptionMutex.Lock()
+	m.subscriptions[topic] = subscriptionInfo{
+		topic:    topic,
+		qos:      qos,
+		callback: callback,
+	}
+	m.subscriptionMutex.Unlock()
 
 	token := m.client.Subscribe(topic, qos, callback)
 
@@ -140,6 +180,11 @@ func (m *MQTTClient) Subscribe(ctx context.Context, topic string, qos byte, call
 // Unsubscribe unsubscribes from the specified topic
 
 func (m *MQTTClient) Unsubscribe(ctx context.Context, topic string) error {
+
+	// Remove from tracked subscriptions
+	m.subscriptionMutex.Lock()
+	delete(m.subscriptions, topic)
+	m.subscriptionMutex.Unlock()
 
 	token := m.client.Unsubscribe(topic)
 
@@ -248,15 +293,76 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	// Parse topic parts
 	parts := strings.Split(topic, "/")
-	if len(parts) < 7 || parts[0] != "" || parts[1] != "device_sensor_data" {
+	if parts[0] != "" {
 		m.logger.Warn().Str("topic", topic).Msg("Received message on unexpected topic format")
 		return
 	}
 
-	// Extract sensor information from MQTT topic
+	// Extract common information
 	deviceID := parts[2]
-	sensorID := parts[3] // This is already in hex format (e.g., 2CF7F1C0649007B3)
-	valueIdentifier := parts[6]
+	sensorID := parts[3]
+
+	// Handle different topic types
+	var valueIdentifier string
+	if parts[1] == "device_sensor_data" {
+		// Handle sensor data topic
+		if len(parts) < 7 {
+			m.logger.Warn().Str("topic", topic).Msg("Invalid sensor data topic format")
+			return
+		}
+		valueIdentifier = parts[6]
+	} else if parts[1] == "device_status_event" {
+		// Handle device status topic format: /device_status_event/<OrgID>/<DeviceEUI>/<Reserved>/<StatusID>
+		if len(parts) < 6 {
+			m.logger.Warn().Str("topic", topic).Msg("Invalid device status topic format")
+			return
+		}
+
+		// Verify this is a battery status message (StatusID = 3000)
+		statusID := parts[5]
+		if statusID != "3000" {
+			m.logger.Warn().Str("topic", topic).Str("statusID", statusID).Msg("Unexpected status ID for device status event")
+			return
+		}
+
+		// Log raw payload for debugging
+		m.logger.Debug().
+			Str("topic", topic).
+			Str("payload", string(payload)).
+			Msg("Received battery status payload")
+
+		// Try to parse payload as standard sensor reading first
+		var reading SensorReading
+		if err := json.Unmarshal(payload, &reading); err != nil {
+			// If that fails, try the battery_level format
+			var statusPayload struct {
+				BatteryLevel float64 `json:"battery_level"`
+				Timestamp    int64   `json:"timestamp"`
+			}
+			if err := json.Unmarshal(payload, &statusPayload); err != nil {
+				m.logger.Error().Err(err).
+					Str("payload", string(payload)).
+					Msg("Failed to parse battery status payload in either format")
+				return
+			}
+			reading = SensorReading{
+				Value:     statusPayload.BatteryLevel,
+				Timestamp: statusPayload.Timestamp,
+			}
+		}
+
+		// Create standardized sensor reading format
+		var err error
+		payload, err = json.Marshal(reading)
+		if err != nil {
+			m.logger.Error().Err(err).Msg("Failed to marshal battery level reading")
+			return
+		}
+		valueIdentifier = "3000" // Battery level identifier
+	} else {
+		m.logger.Warn().Str("topic", topic).Msg("Unknown topic type")
+		return
+	}
 
 	// Log the received topic parts for debugging
 	m.logger.Debug().
@@ -286,6 +392,30 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 
 	// Process based on sensor type
 	switch valueIdentifier {
+	case "3000": // Battery Level
+		batteryDetail := api.BatteryLevelData{
+			Date:         ts,
+			BatteryLevel: reading.Value,
+		}
+		sdkPayload := api.SetBatteryLevelDataResponse{
+			BatteryLevelData: []api.BatteryLevelData{batteryDetail},
+		}
+		err := retryWithRefresh(func() error {
+			return m.sdkClient.SetSensorBatteryData(ctx, sensorID, sdkPayload)
+		})
+		if err != nil {
+			m.logger.Error().Err(err).
+				Str("deviceID", deviceID).
+				Str("sensorID", sensorID).
+				Msg("Failed to set battery data")
+			return
+		}
+		m.logger.Info().
+			Str("deviceID", deviceID).
+			Str("sensorID", sensorID).
+			Float64("batteryLevel", reading.Value).
+			Msg("Successfully processed battery data")
+
 	case "4102": // Temperature
 		tempDetail := api.SensorTemperatureData{
 			SensorID:        sensorID, // Use hex ID directly

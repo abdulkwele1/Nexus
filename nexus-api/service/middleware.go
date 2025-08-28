@@ -63,6 +63,5 @@ func AuthMiddleware(next http.HandlerFunc, apiService *APIService) http.HandlerF
 		r = r.WithContext(ctx)
 		// call next handler
 		next(w, r)
-		return
 	}
 }

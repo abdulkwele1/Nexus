@@ -29,7 +29,6 @@ const store = useNexusStore();
 interface BatteryData {
   date: string;
   battery_level: number;
-  voltage: number;
 }
 
 interface SensorConfig {

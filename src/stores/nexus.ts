@@ -373,7 +373,6 @@ class User {
     async setSensorBatteryData(sensorId: string, batteryData: Array<{
         date: string;
         battery_level: number;
-        voltage: number;
     }>) {
         const url = `${this.baseURL}/sensors/${sensorId}/battery`;
         return apiFetch(url, {

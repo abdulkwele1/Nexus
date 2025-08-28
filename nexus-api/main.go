@@ -249,31 +249,26 @@ func main() {
 					mqttTopics := os.Getenv("MQTT_TOPICS")
 
 					if mqttTopics == "" {
-						mqttTopics = "/device_sensor_data/+/+/+/+/+/+" // Subscribe to all device and sensor IDs
+						// Subscribe to both sensor data and device status topics
+						mqttTopics = "/device_sensor_data/444574498032128/+/+/+/+/+,/device_status_event/444574498032128/+/+/+"
 					}
 
-					topic := strings.Split(strings.TrimSpace(mqttTopics), ",")[0]
+					topics := strings.Split(strings.TrimSpace(mqttTopics), ",")
 
-					topic = strings.TrimSpace(topic)
-
-					if topic != "" {
-
-						err := mqttClient.Subscribe(serviceCtx, topic, 1, mqttClient.HandleMessage)
-
-						if err != nil {
-
-							serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
-
-						} else {
-
-							serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
-
+					for _, topic := range topics {
+						topic = strings.TrimSpace(topic)
+						if topic != "" {
+							err := mqttClient.Subscribe(serviceCtx, topic, 1, mqttClient.HandleMessage)
+							if err != nil {
+								serviceLogger.Error().Err(err).Msgf("Failed to subscribe to topic: %s", topic)
+							} else {
+								serviceLogger.Info().Msgf("Subscribed to topic: %s", topic)
+							}
 						}
+					}
 
-					} else {
-
-						serviceLogger.Warn().Msg("No MQTT topic specified to subscribe to.")
-
+					if len(topics) == 0 {
+						serviceLogger.Warn().Msg("No MQTT topics specified to subscribe to.")
 					}
 
 				}()

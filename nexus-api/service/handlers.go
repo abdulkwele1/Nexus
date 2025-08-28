@@ -1034,7 +1034,6 @@ func CreateGetSensorBatteryDataHandler(apiService *APIService) http.HandlerFunc 
 			response.BatteryLevelData = append(response.BatteryLevelData, api.BatteryLevelData{
 				Date:         d.Date,
 				BatteryLevel: d.BatteryLevel,
-				Voltage:      d.Voltage,
 			})
 		}
 
@@ -1075,7 +1074,6 @@ func CreateSetSensorBatteryDataHandler(apiService *APIService) http.HandlerFunc 
 				SensorID:     sensorID,
 				Date:         batteryData.Date,
 				BatteryLevel: batteryData.BatteryLevel,
-				Voltage:      batteryData.Voltage,
 			}
 
 			err = sensorBatteryData.Save(r.Context(), apiService.DatabaseClient.DB)
