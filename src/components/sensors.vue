@@ -296,7 +296,7 @@ const colors = [
 ];
 
 const nexusStore = useNexusStore();
-// Convert decimal 444574498032128 to hex string
+
 const REALTIME_SENSOR_ID = "2CF7F1C0649007B3"; // Updated to use sensor B3
 
 interface RealtimeSensorDisplay {
