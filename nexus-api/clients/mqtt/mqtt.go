@@ -2,22 +2,16 @@ package clients
 
 import (
 	"context"
-
 	"encoding/json"
-
 	"fmt"
-
+	"strconv"
 	"strings"
-
+	"sync"
 	"time"
 
 	"nexus-api/api"
-
 	"nexus-api/logging"
-
 	"nexus-api/sdk"
-
-	"sync"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -336,8 +330,8 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 		if err := json.Unmarshal(payload, &reading); err != nil {
 			// If that fails, try the battery_level format
 			var statusPayload struct {
-				BatteryLevel float64 `json:"battery_level"`
-				Timestamp    int64   `json:"timestamp"`
+				Value     string `json:"value"`
+				Timestamp int64  `json:"timestamp"`
 			}
 			if err := json.Unmarshal(payload, &statusPayload); err != nil {
 				m.logger.Error().Err(err).
@@ -345,8 +339,16 @@ func (m *MQTTClient) HandleMessage(client mqtt.Client, msg mqtt.Message) {
 					Msg("Failed to parse battery status payload in either format")
 				return
 			}
+			// Convert string value to float64
+			value, err := strconv.ParseFloat(statusPayload.Value, 64)
+			if err != nil {
+				m.logger.Error().Err(err).
+					Str("value", statusPayload.Value).
+					Msg("Failed to parse battery value as float")
+				return
+			}
 			reading = SensorReading{
-				Value:     statusPayload.BatteryLevel,
+				Value:     value,
 				Timestamp: statusPayload.Timestamp,
 			}
 		}
