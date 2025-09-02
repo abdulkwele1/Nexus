@@ -10,13 +10,12 @@
 
 ## Want It
 
-- auto log out when token has expired
+- auto log out when token has expired(fix this to intake activity status)
+- Create dynamic sensors inclusion
 
--Home page should be a map
 
--Update the solar panel dashboard
 
--Creat a case:#### for battery levels in mqtt to subscribe to the topic
+
 
 ## Nice To Have
 
