@@ -667,7 +667,7 @@ func SetAuthHeaders(request *http.Request, cookie *http.Cookie) error {
 // returning the client and error (if any)
 // GetSensorBatteryData retrieves battery data for a specific sensor
 func (nc *NexusClient) GetSensorBatteryData(ctx context.Context, sensorID string, startDate, endDate string) (api.GetBatteryLevelDataResponse, error) {
-	endpoint := fmt.Sprintf("%s/sensors/%s/battery", nc.Config.NexusAPIEndpoint, sensorID)
+	endpoint := fmt.Sprintf("%s/sensors/%s/battery_data", nc.Config.NexusAPIEndpoint, sensorID)
 
 	// Add query parameters for date range if provided
 	if startDate != "" || endDate != "" {
@@ -714,7 +714,7 @@ func (nc *NexusClient) GetSensorBatteryData(ctx context.Context, sensorID string
 
 // SetSensorBatteryData saves battery data for a specific sensor
 func (nc *NexusClient) SetSensorBatteryData(ctx context.Context, sensorID string, batteryData api.SetBatteryLevelDataResponse) error {
-	endpoint := fmt.Sprintf("%s/sensors/%s/battery", nc.Config.NexusAPIEndpoint, sensorID)
+	endpoint := fmt.Sprintf("%s/sensors/%s/battery_data", nc.Config.NexusAPIEndpoint, sensorID)
 
 	body, err := json.Marshal(batteryData)
 	if err != nil {

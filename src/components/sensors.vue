@@ -979,20 +979,30 @@ const formatLastUpdated = (date: Date | undefined) => {
   if (!date) return 'Never';
   // Check if it's epoch time (indicating no data or error)
   if (date.getTime() === 0) return 'No Data';
-  return new Date(date).toLocaleString();
+  
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutesAgo = Math.floor(diff / (1000 * 60));
+  
+  if (minutesAgo < 1) return 'Just now';
+  if (minutesAgo === 1) return '1 minute ago';
+  if (minutesAgo < 60) return `${minutesAgo} minutes ago`;
+  
+  const hoursAgo = Math.floor(minutesAgo / 60);
+  if (hoursAgo === 1) return '1 hour ago';
+  if (hoursAgo < 24) return `${hoursAgo} hours ago`;
+  
+  const daysAgo = Math.floor(hoursAgo / 24);
+  if (daysAgo === 1) return '1 day ago';
+  return `${daysAgo} days ago`;
 };
 
 // Function to fetch battery data for a sensor
 const fetchBatteryData = async (sensorId: string) => {
   try {
-    // Get data for the last 24 hours
-    const now = new Date();
-    const startDate = new Date(now);
-    startDate.setHours(now.getHours() - 24);
-
-    // Format dates as YYYY-MM-DD for the API
-    const startStr = startDate.toISOString().split('T')[0];
-    const endStr = now.toISOString().split('T')[0];
+    // Use fixed dates that include September 2025
+    const startStr = "2025-09-01";  // Start of September 2025
+    const endStr = "2025-09-30";    // End of September 2025
 
     console.log(`[sensors.vue] Fetching battery data for sensor ${sensorId} from ${startStr} to ${endStr}`);
 
@@ -1827,14 +1837,33 @@ select:focus {
 .battery-card {
   background: #242424;
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(144, 238, 144, 0.1);
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.battery-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--sensor-color), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
 }
 
 .battery-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(144, 238, 144, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(144, 238, 144, 0.15);
+  border-color: rgba(144, 238, 144, 0.3);
+}
+
+.battery-card:hover::before {
+  transform: translateX(100%);
 }
 
 .battery-card-header {
@@ -1850,19 +1879,39 @@ select:focus {
 }
 
 .battery-indicator {
-  height: 20px;
+  height: 24px;
   background: #1a1a1a;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   position: relative;
-  border: 1px solid rgba(144, 238, 144, 0.1);
+  border: 1px solid rgba(144, 238, 144, 0.15);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.battery-indicator::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
 }
 
 .battery-level {
   height: 100%;
   background: var(--sensor-color);
-  transition: width 0.3s ease;
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 10px;
+  position: relative;
+  box-shadow: 0 0 10px rgba(144, 238, 144, 0.2);
 }
 
 .battery-indicator.battery-good .battery-level {
@@ -1894,34 +1943,93 @@ select:focus {
 
 .battery-percentage {
   font-weight: 600;
-  font-size: 1.1rem;
-  transition: color 0.3s ease;
+  font-size: 1.2rem;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  text-shadow: 0 0 10px rgba(144, 238, 144, 0.3);
+  letter-spacing: 0.5px;
 }
 
 .battery-percentage.battery-good {
   color: #4CAF50;
+  text-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
 }
 
 .battery-percentage.battery-medium {
   color: #FFC107;
+  text-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
 }
 
 .battery-percentage.battery-critical {
   color: #f44336;
+  text-shadow: 0 0 10px rgba(244, 67, 54, 0.3);
 }
 
 .battery-status {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.1);
-  padding: 2px 8px;
-  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 12px;
+  border-radius: 6px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.battery-status:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .battery-updated {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 4px;
-  display: block;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(144, 238, 144, 0.03);
+  border: 1px solid rgba(144, 238, 144, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.battery-updated::before {
+  content: '⏱';
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin-right: 2px;
+}
+
+.battery-updated::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(144, 238, 144, 0.05),
+    transparent
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.battery-updated:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(144, 238, 144, 0.05);
+  border-color: rgba(144, 238, 144, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.battery-updated:hover::after {
+  transform: translateX(100%);
 }
 </style>
