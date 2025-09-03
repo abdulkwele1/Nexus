@@ -3,7 +3,6 @@
     <!-- Navigation bar -->
     <nav class="navbar" :class="{ 'navbar--hidden': !navbarVisible }">
       <button class="nav-button" @click="goTo('/home')">Home</button>
-      <button v-if="$route.path === '/sensors'" class="nav-button" @click="showSensorInfo">Sensor Info</button>
     </nav>
   </div>
   
@@ -205,23 +204,8 @@
     </div>
   </div>
 
-  <!-- Sensor Info Modal -->
-  <div v-if="showSensorInfoModal" class="sensor-info-modal">
-    <div class="sensor-info-modal-content">
-      <button class="close-btn" @click="showSensorInfoModal = false">&times;</button>
-      <h2>Sensor Information</h2>
-      <div class="sensor-info-grid">
-        <div v-for="sensor in SENSOR_CONFIGS" :key="sensor.id" class="sensor-info-item">
-          <h3>{{ sensor.name }}</h3>
-          <p><strong>ID:</strong> {{ sensor.id }}</p>
-          <div class="sensor-status" :style="{ '--sensor-color': getSensorColor(sensor.name) }">
-            <span class="status-dot"></span>
-            <span>{{ sensorVisibility[sensor.name] ? 'Active' : 'Inactive' }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+ 
+  
 </template>
 
 <script setup lang="ts">
