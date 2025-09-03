@@ -127,7 +127,41 @@
 
     <!-- Main Content Area -->
     <div class="sensors-content">
-      <!-- Real-time data display -->
+      <!-- Battery Status Display -->
+      <div class="battery-status-container">
+        <h2 class="battery-status-title">Sensor Battery Status</h2>
+        <div class="battery-grid">
+          <div v-for="sensor in SENSOR_CONFIGS" 
+               :key="sensor.id" 
+               class="battery-card"
+               :style="{ '--sensor-color': getSensorColor(sensor.name) }">
+            <div class="battery-card-header">
+              <h3>{{ sensor.name }}</h3>
+              <div class="battery-indicator" 
+                   :class="getBatteryLevelClass(batteryLevels[sensor.id]?.level)">
+                <div class="battery-level" 
+                     :style="{ width: `${batteryLevels[sensor.id]?.level || 0}%` }">
+                </div>
+              </div>
+            </div>
+            <div class="battery-details">
+              <div class="battery-info">
+                <span class="battery-percentage" :class="getBatteryLevelClass(batteryLevels[sensor.id]?.level)">
+                  {{ (batteryLevels[sensor.id]?.level || 0).toFixed(1) }}%
+                </span>
+                <span class="battery-status">
+                  {{ getBatteryStatus(batteryLevels[sensor.id]?.level) }}
+                </span>
+              </div>
+              <span class="battery-updated">
+                Last updated: {{ formatLastUpdated(batteryLevels[sensor.id]?.lastUpdated) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <!-- Real-time data display -->
       <div class="realtime-container">
         <div class="sensor-carousel">
           <div class="sensor-card" :style="{ '--sensor-color': colors[0] }">
@@ -419,6 +453,10 @@ onMounted(async () => {
     currentTime.value = new Date();
   }, 1000);
 
+  // Initial battery data fetch and setup periodic updates
+  await updateAllBatteryLevels();
+  batteryUpdateInterval.value = setInterval(updateAllBatteryLevels, 60000); // Update every minute
+
   const fetchAndUpdateRealtimeSensor = async () => {
     try {
       let data;
@@ -492,6 +530,9 @@ onUnmounted(() => {
   clearInterval(timeInterval);
   clearInterval(dataInterval);
   clearInterval(graphRefreshInterval); // Clear the graph refresh interval
+  if (batteryUpdateInterval.value) {
+    clearInterval(batteryUpdateInterval.value);
+  }
 
   // Remove scroll listener
   window.removeEventListener('scroll', handleScroll);
@@ -908,6 +949,95 @@ const resetToDefault = () => {
       currentGraph.fetchAllSensorData();
     }
   });
+};
+
+// Add battery level tracking
+interface BatteryStatus {
+  level: number;
+  lastUpdated: Date;
+}
+
+const batteryLevels = ref<{ [key: string]: BatteryStatus }>({});
+const batteryUpdateInterval = ref<number>();
+
+// Battery level helper functions
+const getBatteryLevelClass = (level: number | undefined) => {
+  if (!level) return 'battery-critical';
+  if (level > 75) return 'battery-good';
+  if (level > 25) return 'battery-medium';
+  return 'battery-critical';
+};
+
+const getBatteryStatus = (level: number | undefined) => {
+  if (!level) return 'No Data';
+  if (level > 75) return 'Good';
+  if (level > 25) return 'Medium';
+  return 'Critical';
+};
+
+const formatLastUpdated = (date: Date | undefined) => {
+  if (!date) return 'Never';
+  // Check if it's epoch time (indicating no data or error)
+  if (date.getTime() === 0) return 'No Data';
+  return new Date(date).toLocaleString();
+};
+
+// Function to fetch battery data for a sensor
+const fetchBatteryData = async (sensorId: string) => {
+  try {
+    // Get data for the last 24 hours
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setHours(now.getHours() - 24);
+
+    // Format dates as YYYY-MM-DD for the API
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = now.toISOString().split('T')[0];
+
+    console.log(`[sensors.vue] Fetching battery data for sensor ${sensorId} from ${startStr} to ${endStr}`);
+
+    const response = await nexusStore.user.getSensorBatteryData(sensorId, startStr, endStr);
+    console.log(`[sensors.vue] Battery data response for sensor ${sensorId}:`, response);
+    
+    if (response?.battery_level_data && Array.isArray(response.battery_level_data) && response.battery_level_data.length > 0) {
+      // Sort by date to get the most recent reading
+      const sortedData = [...response.battery_level_data].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      
+      const latestReading = sortedData[0];
+      console.log(`[sensors.vue] Latest battery reading for sensor ${sensorId}:`, latestReading);
+      
+      batteryLevels.value[sensorId] = {
+        level: latestReading.battery_level,
+        lastUpdated: new Date(latestReading.date)
+      };
+
+      // Log success for debugging
+      console.log(`[sensors.vue] Updated battery level for sensor ${sensorId}:`, batteryLevels.value[sensorId]);
+    } else {
+      console.log(`[sensors.vue] No battery data found for sensor ${sensorId}`);
+      // Initialize with zero if no data
+      batteryLevels.value[sensorId] = {
+        level: 0,
+        lastUpdated: new Date(0) // epoch time to indicate no data
+      };
+    }
+  } catch (error) {
+    console.error(`[sensors.vue] Error fetching battery data for sensor ${sensorId}:`, error);
+    // Initialize with zero on error
+    batteryLevels.value[sensorId] = {
+      level: 0,
+      lastUpdated: new Date(0) // epoch time to indicate error
+    };
+  }
+};
+
+// Function to update all battery levels
+const updateAllBatteryLevels = async () => {
+  for (const sensor of SENSOR_CONFIGS.value) {
+    await fetchBatteryData(sensor.id);
+  }
 };
 
 // Add new refs for drone images
@@ -1666,5 +1796,132 @@ select:focus {
 .close-btn:hover {
   color: white;
   transform: scale(1.1);
+}
+
+/* Battery Status Styles */
+.battery-status-container {
+  padding: 20px;
+  background: #1a1a1a;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 928px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.battery-status-title {
+  color: #90EE90;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.battery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.battery-card {
+  background: #242424;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  transition: all 0.3s ease;
+}
+
+.battery-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(144, 238, 144, 0.1);
+}
+
+.battery-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.battery-card-header h3 {
+  color: var(--sensor-color);
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.battery-indicator {
+  height: 20px;
+  background: #1a1a1a;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+}
+
+.battery-level {
+  height: 100%;
+  background: var(--sensor-color);
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.battery-indicator.battery-good .battery-level {
+  background: #4CAF50;
+}
+
+.battery-indicator.battery-medium .battery-level {
+  background: #FFC107;
+}
+
+.battery-indicator.battery-critical .battery-level {
+  background: #f44336;
+}
+
+.battery-details {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+}
+
+.battery-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.battery-percentage {
+  font-weight: 600;
+  font-size: 1.1rem;
+  transition: color 0.3s ease;
+}
+
+.battery-percentage.battery-good {
+  color: #4CAF50;
+}
+
+.battery-percentage.battery-medium {
+  color: #FFC107;
+}
+
+.battery-percentage.battery-critical {
+  color: #f44336;
+}
+
+.battery-status {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.battery-updated {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+  display: block;
 }
 </style>
