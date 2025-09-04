@@ -332,7 +332,7 @@ class User {
 
     async getSensorBatteryData(sensorId: string, startDate?: string, endDate?: string) {
         try {
-            let url = `${this.baseURL}/sensors/${sensorId}/battery`;
+            let url = `${this.baseURL}/sensors/${sensorId}/battery_data`;
             
             // Add date range parameters if provided
             if (startDate && endDate) {
@@ -374,7 +374,7 @@ class User {
         date: string;
         battery_level: number;
     }>) {
-        const url = `${this.baseURL}/sensors/${sensorId}/battery`;
+        const url = `${this.baseURL}/sensors/${sensorId}/battery_data`;
         return apiFetch(url, {
             credentials: 'include',
             headers: {

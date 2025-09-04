@@ -107,8 +107,8 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/drone_images/{image_id}/content", CorsMiddleware(AuthMiddleware(CreateGetDroneImageContentHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 
 	// Battery data routes
-	router.HandleFunc("/sensors/{sensor_id}/battery", CorsMiddleware(AuthMiddleware(CreateGetSensorBatteryDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc("/sensors/{sensor_id}/battery", CorsMiddleware(AuthMiddleware(CreateSetSensorBatteryDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
+	router.HandleFunc("/sensors/{sensor_id}/battery_data", CorsMiddleware(AuthMiddleware(CreateGetSensorBatteryDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/sensors/{sensor_id}/battery_data", CorsMiddleware(AuthMiddleware(CreateSetSensorBatteryDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),

@@ -3,7 +3,6 @@
     <!-- Navigation bar -->
     <nav class="navbar" :class="{ 'navbar--hidden': !navbarVisible }">
       <button class="nav-button" @click="goTo('/home')">Home</button>
-      <button v-if="$route.path === '/sensors'" class="nav-button" @click="showSensorInfo">Sensor Info</button>
     </nav>
   </div>
   
@@ -128,7 +127,41 @@
 
     <!-- Main Content Area -->
     <div class="sensors-content">
-      <!-- Real-time data display -->
+      <!-- Battery Status Display -->
+      <div class="battery-status-container">
+        <h2 class="battery-status-title">Sensor Battery Status</h2>
+        <div class="battery-grid">
+          <div v-for="sensor in SENSOR_CONFIGS" 
+               :key="sensor.id" 
+               class="battery-card"
+               :style="{ '--sensor-color': getSensorColor(sensor.name) }">
+            <div class="battery-card-header">
+              <h3>{{ sensor.name }}</h3>
+              <div class="battery-indicator" 
+                   :class="getBatteryLevelClass(batteryLevels[sensor.id]?.level)">
+                <div class="battery-level" 
+                     :style="{ width: `${batteryLevels[sensor.id]?.level || 0}%` }">
+                </div>
+              </div>
+            </div>
+            <div class="battery-details">
+              <div class="battery-info">
+                <span class="battery-percentage" :class="getBatteryLevelClass(batteryLevels[sensor.id]?.level)">
+                  {{ (batteryLevels[sensor.id]?.level || 0).toFixed(1) }}%
+                </span>
+                <span class="battery-status">
+                  {{ getBatteryStatus(batteryLevels[sensor.id]?.level) }}
+                </span>
+              </div>
+              <span class="battery-updated">
+                Last updated: {{ formatLastUpdated(batteryLevels[sensor.id]?.lastUpdated) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <!-- Real-time data display -->
       <div class="realtime-container">
         <div class="sensor-carousel">
           <div class="sensor-card" :style="{ '--sensor-color': colors[0] }">
@@ -205,23 +238,8 @@
     </div>
   </div>
 
-  <!-- Sensor Info Modal -->
-  <div v-if="showSensorInfoModal" class="sensor-info-modal">
-    <div class="sensor-info-modal-content">
-      <button class="close-btn" @click="showSensorInfoModal = false">&times;</button>
-      <h2>Sensor Information</h2>
-      <div class="sensor-info-grid">
-        <div v-for="sensor in SENSOR_CONFIGS" :key="sensor.id" class="sensor-info-item">
-          <h3>{{ sensor.name }}</h3>
-          <p><strong>ID:</strong> {{ sensor.id }}</p>
-          <div class="sensor-status" :style="{ '--sensor-color': getSensorColor(sensor.name) }">
-            <span class="status-dot"></span>
-            <span>{{ sensorVisibility[sensor.name] ? 'Active' : 'Inactive' }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+ 
+  
 </template>
 
 <script setup lang="ts">
@@ -435,6 +453,10 @@ onMounted(async () => {
     currentTime.value = new Date();
   }, 1000);
 
+  // Initial battery data fetch and setup periodic updates
+  await updateAllBatteryLevels();
+  batteryUpdateInterval.value = setInterval(updateAllBatteryLevels, 60000); // Update every minute
+
   const fetchAndUpdateRealtimeSensor = async () => {
     try {
       let data;
@@ -508,6 +530,9 @@ onUnmounted(() => {
   clearInterval(timeInterval);
   clearInterval(dataInterval);
   clearInterval(graphRefreshInterval); // Clear the graph refresh interval
+  if (batteryUpdateInterval.value) {
+    clearInterval(batteryUpdateInterval.value);
+  }
 
   // Remove scroll listener
   window.removeEventListener('scroll', handleScroll);
@@ -924,6 +949,105 @@ const resetToDefault = () => {
       currentGraph.fetchAllSensorData();
     }
   });
+};
+
+// Add battery level tracking
+interface BatteryStatus {
+  level: number;
+  lastUpdated: Date;
+}
+
+const batteryLevels = ref<{ [key: string]: BatteryStatus }>({});
+const batteryUpdateInterval = ref<number>();
+
+// Battery level helper functions
+const getBatteryLevelClass = (level: number | undefined) => {
+  if (!level) return 'battery-critical';
+  if (level > 75) return 'battery-good';
+  if (level > 25) return 'battery-medium';
+  return 'battery-critical';
+};
+
+const getBatteryStatus = (level: number | undefined) => {
+  if (!level) return 'No Data';
+  if (level > 75) return 'Good';
+  if (level > 25) return 'Medium';
+  return 'Critical';
+};
+
+const formatLastUpdated = (date: Date | undefined) => {
+  if (!date) return 'Never';
+  // Check if it's epoch time (indicating no data or error)
+  if (date.getTime() === 0) return 'No Data';
+  
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutesAgo = Math.floor(diff / (1000 * 60));
+  
+  if (minutesAgo < 1) return 'Just now';
+  if (minutesAgo === 1) return '1 minute ago';
+  if (minutesAgo < 60) return `${minutesAgo} minutes ago`;
+  
+  const hoursAgo = Math.floor(minutesAgo / 60);
+  if (hoursAgo === 1) return '1 hour ago';
+  if (hoursAgo < 24) return `${hoursAgo} hours ago`;
+  
+  const daysAgo = Math.floor(hoursAgo / 24);
+  if (daysAgo === 1) return '1 day ago';
+  return `${daysAgo} days ago`;
+};
+
+// Function to fetch battery data for a sensor
+const fetchBatteryData = async (sensorId: string) => {
+  try {
+    // Use fixed dates that include September 2025
+    const startStr = "2025-09-01";  // Start of September 2025
+    const endStr = "2025-09-30";    // End of September 2025
+
+    console.log(`[sensors.vue] Fetching battery data for sensor ${sensorId} from ${startStr} to ${endStr}`);
+
+    const response = await nexusStore.user.getSensorBatteryData(sensorId, startStr, endStr);
+    console.log(`[sensors.vue] Battery data response for sensor ${sensorId}:`, response);
+    
+    if (response?.battery_level_data && Array.isArray(response.battery_level_data) && response.battery_level_data.length > 0) {
+      // Sort by date to get the most recent reading
+      const sortedData = [...response.battery_level_data].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      
+      const latestReading = sortedData[0];
+      console.log(`[sensors.vue] Latest battery reading for sensor ${sensorId}:`, latestReading);
+      
+      batteryLevels.value[sensorId] = {
+        level: latestReading.battery_level,
+        lastUpdated: new Date(latestReading.date)
+      };
+
+      // Log success for debugging
+      console.log(`[sensors.vue] Updated battery level for sensor ${sensorId}:`, batteryLevels.value[sensorId]);
+    } else {
+      console.log(`[sensors.vue] No battery data found for sensor ${sensorId}`);
+      // Initialize with zero if no data
+      batteryLevels.value[sensorId] = {
+        level: 0,
+        lastUpdated: new Date(0) // epoch time to indicate no data
+      };
+    }
+  } catch (error) {
+    console.error(`[sensors.vue] Error fetching battery data for sensor ${sensorId}:`, error);
+    // Initialize with zero on error
+    batteryLevels.value[sensorId] = {
+      level: 0,
+      lastUpdated: new Date(0) // epoch time to indicate error
+    };
+  }
+};
+
+// Function to update all battery levels
+const updateAllBatteryLevels = async () => {
+  for (const sensor of SENSOR_CONFIGS.value) {
+    await fetchBatteryData(sensor.id);
+  }
 };
 
 // Add new refs for drone images
@@ -1682,5 +1806,230 @@ select:focus {
 .close-btn:hover {
   color: white;
   transform: scale(1.1);
+}
+
+/* Battery Status Styles */
+.battery-status-container {
+  padding: 20px;
+  background: #1a1a1a;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 928px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.battery-status-title {
+  color: #90EE90;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.battery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.battery-card {
+  background: #242424;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(144, 238, 144, 0.1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.battery-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--sensor-color), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.battery-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(144, 238, 144, 0.15);
+  border-color: rgba(144, 238, 144, 0.3);
+}
+
+.battery-card:hover::before {
+  transform: translateX(100%);
+}
+
+.battery-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.battery-card-header h3 {
+  color: var(--sensor-color);
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.battery-indicator {
+  height: 24px;
+  background: #1a1a1a;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(144, 238, 144, 0.15);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.battery-indicator::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.battery-level {
+  height: 100%;
+  background: var(--sensor-color);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 10px;
+  position: relative;
+  box-shadow: 0 0 10px rgba(144, 238, 144, 0.2);
+}
+
+.battery-indicator.battery-good .battery-level {
+  background: #4CAF50;
+}
+
+.battery-indicator.battery-medium .battery-level {
+  background: #FFC107;
+}
+
+.battery-indicator.battery-critical .battery-level {
+  background: #f44336;
+}
+
+.battery-details {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+}
+
+.battery-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.battery-percentage {
+  font-weight: 600;
+  font-size: 1.2rem;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  text-shadow: 0 0 10px rgba(144, 238, 144, 0.3);
+  letter-spacing: 0.5px;
+}
+
+.battery-percentage.battery-good {
+  color: #4CAF50;
+  text-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+.battery-percentage.battery-medium {
+  color: #FFC107;
+  text-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
+}
+
+.battery-percentage.battery-critical {
+  color: #f44336;
+  text-shadow: 0 0 10px rgba(244, 67, 54, 0.3);
+}
+
+.battery-status {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 12px;
+  border-radius: 6px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.battery-status:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.battery-updated {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(144, 238, 144, 0.03);
+  border: 1px solid rgba(144, 238, 144, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.battery-updated::before {
+  content: '⏱';
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin-right: 2px;
+}
+
+.battery-updated::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(144, 238, 144, 0.05),
+    transparent
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.battery-updated:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(144, 238, 144, 0.05);
+  border-color: rgba(144, 238, 144, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.battery-updated:hover::after {
+  transform: translateX(100%);
 }
 </style>
