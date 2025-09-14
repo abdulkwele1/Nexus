@@ -22,6 +22,8 @@
     <div class="settings-content">
       <div class="option" @click="showChangePasswordModal = true">Change password</div>
       <div class="divider"></div>
+      <div class="option" @click="addNewSensor">Add New Sensor</div>
+      <div class="divider"></div>
       <div class="option" @click="logout">Log Out</div>
     </div>
 
@@ -124,6 +126,11 @@ const changePassword = async () => {
 // Navigate to the home page
 const goHome = () => {
   router.push('/home');
+};
+
+// Handle adding new sensor (placeholder for now)
+const addNewSensor = () => {
+  alert('Add New Sensor functionality coming soon!');
 };
 
 // Handle user logout
