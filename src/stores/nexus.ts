@@ -16,12 +16,14 @@ export const useNexusStore = defineStore('nexus', {
 class User {
     baseURL: string;
     userName: string;
-    loggedIn: boolean
+    loggedIn: boolean;
+    isAdmin: boolean;
 
     constructor(baseURL: any) {
         this.baseURL = baseURL;
         this.userName = '';
         this.loggedIn = false;
+        this.isAdmin = false;
     }
 
     async login(userName: any, password: any): Promise<any> {
@@ -450,5 +452,70 @@ class User {
                 battery_level_data: batteryData
             }),
         });
+    }
+
+    // Admin methods
+    async getAllUsers() {
+        try {
+            console.log('[NexusStore] Fetching all users from:', `${this.baseURL}/admin/users`);
+            const response = await apiFetch(`${this.baseURL}/admin/users`, {
+                credentials: 'include',
+            });
+            const data = await response.json();
+            console.log('[NexusStore] Got users response:', data);
+            return data;
+        } catch (error) {
+            console.error('[NexusStore] Error fetching all users:', error);
+            throw error;
+        }
+    }
+
+    async updateUserRole(username: string, role: string) {
+        try {
+            console.log('[NexusStore] Updating user role:', username, 'to', role);
+            const response = await apiFetch(`${this.baseURL}/admin/users/${username}`, {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                method: 'PATCH',
+                body: JSON.stringify({ role }),
+            });
+            const data = await response.json();
+            console.log('[NexusStore] User role update response:', data);
+            return data;
+        } catch (error) {
+            console.error('[NexusStore] Error updating user role:', error);
+            throw error;
+        }
+    }
+
+    async removeAdminPermissions(username: string) {
+        try {
+            console.log('[NexusStore] Removing admin permissions for:', username);
+            const response = await apiFetch(`${this.baseURL}/admin/users/${username}`, {
+                credentials: 'include',
+                method: 'DELETE',
+            });
+            const data = await response.json();
+            console.log('[NexusStore] Remove admin response:', data);
+            return data;
+        } catch (error) {
+            console.error('[NexusStore] Error removing admin permissions:', error);
+            throw error;
+        }
+    }
+
+    async checkAdminStatus() {
+        try {
+            // Try to access admin endpoint to check if user is admin
+            const response = await apiFetch(`${this.baseURL}/admin/users`, {
+                credentials: 'include',
+            });
+            return response.ok;
+        } catch (error) {
+            console.log('[NexusStore] User is not an admin:', error);
+            return false;
+        }
     }
 }

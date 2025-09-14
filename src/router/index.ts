@@ -4,7 +4,8 @@ import Home from '../components/Home.vue';
 import userSettings from '../components/userSettings.vue';
 import SolarPage from '../components/SolarPage.vue';
 import Sensors from '../components/sensors.vue';
-import Drone from '../components/drone.vue'
+import Drone from '../components/drone.vue';
+import AdminPanel from '../components/AdminPanel.vue';
 import { useNexusStore } from '@/stores/nexus'
 
 const router = createRouter({
@@ -51,6 +52,12 @@ const router = createRouter({
       meta: { requiresAuth: true } // Protect this route
     },
     {
+      path: '/admin',
+      name: 'admin',
+      component: AdminPanel,
+      meta: { requiresAuth: true, requiresAdmin: true } // Protect this route and require admin
+    },
+    {
       path: '/about',
       name: 'about',
       component: () => import('../views/AboutView.vue') // Lazy-loaded route
@@ -70,8 +77,19 @@ router.beforeEach(async (to, from, next) => {
         credentials: 'include'
       });
       if (response.ok) {
-        // User is authenticated, allow access
-        next();
+        // User is authenticated, check if admin access is required
+        if (to.matched.some(record => record.meta.requiresAdmin)) {
+          // Check if user is admin
+          if (store.user.isAdmin) {
+            next();
+          } else {
+            // User is not admin, redirect to home
+            next('/home');
+          }
+        } else {
+          // No admin requirement, allow access
+          next();
+        }
       } else {
         // User is not authenticated, redirect to login
         next('/');
