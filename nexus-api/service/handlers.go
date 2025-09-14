@@ -1310,3 +1310,209 @@ func CreateDeleteDroneImageHandler(apiService *APIService) http.HandlerFunc {
 		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Image deleted successfully"})
 	}
 }
+
+// CreateGetAllUsersHandler returns a handler that gets all users (admin only)
+func CreateGetAllUsersHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Get the current user from the context (set by auth middleware)
+		currentUser, ok := ctx.Value("user").(string)
+		if !ok {
+			apiService.Error().Msg("No user found in context")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Check if current user is admin or root_admin
+		userRole, err := database.GetUserRole(ctx, apiService.DatabaseClient.DB, currentUser)
+		if err != nil {
+			apiService.Error().Msgf("Error getting user role: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		if userRole != "admin" && userRole != "root_admin" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Insufficient permissions"})
+			return
+		}
+
+		// Get all users
+		users, err := database.GetAllUsers(ctx, apiService.DatabaseClient.DB)
+		if err != nil {
+			apiService.Error().Msgf("Error getting all users: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to retrieve users"})
+			return
+		}
+
+		// Convert to API response format
+		var userList []api.User
+		for _, user := range users {
+			userList = append(userList, api.User{
+				Username:  user.UserName,
+				Role:      user.Role,
+				CreatedAt: time.Now().Format(time.RFC3339), // TODO: Add created_at to database
+				LastLogin: time.Now().Format(time.RFC3339), // TODO: Add last_login to database
+				IsActive:  true,                            // TODO: Add is_active to database
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.ListUsersResponse{Users: userList})
+	}
+}
+
+// CreateUpdateUserRoleHandler returns a handler that updates a user's role (admin only)
+func CreateUpdateUserRoleHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		vars := mux.Vars(r)
+		username := vars["username"]
+
+		// Get the current user from the context
+		currentUser, ok := ctx.Value("user").(string)
+		if !ok {
+			apiService.Error().Msg("No user found in context")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Check if current user is admin or root_admin
+		userRole, err := database.GetUserRole(ctx, apiService.DatabaseClient.DB, currentUser)
+		if err != nil {
+			apiService.Error().Msgf("Error getting user role: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		if userRole != "admin" && userRole != "root_admin" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Insufficient permissions"})
+			return
+		}
+
+		// Parse request body
+		var request api.UpdateUserRoleRequest
+		err = json.NewDecoder(r.Body).Decode(&request)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request body"})
+			return
+		}
+
+		// Validate role
+		if request.Role != "user" && request.Role != "admin" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid role. Must be 'user' or 'admin'"})
+			return
+		}
+
+		// Check if target user exists
+		_, err = database.GetLoginAuthenticationByUserName(ctx, apiService.DatabaseClient.DB, username)
+		if err != nil {
+			if err == database.ErrorNoLoginAuthenticationForUsername {
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "User not found"})
+				return
+			}
+			apiService.Error().Msgf("Error checking if user exists: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Update user role
+		err = database.UpdateUserRole(ctx, apiService.DatabaseClient.DB, username, request.Role)
+		if err != nil {
+			apiService.Error().Msgf("Error updating user role: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to update user role"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "User role updated successfully"})
+	}
+}
+
+// CreateRemoveAdminHandler returns a handler that removes admin permissions (root_admin only)
+func CreateRemoveAdminHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		vars := mux.Vars(r)
+		username := vars["username"]
+
+		// Get the current user from the context
+		currentUser, ok := ctx.Value("user").(string)
+		if !ok {
+			apiService.Error().Msg("No user found in context")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Check if current user is root_admin
+		userRole, err := database.GetUserRole(ctx, apiService.DatabaseClient.DB, currentUser)
+		if err != nil {
+			apiService.Error().Msgf("Error getting user role: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		if userRole != "root_admin" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Only root admin can remove admin permissions"})
+			return
+		}
+
+		// Prevent removing admin from root_admin
+		if username == currentUser {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Cannot remove admin permissions from root admin"})
+			return
+		}
+
+		// Check if target user exists and get their current role
+		targetUser, err := database.GetLoginAuthenticationByUserName(ctx, apiService.DatabaseClient.DB, username)
+		if err != nil {
+			if err == database.ErrorNoLoginAuthenticationForUsername {
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "User not found"})
+				return
+			}
+			apiService.Error().Msgf("Error checking if user exists: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Only allow removing admin permissions from admin users
+		if targetUser.Role != "admin" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "User is not an admin"})
+			return
+		}
+
+		// Update user role to 'user'
+		err = database.UpdateUserRole(ctx, apiService.DatabaseClient.DB, username, "user")
+		if err != nil {
+			apiService.Error().Msgf("Error removing admin permissions: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to remove admin permissions"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Admin permissions removed successfully"})
+	}
+}

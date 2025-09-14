@@ -158,3 +158,20 @@ type GetBatteryLevelDataResponse struct {
 type SetBatteryLevelDataResponse struct {
 	BatteryLevelData []BatteryLevelData `json:"battery_level_data"`
 }
+
+// Admin-related types
+type User struct {
+	Username  string `json:"username"`
+	Role      string `json:"role"`
+	CreatedAt string `json:"created_at"`
+	LastLogin string `json:"last_login"`
+	IsActive  bool   `json:"is_active"`
+}
+
+type ListUsersResponse struct {
+	Users []User `json:"users"`
+}
+
+type UpdateUserRoleRequest struct {
+	Role string `json:"role"`
+}

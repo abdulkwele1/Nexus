@@ -12,14 +12,13 @@ var (
 	ErrorNoLoginAuthenticationForUsername = errors.New("no login authentication info found for user_name")
 )
 
-
 type LoginAuthentication struct {
 	bun.BaseModel `bun:"table:login_authentications"`
 	ID            int64  `bun:",pk,autoincrement"`
 	UserName      string `bun:"user_name"`
 	PasswordHash  string `bun:"password_hash"`
+	Role          string `bun:"role"`
 }
-
 
 func (a *LoginAuthentication) Save(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewInsert().Model(a).Exec(ctx)
@@ -27,11 +26,9 @@ func (a *LoginAuthentication) Save(ctx context.Context, db *bun.DB) error {
 	return err
 }
 
-
 func (a *LoginAuthentication) Load(ctx context.Context, db *bun.DB) error {
 	return db.NewSelect().Model(a).WherePK().Scan(ctx)
 }
-
 
 func (a *LoginAuthentication) Update(ctx context.Context, db *bun.DB) error {
 	_, err := db.NewUpdate().Model(a).WherePK().Exec(ctx)
@@ -97,4 +94,35 @@ func ListLoginAuthenticationsWithPagination(ctx context.Context, db *bun.DB, cur
 
 	// otherwise leave nextCursor as 0 to signal no more pages
 	return loginAuthentications, nextCursor, err
+}
+
+// GetAllUsers returns all users with their roles and basic info
+func GetAllUsers(ctx context.Context, db *bun.DB) ([]LoginAuthentication, error) {
+	var users []LoginAuthentication
+	err := db.NewSelect().Model(&users).OrderExpr("user_name ASC").Scan(ctx)
+	return users, err
+}
+
+// UpdateUserRole updates the role of a specific user
+func UpdateUserRole(ctx context.Context, db *bun.DB, username, newRole string) error {
+	_, err := db.NewUpdate().
+		Model((*LoginAuthentication)(nil)).
+		Set("role = ?", newRole).
+		Where("user_name = ?", username).
+		Exec(ctx)
+	return err
+}
+
+// GetUserRole returns the role of a specific user
+func GetUserRole(ctx context.Context, db *bun.DB, username string) (string, error) {
+	var user LoginAuthentication
+	err := db.NewSelect().
+		Model(&user).
+		Column("role").
+		Where("user_name = ?", username).
+		Scan(ctx)
+	if err != nil {
+		return "", err
+	}
+	return user.Role, nil
 }
