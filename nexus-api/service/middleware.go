@@ -9,8 +9,10 @@ import (
 	"time"
 )
 
+type contextKey string
+
 const (
-	UsernameContextKey = "username"
+	UsernameContextKey contextKey = "user"
 )
 
 func CorsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -64,4 +66,39 @@ func AuthMiddleware(next http.HandlerFunc, apiService *APIService) http.HandlerF
 		// call next handler
 		next(w, r)
 	}
+}
+
+// AdminMiddleware checks if the authenticated user has admin privileges
+func AdminMiddleware(next http.HandlerFunc, apiService *APIService) http.HandlerFunc {
+	return AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+
+		// Get username from context (set by AuthMiddleware)
+		username, ok := r.Context().Value(UsernameContextKey).(string)
+		if !ok {
+			apiService.Error().Msgf("Username not found in context for admin request")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Get user info to check role
+		user, err := database.GetLoginAuthenticationByUserName(r.Context(), apiService.DatabaseClient.DB, username)
+		if err != nil {
+			apiService.Error().Msgf("Error getting user info for admin check: %s", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Check if user has admin privileges
+		if user.Role != "admin" && user.Role != "root_admin" {
+			apiService.Error().Msgf("ACCESS DENIED: user %s with role '%s' attempted to access admin endpoint", user.UserName, user.Role)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Insufficient privileges"})
+			return
+		}
+
+		// User is authenticated and has admin privileges, call next handler
+		next(w, r)
+	}, apiService)
 }

@@ -118,9 +118,9 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/sensors/{sensor_id}/battery_data", CorsMiddleware(AuthMiddleware(CreateSetSensorBatteryDataHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)
 
 	// Admin routes
-	router.HandleFunc("/admin/users", CorsMiddleware(AuthMiddleware(CreateGetAllUsersHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc("/admin/users/{username}", CorsMiddleware(AuthMiddleware(CreateUpdateUserRoleHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPatch, http.MethodOptions)
-	router.HandleFunc("/admin/users/{username}", CorsMiddleware(AuthMiddleware(CreateRemoveAdminHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodDelete, http.MethodOptions)
+	router.HandleFunc("/admin/users", CorsMiddleware(AdminMiddleware(CreateGetAllUsersHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/admin/users/{username}", CorsMiddleware(AdminMiddleware(CreateUpdateUserRoleHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPatch, http.MethodOptions)
+	router.HandleFunc("/admin/users/{username}", CorsMiddleware(AdminMiddleware(CreateRemoveAdminHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodDelete, http.MethodOptions)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),

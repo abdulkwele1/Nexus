@@ -156,6 +156,7 @@ export default defineComponent({
     window.removeEventListener('scroll', this.handleScroll);
   },
   created() {
+    console.log('Drone component created');
     this.store = useNexusStore();
     this.router = useRouter();
     this.checkAuthentication();
@@ -173,14 +174,32 @@ export default defineComponent({
       this.lastScrollPosition = currentScrollPosition;
     },
     async checkAuthentication() {
+      console.log('Checking authentication for drone component');
       // Check if user is logged in before initializing
-      if (!this.store.user.loggedIn) {
-        console.warn('User not logged in, redirecting to login');
-        window.location.href = '/';
-        return;
+      try {
+        // Make a test API call to verify authentication
+        console.log('Making auth request to:', `${this.store.user.baseURL}/sensors`);
+        const response = await fetch(`${this.store.user.baseURL}/sensors`, {
+          credentials: 'include'
+        });
+        
+        console.log('Auth response status:', response.status);
+        
+        if (!response.ok) {
+          console.warn('User not authenticated, redirecting to login');
+          this.router.push('/');
+          return;
+        }
+        
+        // User is authenticated, initialize the component
+        this.store.user.loggedIn = true;
+        console.log('User authenticated, initializing drone component');
+        this.initializeWeek();
+        await this.fetchWeekImages();
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        this.router.push('/');
       }
-      this.initializeWeek();
-      await this.fetchWeekImages();
     },
     initializeWeek(startDate = null) {
       if (startDate) {
@@ -229,10 +248,7 @@ export default defineComponent({
     },
     async fetchWeekImages() {
       try {
-        if (!this.store.user.loggedIn) {
-          console.warn('User not logged in, skipping fetch');
-          return;
-        }
+        // Authentication is already verified in checkAuthentication
 
         // Ensure we have valid dates
         const start = new Date(this.weekStart);
@@ -358,10 +374,7 @@ export default defineComponent({
     async uploadImages() {
       if (!this.selectedFiles.length || this.isUploading) return;
       
-      if (!this.store.user.loggedIn) {
-        alert('Please log in to upload images');
-        return;
-      }
+      // Authentication is already verified in checkAuthentication
 
       this.isUploading = true;
       const failedUploads = [];

@@ -85,6 +85,7 @@ func TestE2ETestLoginWithValidCredentialsReturnsCookie(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -125,6 +126,7 @@ func TestE2ETestChangePasswordAndLoginWithChangedPasswordSucceeds(t *testing.T) 
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -174,6 +176,7 @@ func TestE2ETestLogoutDeletesCookieFromDatabase(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -216,6 +219,7 @@ func TestE2ESetAndGetPanelYieldData(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -267,6 +271,7 @@ func TestE2ESetAndGetPanelConsumptionData(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -318,6 +323,7 @@ func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -389,6 +395,7 @@ func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -460,6 +467,7 @@ func TestE2EGetAllSensors(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -541,6 +549,7 @@ func TestE2EAddAndDeleteSensor(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -608,6 +617,7 @@ func TestE2ESetAndGetSensorBatteryData(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -695,6 +705,7 @@ func TestE2ESessionRefresh(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -755,6 +766,7 @@ func TestE2ESetAndGetDroneImages(t *testing.T) {
 	testLoginAuthentication := database.LoginAuthentication{
 		UserName:     testUserName,
 		PasswordHash: testPasswordHash,
+		Role:         "user", // Default role for test users
 	}
 
 	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
@@ -823,4 +835,397 @@ func TestE2ESetAndGetDroneImages(t *testing.T) {
 	// Verify deletion
 	_, err = testClient.GetDroneImage(testCtx, uploadedImage.ID)
 	assert.Error(t, err, "Getting deleted image should return error")
+}
+
+// Admin functionality tests
+
+// TestE2EGetAllUsersAsAdmin tests that admin users can retrieve all users
+func TestE2EGetAllUsersAsAdmin(t *testing.T) {
+	// Create admin user
+	adminClient, adminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, adminUsername)
+
+	// Create some regular users
+	_, user1Username := createTestRegularUser(t)
+	defer cleanupTestUser(t, user1Username)
+
+	_, user2Username := createTestRegularUser(t)
+	defer cleanupTestUser(t, user2Username)
+
+	// Login as admin
+	_, err := adminClient.Login(testCtx, api.LoginRequest{
+		Username: adminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test getting all users as admin
+	users, err := adminClient.GetAllUsers(testCtx)
+	assert.NoError(t, err, "Admin should be able to get all users")
+	assert.NotNil(t, users, "Response should not be nil")
+	assert.GreaterOrEqual(t, len(users), 3, "Should have at least admin and 2 regular users")
+
+	// Verify we can see all users including ourselves
+	userMap := make(map[string]api.User)
+	for _, user := range users {
+		userMap[user.Username] = user
+	}
+
+	assert.Contains(t, userMap, adminUsername, "Should contain admin user")
+	assert.Contains(t, userMap, user1Username, "Should contain regular user 1")
+	assert.Contains(t, userMap, user2Username, "Should contain regular user 2")
+
+	// Verify admin user has admin role
+	adminUser := userMap[adminUsername]
+	assert.Equal(t, "admin", adminUser.Role, "Admin user should have admin role")
+}
+
+// TestE2EGetAllUsersAsRegularUser tests that regular users cannot retrieve all users
+func TestE2EGetAllUsersAsRegularUser(t *testing.T) {
+	// Create regular user
+	userClient, username := createTestRegularUser(t)
+	defer cleanupTestUser(t, username)
+
+	// Login as regular user
+	_, err := userClient.Login(testCtx, api.LoginRequest{
+		Username: username,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test getting all users as regular user (should fail)
+	_, err = userClient.GetAllUsers(testCtx)
+	assert.Error(t, err, "Regular user should not be able to get all users")
+}
+
+// TestE2EUpdateUserRoleAsAdmin tests that admin users can update other users' roles
+func TestE2EUpdateUserRoleAsAdmin(t *testing.T) {
+	// Create admin user
+	adminClient, adminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, adminUsername)
+
+	// Create regular user
+	_, username := createTestRegularUser(t)
+	defer cleanupTestUser(t, username)
+
+	// Login as admin
+	_, err := adminClient.Login(testCtx, api.LoginRequest{
+		Username: adminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test updating user role to admin
+	err = adminClient.UpdateUserRole(testCtx, username, "admin")
+	assert.NoError(t, err, "Admin should be able to promote user to admin")
+
+	// Verify the role was updated by getting all users
+	users, err := adminClient.GetAllUsers(testCtx)
+	assert.NoError(t, err)
+
+	var updatedUser api.User
+	for _, user := range users {
+		if user.Username == username {
+			updatedUser = user
+			break
+		}
+	}
+	assert.Equal(t, "admin", updatedUser.Role, "User role should be updated to admin")
+
+	// Test updating user role back to user
+	err = adminClient.UpdateUserRole(testCtx, username, "user")
+	assert.NoError(t, err, "Admin should be able to demote admin to user")
+
+	// Verify the role was updated back
+	users, err = adminClient.GetAllUsers(testCtx)
+	assert.NoError(t, err)
+
+	for _, user := range users {
+		if user.Username == username {
+			updatedUser = user
+			break
+		}
+	}
+	assert.Equal(t, "user", updatedUser.Role, "User role should be updated back to user")
+}
+
+// TestE2EUpdateUserRoleAsRegularUser tests that regular users cannot update roles
+func TestE2EUpdateUserRoleAsRegularUser(t *testing.T) {
+	// Create regular user
+	userClient, username := createTestRegularUser(t)
+	defer cleanupTestUser(t, username)
+
+	// Create another regular user
+	_, targetUsername := createTestRegularUser(t)
+	defer cleanupTestUser(t, targetUsername)
+
+	// Login as regular user
+	_, err := userClient.Login(testCtx, api.LoginRequest{
+		Username: username,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test updating user role as regular user (should fail)
+	err = userClient.UpdateUserRole(testCtx, targetUsername, "admin")
+	assert.Error(t, err, "Regular user should not be able to update roles")
+}
+
+// TestE2EUpdateUserRoleInvalidRole tests that invalid roles are rejected
+func TestE2EUpdateUserRoleInvalidRole(t *testing.T) {
+	// Create admin user
+	adminClient, adminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, adminUsername)
+
+	// Create regular user
+	_, username := createTestRegularUser(t)
+	defer cleanupTestUser(t, username)
+
+	// Login as admin
+	_, err := adminClient.Login(testCtx, api.LoginRequest{
+		Username: adminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test updating user role with invalid role (should fail)
+	err = adminClient.UpdateUserRole(testCtx, username, "invalid_role")
+	assert.Error(t, err, "Invalid role should be rejected")
+
+	// Test updating user role with root_admin (should fail - only system can create root_admin)
+	err = adminClient.UpdateUserRole(testCtx, username, "root_admin")
+	assert.Error(t, err, "root_admin role should not be assignable via API")
+}
+
+// TestE2EUpdateUserRoleNonExistentUser tests updating role for non-existent user
+func TestE2EUpdateUserRoleNonExistentUser(t *testing.T) {
+	// Create admin user
+	adminClient, adminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, adminUsername)
+
+	// Login as admin
+	_, err := adminClient.Login(testCtx, api.LoginRequest{
+		Username: adminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test updating role for non-existent user (should fail)
+	err = adminClient.UpdateUserRole(testCtx, "nonexistentuser", "admin")
+	assert.Error(t, err, "Should fail when trying to update non-existent user")
+}
+
+// TestE2ERemoveAdminPermissionsAsRootAdmin tests that root_admin can remove admin permissions
+func TestE2ERemoveAdminPermissionsAsRootAdmin(t *testing.T) {
+	// Create root_admin user
+	rootAdminClient, rootAdminUsername := createTestRootAdminUser(t)
+	defer cleanupTestUser(t, rootAdminUsername)
+
+	// Create admin user
+	_, adminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, adminUsername)
+
+	// Login as root_admin
+	_, err := rootAdminClient.Login(testCtx, api.LoginRequest{
+		Username: rootAdminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test removing admin permissions
+	err = rootAdminClient.RemoveAdminPermissions(testCtx, adminUsername)
+	assert.NoError(t, err, "Root admin should be able to remove admin permissions")
+
+	// Verify the role was updated by getting all users
+	users, err := rootAdminClient.GetAllUsers(testCtx)
+	assert.NoError(t, err)
+
+	var updatedUser api.User
+	for _, user := range users {
+		if user.Username == adminUsername {
+			updatedUser = user
+			break
+		}
+	}
+	assert.Equal(t, "user", updatedUser.Role, "Admin should be demoted to user")
+}
+
+// TestE2ERemoveAdminPermissionsAsAdmin tests that regular admin cannot remove admin permissions
+func TestE2ERemoveAdminPermissionsAsAdmin(t *testing.T) {
+	// Create admin user
+	adminClient, adminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, adminUsername)
+
+	// Create another admin user
+	_, targetAdminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, targetAdminUsername)
+
+	// Login as admin
+	_, err := adminClient.Login(testCtx, api.LoginRequest{
+		Username: adminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test removing admin permissions as regular admin (should fail)
+	err = adminClient.RemoveAdminPermissions(testCtx, targetAdminUsername)
+	assert.Error(t, err, "Regular admin should not be able to remove admin permissions")
+}
+
+// TestE2ERemoveAdminPermissionsAsRegularUser tests that regular users cannot remove admin permissions
+func TestE2ERemoveAdminPermissionsAsRegularUser(t *testing.T) {
+	// Create regular user
+	userClient, username := createTestRegularUser(t)
+	defer cleanupTestUser(t, username)
+
+	// Create admin user
+	_, adminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, adminUsername)
+
+	// Login as regular user
+	_, err := userClient.Login(testCtx, api.LoginRequest{
+		Username: username,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test removing admin permissions as regular user (should fail)
+	err = userClient.RemoveAdminPermissions(testCtx, adminUsername)
+	assert.Error(t, err, "Regular user should not be able to remove admin permissions")
+}
+
+// TestE2ERemoveAdminPermissionsFromRootAdmin tests that root_admin cannot remove their own permissions
+func TestE2ERemoveAdminPermissionsFromRootAdmin(t *testing.T) {
+	// Create root_admin user
+	rootAdminClient, rootAdminUsername := createTestRootAdminUser(t)
+	defer cleanupTestUser(t, rootAdminUsername)
+
+	// Login as root_admin
+	_, err := rootAdminClient.Login(testCtx, api.LoginRequest{
+		Username: rootAdminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test removing admin permissions from root_admin (should fail)
+	err = rootAdminClient.RemoveAdminPermissions(testCtx, rootAdminUsername)
+	assert.Error(t, err, "Should not be able to remove admin permissions from root admin")
+}
+
+// TestE2ERemoveAdminPermissionsFromNonAdmin tests removing admin permissions from non-admin user
+func TestE2ERemoveAdminPermissionsFromNonAdmin(t *testing.T) {
+	// Create root_admin user
+	rootAdminClient, rootAdminUsername := createTestRootAdminUser(t)
+	defer cleanupTestUser(t, rootAdminUsername)
+
+	// Create regular user
+	_, username := createTestRegularUser(t)
+	defer cleanupTestUser(t, username)
+
+	// Login as root_admin
+	_, err := rootAdminClient.Login(testCtx, api.LoginRequest{
+		Username: rootAdminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test removing admin permissions from regular user (should fail)
+	err = rootAdminClient.RemoveAdminPermissions(testCtx, username)
+	assert.Error(t, err, "Should not be able to remove admin permissions from non-admin user")
+}
+
+// TestE2ERemoveAdminPermissionsNonExistentUser tests removing admin permissions from non-existent user
+func TestE2ERemoveAdminPermissionsNonExistentUser(t *testing.T) {
+	// Create root_admin user
+	rootAdminClient, rootAdminUsername := createTestRootAdminUser(t)
+	defer cleanupTestUser(t, rootAdminUsername)
+
+	// Login as root_admin
+	_, err := rootAdminClient.Login(testCtx, api.LoginRequest{
+		Username: rootAdminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Test removing admin permissions from non-existent user (should fail)
+	err = rootAdminClient.RemoveAdminPermissions(testCtx, "nonexistentuser")
+	assert.Error(t, err, "Should fail when trying to remove admin permissions from non-existent user")
+}
+
+// Helper functions for creating test users
+
+func createTestAdminUser(t *testing.T) (*sdk.NexusClient, string) {
+	username := "test_admin_" + uuid.NewString()[:8]
+	password := "password123"
+
+	return createTestUserWithRole(t, username, password, "admin")
+}
+
+func createTestRootAdminUser(t *testing.T) (*sdk.NexusClient, string) {
+	username := "test_root_admin_" + uuid.NewString()[:8]
+	password := "password123"
+
+	return createTestUserWithRole(t, username, password, "root_admin")
+}
+
+func createTestRegularUser(t *testing.T) (*sdk.NexusClient, string) {
+	username := "test_user_" + uuid.NewString()[:8]
+	password := "password123"
+
+	return createTestUserWithRole(t, username, password, "user")
+}
+
+func createTestUserWithRole(t *testing.T, username, userPassword, role string) (*sdk.NexusClient, string) {
+	testClient := nexusClientGenerator()
+
+	// Hash password
+	passwordHash, err := password.HashPassword(userPassword)
+	assert.NoError(t, err)
+
+	// Create user with specified role
+	loginAuth := database.LoginAuthentication{
+		UserName:     username,
+		PasswordHash: passwordHash,
+		Role:         role,
+	}
+
+	err = loginAuth.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// Verify user was created with correct role
+	createdUser, err := database.GetLoginAuthenticationByUserName(testCtx, databaseClient.DB, username)
+	assert.NoError(t, err)
+	assert.Equal(t, role, createdUser.Role, "User should be created with correct role")
+
+	// Update client credentials
+	testClient.Config.UserName = username
+	testClient.Config.Password = userPassword
+
+	return testClient, username
+}
+
+func cleanupTestUser(t *testing.T, username string) {
+	// Note: In a real test environment, you might want to clean up test users
+	// For now, we'll leave them as they don't interfere with other tests
+	// and help with debugging
+}
+
+// TestAdminUserCreation verifies that admin users are created with correct roles
+func TestAdminUserCreation(t *testing.T) {
+	// Create admin user
+	adminClient, adminUsername := createTestAdminUser(t)
+	defer cleanupTestUser(t, adminUsername)
+
+	// Verify user exists in database with admin role
+	user, err := database.GetLoginAuthenticationByUserName(testCtx, databaseClient.DB, adminUsername)
+	assert.NoError(t, err)
+	assert.Equal(t, "admin", user.Role, "Admin user should have admin role")
+
+	// Test login
+	_, err = adminClient.Login(testCtx, api.LoginRequest{
+		Username: adminUsername,
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
 }

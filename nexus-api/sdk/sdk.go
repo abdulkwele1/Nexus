@@ -844,6 +844,102 @@ func (nc *NexusClient) SetSensorBatteryData(ctx context.Context, sensorID string
 	return nil
 }
 
+// Admin-related methods
+
+// GetAllUsers retrieves all users (admin only)
+func (nc *NexusClient) GetAllUsers(ctx context.Context) ([]api.User, error) {
+	endpoint := fmt.Sprintf("%s/admin/users", nc.Config.NexusAPIEndpoint)
+
+	request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return nil, fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	var result api.ListUsersResponse
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.Users, nil
+}
+
+// UpdateUserRole updates a user's role (admin only)
+func (nc *NexusClient) UpdateUserRole(ctx context.Context, username, role string) error {
+	endpoint := fmt.Sprintf("%s/admin/users/%s", nc.Config.NexusAPIEndpoint, username)
+
+	requestBody := api.UpdateUserRoleRequest{Role: role}
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "PATCH", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
+// RemoveAdminPermissions removes admin permissions from a user (root_admin only)
+func (nc *NexusClient) RemoveAdminPermissions(ctx context.Context, username string) error {
+	endpoint := fmt.Sprintf("%s/admin/users/%s", nc.Config.NexusAPIEndpoint, username)
+
+	request, err := http.NewRequestWithContext(ctx, "DELETE", endpoint, nil)
+	if err != nil {
+		return err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
 func NewClient(config SDKConfig) (*NexusClient, error) {
 	client := NexusClient{
 		http:          http.Client{},

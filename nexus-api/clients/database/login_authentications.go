@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/uptrace/bun"
 )
@@ -103,16 +104,6 @@ func GetAllUsers(ctx context.Context, db *bun.DB) ([]LoginAuthentication, error)
 	return users, err
 }
 
-// UpdateUserRole updates the role of a specific user
-func UpdateUserRole(ctx context.Context, db *bun.DB, username, newRole string) error {
-	_, err := db.NewUpdate().
-		Model((*LoginAuthentication)(nil)).
-		Set("role = ?", newRole).
-		Where("user_name = ?", username).
-		Exec(ctx)
-	return err
-}
-
 // GetUserRole returns the role of a specific user
 func GetUserRole(ctx context.Context, db *bun.DB, username string) (string, error) {
 	var user LoginAuthentication
@@ -125,4 +116,20 @@ func GetUserRole(ctx context.Context, db *bun.DB, username string) (string, erro
 		return "", err
 	}
 	return user.Role, nil
+}
+
+// UpdateUserRole updates the role of a specific user
+func UpdateUserRole(ctx context.Context, db *bun.DB, username, role string) error {
+	// Validate role
+	if role != "user" && role != "admin" && role != "root_admin" {
+		return fmt.Errorf("invalid role: %s", role)
+	}
+
+	_, err := db.NewUpdate().
+		Model((*LoginAuthentication)(nil)).
+		Set("role = ?", role).
+		Where("user_name = ?", username).
+		Exec(ctx)
+
+	return err
 }

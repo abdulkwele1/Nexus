@@ -1317,7 +1317,7 @@ func CreateGetAllUsersHandler(apiService *APIService) http.HandlerFunc {
 		ctx := r.Context()
 
 		// Get the current user from the context (set by auth middleware)
-		currentUser, ok := ctx.Value("user").(string)
+		currentUser, ok := ctx.Value(UsernameContextKey).(string)
 		if !ok {
 			apiService.Error().Msg("No user found in context")
 			w.WriteHeader(http.StatusUnauthorized)
@@ -1375,7 +1375,7 @@ func CreateUpdateUserRoleHandler(apiService *APIService) http.HandlerFunc {
 		username := vars["username"]
 
 		// Get the current user from the context
-		currentUser, ok := ctx.Value("user").(string)
+		currentUser, ok := ctx.Value(UsernameContextKey).(string)
 		if !ok {
 			apiService.Error().Msg("No user found in context")
 			w.WriteHeader(http.StatusUnauthorized)
@@ -1451,7 +1451,7 @@ func CreateRemoveAdminHandler(apiService *APIService) http.HandlerFunc {
 		username := vars["username"]
 
 		// Get the current user from the context
-		currentUser, ok := ctx.Value("user").(string)
+		currentUser, ok := ctx.Value(UsernameContextKey).(string)
 		if !ok {
 			apiService.Error().Msg("No user found in context")
 			w.WriteHeader(http.StatusUnauthorized)
