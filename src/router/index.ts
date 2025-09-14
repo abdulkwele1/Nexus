@@ -59,14 +59,30 @@ const router = createRouter({
 });
 
 // Navigation guard
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const store = useNexusStore()
 
-  const loggedInUser = store.user.getCookie(); // Check for session_id cookie
-  if (to.matched.some(record => record.meta.requiresAuth) && !loggedInUser) {
-    next('/'); // Redirect to login if not logged in
+  // Check if route requires authentication
+  if (to.matched.some(record => record.meta.requiresAuth)) {
+    // Check if user is logged in by making a test API call
+    try {
+      const response = await fetch(`${store.user.baseURL}/sensors`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        // User is authenticated, allow access
+        next();
+      } else {
+        // User is not authenticated, redirect to login
+        next('/');
+      }
+    } catch (error) {
+      // Error making request, redirect to login
+      next('/');
+    }
   } else {
-    next(); // Allow access
+    // Route doesn't require auth, allow access
+    next();
   }
 });
 
