@@ -19,11 +19,23 @@ const password = ref('');
 const router = useRouter();
 
 onMounted(() => {
-  const loggedInUser = store.user.getCookie(); // Check session_id cookie
-  if (loggedInUser) {
-    router.push({ path: '/home' });
-  }
+  // Check if user is already logged in by making a test API call
+  checkLoginStatus();
 });
+
+async function checkLoginStatus() {
+  try {
+    // Try to make an authenticated request to see if we're logged in
+    const response = await fetch(`${store.user.baseURL}/sensors`, {
+      credentials: 'include'
+    });
+    if (response.ok) {
+      router.push({ path: '/home' });
+    }
+  } catch (error) {
+    // Not logged in, stay on login page
+  }
+}
 
 // Handle the login action
 async function handleLogin() {
@@ -34,10 +46,9 @@ async function handleLogin() {
       const responseData = await response.json();
 
       if (response.ok && responseData.match) {
-        // Set session cookie 
-        document.cookie = `session_id=${responseData.cookie}; path=/; samesite=strict`; // Use session_id
-        // update app state for current user
-        store.user.userName = username
+        // The API already set the HttpOnly cookie, so we don't need to set it manually
+        // Just update the app state
+        store.user.userName = username.value
         store.user.loggedIn = true
         router.push({ path: '/home' });
       } else {

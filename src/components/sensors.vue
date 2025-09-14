@@ -141,7 +141,7 @@
                    :class="getBatteryLevelClass(batteryLevels[sensor.id]?.level)">
                 <div class="battery-level" 
                      :style="{ width: `${batteryLevels[sensor.id]?.level || 0}%` }">
-                </div>
+              </div>
               </div>
             </div>
             <div class="battery-details">
@@ -161,7 +161,7 @@
         </div>
       </div>
 
-    <!-- Real-time data display -->
+      <!-- Real-time data display -->
       <div class="realtime-container">
         <div class="sensor-carousel">
           <div class="sensor-card" :style="{ '--sensor-color': colors[0] }">
@@ -236,7 +236,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </div>  
 
  
   

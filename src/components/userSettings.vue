@@ -129,8 +129,10 @@ const goHome = () => {
 // Handle user logout
 const logout = async () => {
   await store.user.logout()
-  document.cookie = 'session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-
+  // Clear the store state
+  store.user.loggedIn = false;
+  store.user.userName = '';
+  
   router.push('/');
 };
 </script>
