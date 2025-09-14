@@ -337,6 +337,64 @@ class User {
         }
     }
 
+    async addSensor(eui: string, name?: string, location?: string) {
+        try {
+            console.log('[NexusStore] Adding new sensor with EUI:', eui);
+            const response = await apiFetch(`${this.baseURL}/sensors`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    eui: eui,
+                    name: name || `Sensor ${eui}`,
+                    location: location || 'Unknown Location'
+                }),
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('[NexusStore] Sensor added successfully:', data);
+                // Trigger a custom event to notify components that sensors have been updated
+                window.dispatchEvent(new CustomEvent('sensorsUpdated'));
+                return { success: true, message: data.message };
+            } else {
+                const errorData = await response.json();
+                console.error('[NexusStore] Failed to add sensor:', errorData);
+                return { success: false, error: errorData.error || 'Failed to add sensor' };
+            }
+        } catch (error) {
+            console.error('[NexusStore] Error adding sensor:', error);
+            return { success: false, error: 'Network error occurred' };
+        }
+    }
+
+    async deleteSensor(sensorId: string) {
+        try {
+            console.log('[NexusStore] Deleting sensor with ID:', sensorId);
+            const response = await apiFetch(`${this.baseURL}/sensors/${sensorId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('[NexusStore] Sensor deleted successfully:', data);
+                // Trigger a custom event to notify components that sensors have been updated
+                window.dispatchEvent(new CustomEvent('sensorsUpdated'));
+                return { success: true, message: data.message };
+            } else {
+                const errorData = await response.json();
+                console.error('[NexusStore] Failed to delete sensor:', errorData);
+                return { success: false, error: errorData.error || 'Failed to delete sensor' };
+            }
+        } catch (error) {
+            console.error('[NexusStore] Error deleting sensor:', error);
+            return { success: false, error: 'Network error occurred' };
+        }
+    }
+
     async getSensorBatteryData(sensorId: string, startDate?: string, endDate?: string) {
         try {
             let url = `${this.baseURL}/sensors/${sensorId}/battery_data`;

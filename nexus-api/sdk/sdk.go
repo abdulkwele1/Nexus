@@ -510,6 +510,73 @@ func (nc *NexusClient) GetAllSensors(ctx context.Context) ([]api.Sensor, error) 
 	return sensors, nil
 }
 
+// AddSensor creates a new sensor with the given EUI, name, and location
+func (nc *NexusClient) AddSensor(ctx context.Context, eui, name, location string) error {
+	endpoint := fmt.Sprintf("%s/sensors", nc.Config.NexusAPIEndpoint)
+
+	requestBody := map[string]string{
+		"eui":      eui,
+		"name":     name,
+		"location": location,
+	}
+
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
+// DeleteSensor removes a sensor with the given ID
+func (nc *NexusClient) DeleteSensor(ctx context.Context, sensorID string) error {
+	endpoint := fmt.Sprintf("%s/sensors/%s", nc.Config.NexusAPIEndpoint, sensorID)
+
+	request, err := http.NewRequestWithContext(ctx, "DELETE", endpoint, nil)
+	if err != nil {
+		return err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+	if err != nil {
+		return err
+	}
+
+	response, err := nc.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200-level status code: %d", response.StatusCode)
+	}
+
+	return nil
+}
+
 // GetDroneImages retrieves drone images within a date range
 func (nc *NexusClient) GetDroneImages(ctx context.Context, startDate, endDate time.Time) (api.GetDroneImagesResponse, error) {
 	endpoint := fmt.Sprintf("%s/drone_images?start_date=%s&end_date=%s",

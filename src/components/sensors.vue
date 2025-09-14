@@ -26,9 +26,9 @@
             <div 
               v-for="(sensor, index) in SENSOR_CONFIGS" 
               :key="sensor.id"
-              class="sensor-checkbox"
+              class="sensor-item"
             >
-              <label :style="{ '--sensor-color': colors[index % colors.length] }">
+              <label :style="{ '--sensor-color': colors[index % colors.length] }" class="sensor-checkbox">
                 <input 
                   type="checkbox" 
                   :checked="sensorVisibility[sensor.name]" 
@@ -36,6 +36,13 @@
                 >
                 <span class="sensor-name">{{ sensor.name }}</span>
               </label>
+              <button 
+                @click="deleteSensor(sensor.id, sensor.name)" 
+                class="delete-sensor-btn"
+                title="Delete sensor"
+              >
+                🗑️
+              </button>
             </div>
           </div>
         </div>
@@ -445,6 +452,28 @@ const fetchSensors = async () => {
   }
 };
 
+// Function to delete a sensor
+const deleteSensor = async (sensorId: string, sensorName: string) => {
+  if (!confirm(`Are you sure you want to delete "${sensorName}"? This action cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const result = await nexusStore.user.deleteSensor(sensorId);
+    
+    if (result.success) {
+      console.log('[sensors.vue] Sensor deleted successfully:', result.message);
+      // The sensorsUpdated event will be triggered by the store, which will refresh the list
+    } else {
+      console.error('[sensors.vue] Failed to delete sensor:', result.error);
+      alert(`Failed to delete sensor: ${result.error}`);
+    }
+  } catch (error) {
+    console.error('[sensors.vue] Error deleting sensor:', error);
+    alert('An unexpected error occurred while deleting the sensor');
+  }
+};
+
 onMounted(async () => {
   await fetchSensors();
   
@@ -456,6 +485,14 @@ onMounted(async () => {
   // Initial battery data fetch and setup periodic updates
   await updateAllBatteryLevels();
   batteryUpdateInterval.value = setInterval(updateAllBatteryLevels, 60000); // Update every minute
+
+  // Listen for sensor updates from other components
+  window.addEventListener('sensorsUpdated', async () => {
+    console.log('[sensors.vue] Sensors updated event received, refreshing sensor list...');
+    await fetchSensors();
+    // Also refresh battery data for the new sensors
+    await updateAllBatteryLevels();
+  });
 
   const fetchAndUpdateRealtimeSensor = async () => {
     try {
@@ -536,6 +573,13 @@ onUnmounted(() => {
 
   // Remove scroll listener
   window.removeEventListener('scroll', handleScroll);
+  
+  // Remove sensors updated event listener
+  window.removeEventListener('sensorsUpdated', async () => {
+    console.log('[sensors.vue] Sensors updated event received, refreshing sensor list...');
+    await fetchSensors();
+    await updateAllBatteryLevels();
+  });
 });
 
 interface QueryParams {
@@ -1627,6 +1671,46 @@ select:focus {
   margin-left: 8px;
   vertical-align: middle;
   opacity: 0.8;
+}
+
+/* Sensor item container */
+.sensor-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sensor-item .sensor-checkbox {
+  flex-grow: 1;
+}
+
+/* Delete sensor button */
+.delete-sensor-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 16px;
+  opacity: 0.6;
+  transition: all 0.3s ease;
+  color: #ff6b6b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+}
+
+.delete-sensor-btn:hover {
+  opacity: 1;
+  background-color: rgba(255, 107, 107, 0.1);
+  transform: scale(1.1);
+}
+
+.delete-sensor-btn:active {
+  transform: scale(0.95);
 }
 
 /* Loading, error, and no-sensors states */

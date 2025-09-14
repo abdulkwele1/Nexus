@@ -119,6 +119,8 @@ paths:
   /sensors:
     get:
       summary: Get all sensors
+      security:
+        - cookieAuth: []
       responses:
         '200':
           description: Sensors retrieved successfully
@@ -128,6 +130,48 @@ paths:
                 $ref: '#/components/schemas/ListSensorsResponse'
         '404':
           description: Sensors not found
+        '401':
+          description: Unauthorized - invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Add a new sensor
+      security:
+        - cookieAuth: []
+      requestBody:
+        description: Sensor information
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddSensorRequest'
+      responses:
+        '201':
+          description: Sensor created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request - missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /sensors/{sensor_id}:
     get:
       summary: Get details of a specific sensor
@@ -171,18 +215,46 @@ paths:
           description: Sensor not found
     delete:
       summary: Delete a specific sensor
+      security:
+        - cookieAuth: []
       parameters:
         - in: path
           name: sensor_id
           required: true
           schema:
             type: string
-          description: The unique ID of the sensor
+          description: The unique ID of the sensor to delete
       responses:
         '200':
           description: Sensor deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request - missing sensor ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Sensor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /sensors/{sensor_id}/soil_moisture:
     get:
       summary: Get soil moisture data for a specific sensor
@@ -837,6 +909,24 @@ components:
             $ref: '#/components/schemas/Sensor'
       required:
         - sensors
+    
+    AddSensorRequest:
+      type: object
+      properties:
+        eui:
+          type: string
+          description: Device EUI (Extended Unique Identifier) - required
+          example: "70B3D57ED0001234"
+        name:
+          type: string
+          description: Sensor name - optional, defaults to "Sensor {EUI}"
+          example: "Field Sensor A1"
+        location:
+          type: string
+          description: Sensor location - optional, defaults to "Unknown Location"
+          example: "North Field, Section 3"
+      required:
+        - eui
     
     DroneImage:
       type: object

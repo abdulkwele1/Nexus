@@ -100,6 +100,12 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	// Route to get all sensors
 	router.HandleFunc("/sensors", CorsMiddleware(AuthMiddleware(CreateGetAllSensorsHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 
+	// Route to add a new sensor
+	router.HandleFunc("/sensors", CorsMiddleware(AuthMiddleware(CreateAddSensorHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost, http.MethodOptions)
+
+	// Route to delete a sensor
+	router.HandleFunc("/sensors/{sensor_id}", CorsMiddleware(AuthMiddleware(CreateDeleteSensorHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodDelete, http.MethodOptions)
+
 	// Drone image routes
 	router.HandleFunc("/drone_images", CorsMiddleware(AuthMiddleware(CreateGetDroneImagesHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc("/drone_images", CorsMiddleware(AuthMiddleware(CreateUploadDroneImagesHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost)

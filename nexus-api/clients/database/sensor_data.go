@@ -160,8 +160,9 @@ func GetSensorTemperatureData(ctx context.Context, db *bun.DB, sensorID string) 
 	return data, nil
 }
 
-func CreateSensor(ctx context.Context, db *bun.DB, name, location string) (Sensor, error) {
+func CreateSensor(ctx context.Context, db *bun.DB, eui, name, location string) (Sensor, error) {
 	sensor := Sensor{
+		ID:               eui,
 		Name:             name,
 		Location:         location,
 		InstallationDate: time.Now(),
@@ -174,6 +175,11 @@ func GetSensorByID(ctx context.Context, db *bun.DB, id string) (Sensor, error) {
 	var sensor Sensor
 	err := db.NewSelect().Model(&sensor).Where("id = ?", id).Scan(ctx)
 	return sensor, err
+}
+
+func DeleteSensor(ctx context.Context, db *bun.DB, id string) error {
+	_, err := db.NewDelete().Model((*Sensor)(nil)).Where("id = ?", id).Exec(ctx)
+	return err
 }
 
 type SensorBatteryData struct {

@@ -43,6 +43,24 @@
         <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
       </div>
     </div>
+
+    <!-- Add Sensor Modal -->
+    <div v-if="showAddSensorModal" class="modal">
+      <div class="modal-content">
+        <h2>Add New Sensor</h2>
+        <input type="text" v-model="sensorEUI" placeholder="Device EUI (required)" @input="clearSensorError" />
+        <input type="text" v-model="sensorName" placeholder="Sensor Name (optional)" @input="clearSensorError" />
+        <input type="text" v-model="sensorLocation" placeholder="Location (optional)" @input="clearSensorError" />
+
+        <div class="button-container">
+          <button class="submit-button" @click="addSensor" :disabled="!sensorEUI.trim()">Add Sensor</button>
+          <button class="cancel-button" @click="closeAddSensorModal">Cancel</button>
+        </div>
+
+        <p v-if="sensorErrorMessage" class="error">{{ sensorErrorMessage }}</p>
+        <p v-if="sensorSuccessMessage" class="success">{{ sensorSuccessMessage }}</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -65,6 +83,14 @@ const newPassword = ref('');
 const confirmPassword = ref('');
 const errorMessage = ref('');
 
+// Add sensor modal state
+const showAddSensorModal = ref(false);
+const sensorEUI = ref('');
+const sensorName = ref('');
+const sensorLocation = ref('');
+const sensorErrorMessage = ref('');
+const sensorSuccessMessage = ref('');
+
 // Computed property to check if passwords match
 const passwordsMatch = computed(() => newPassword.value === confirmPassword.value);
 
@@ -72,6 +98,16 @@ const passwordsMatch = computed(() => newPassword.value === confirmPassword.valu
 const clearError = () => {
   if (errorMessage.value) {
     errorMessage.value = '';
+  }
+};
+
+// Clear sensor error/success messages when input changes
+const clearSensorError = () => {
+  if (sensorErrorMessage.value) {
+    sensorErrorMessage.value = '';
+  }
+  if (sensorSuccessMessage.value) {
+    sensorSuccessMessage.value = '';
   }
 };
 
@@ -128,9 +164,53 @@ const goHome = () => {
   router.push('/home');
 };
 
-// Handle adding new sensor (placeholder for now)
+// Handle adding new sensor
 const addNewSensor = () => {
-  alert('Add New Sensor functionality coming soon!');
+  showAddSensorModal.value = true;
+  // Clear any previous messages
+  sensorErrorMessage.value = '';
+  sensorSuccessMessage.value = '';
+};
+
+// Close add sensor modal and reset form
+const closeAddSensorModal = () => {
+  showAddSensorModal.value = false;
+  sensorEUI.value = '';
+  sensorName.value = '';
+  sensorLocation.value = '';
+  sensorErrorMessage.value = '';
+  sensorSuccessMessage.value = '';
+};
+
+// Add sensor functionality
+const addSensor = async () => {
+  if (!sensorEUI.value.trim()) {
+    sensorErrorMessage.value = 'Device EUI is required';
+    return;
+  }
+
+  try {
+    const result = await store.user.addSensor(
+      sensorEUI.value.trim(),
+      sensorName.value.trim() || undefined,
+      sensorLocation.value.trim() || undefined
+    );
+
+    if (result.success) {
+      sensorSuccessMessage.value = result.message || 'Sensor added successfully!';
+      // Clear form after successful addition
+      setTimeout(() => {
+        closeAddSensorModal();
+        // Optionally refresh the sensors list or navigate to sensors page
+        // You could emit an event here to notify parent components
+      }, 2000);
+    } else {
+      sensorErrorMessage.value = result.error || 'Failed to add sensor';
+    }
+  } catch (error) {
+    console.error('Error adding sensor:', error);
+    sensorErrorMessage.value = 'An unexpected error occurred';
+  }
 };
 
 // Handle user logout
@@ -317,6 +397,13 @@ const logout = async () => {
 
 .error {
   color: #ff6b6b;
+  font-size: 14px;
+  margin-top: 15px;
+  text-align: center;
+}
+
+.success {
+  color: #90EE90;
   font-size: 14px;
   margin-top: 15px;
   text-align: center;

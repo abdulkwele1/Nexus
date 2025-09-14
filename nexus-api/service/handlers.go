@@ -742,6 +742,109 @@ func CreateGetAllSensorsHandler(apiService *APIService) http.HandlerFunc {
 	}
 }
 
+func CreateAddSensorHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		username, ok := ctx.Value(UsernameContextKey).(string)
+		if !ok {
+			http.Error(w, "failed to get username from context", http.StatusUnauthorized)
+			return
+		}
+
+		// Parse request body
+		var request struct {
+			EUI      string `json:"eui"`
+			Name     string `json:"name"`
+			Location string `json:"location"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("failed to decode request body")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request body"})
+			return
+		}
+
+		// Validate required fields
+		if request.EUI == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "EUI is required"})
+			return
+		}
+
+		// Set default values if not provided
+		if request.Name == "" {
+			request.Name = "Sensor " + request.EUI
+		}
+		if request.Location == "" {
+			request.Location = "Unknown Location"
+		}
+
+		// Create sensor in database
+		sensor, err := database.CreateSensor(ctx, apiService.DatabaseClient.DB, request.EUI, request.Name, request.Location)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("failed to create sensor in database")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to create sensor"})
+			return
+		}
+
+		log.Ctx(ctx).Info().Str("sensor_id", sensor.ID).Str("username", username).Msg("sensor created successfully")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Sensor created successfully"})
+	}
+}
+
+func CreateDeleteSensorHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		username, ok := ctx.Value(UsernameContextKey).(string)
+		if !ok {
+			http.Error(w, "failed to get username from context", http.StatusUnauthorized)
+			return
+		}
+
+		// Get sensor ID from URL path
+		vars := mux.Vars(r)
+		sensorID := vars["sensor_id"]
+		if sensorID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Sensor ID is required"})
+			return
+		}
+
+		// Check if sensor exists first
+		_, err := database.GetSensorByID(ctx, apiService.DatabaseClient.DB, sensorID)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msgf("sensor not found: %s", sensorID)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Sensor not found"})
+			return
+		}
+
+		// Delete sensor from database
+		err = database.DeleteSensor(ctx, apiService.DatabaseClient.DB, sensorID)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msgf("failed to delete sensor: %s", sensorID)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to delete sensor"})
+			return
+		}
+
+		log.Ctx(ctx).Info().Str("sensor_id", sensorID).Str("username", username).Msg("sensor deleted successfully")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Sensor deleted successfully"})
+	}
+}
+
 func CreateGetDroneImagesHandler(apiService *APIService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse date range from query parameters

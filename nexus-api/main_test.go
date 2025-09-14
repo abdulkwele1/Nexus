@@ -528,6 +528,73 @@ func TestE2EGetAllSensors(t *testing.T) {
 	}
 }
 
+func TestE2EAddAndDeleteSensor(t *testing.T) {
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// login user
+	_, err = testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+	assert.NoError(t, err)
+
+	// Step 1: Add a new sensor
+	testEUI := "TEST" + uuid.NewString()[:12]
+	testName := "Test Sensor " + testEUI
+	testLocation := "Test Location"
+
+	err = testClient.AddSensor(testCtx, testEUI, testName, testLocation)
+	assert.NoError(t, err, "Adding sensor should succeed")
+
+	// Step 2: Verify sensor was added by getting all sensors
+	allSensors, err := testClient.GetAllSensors(testCtx)
+	assert.NoError(t, err, "Getting all sensors should succeed")
+
+	// Find our added sensor
+	var addedSensor *api.Sensor
+	for _, sensor := range allSensors {
+		if sensor.ID == testEUI {
+			addedSensor = &sensor
+			break
+		}
+	}
+	assert.NotNil(t, addedSensor, "Added sensor should be found in the list")
+	assert.Equal(t, testName, addedSensor.Name, "Sensor name should match")
+	assert.Equal(t, testLocation, addedSensor.Location, "Sensor location should match")
+
+	// Step 3: Delete the sensor
+	err = testClient.DeleteSensor(testCtx, testEUI)
+	assert.NoError(t, err, "Deleting sensor should succeed")
+
+	// Step 4: Verify sensor was deleted by getting all sensors again
+	allSensorsAfterDelete, err := testClient.GetAllSensors(testCtx)
+	assert.NoError(t, err, "Getting all sensors after delete should succeed")
+
+	// Verify our sensor is no longer in the list
+	for _, sensor := range allSensorsAfterDelete {
+		assert.NotEqual(t, testEUI, sensor.ID, "Deleted sensor should not be found in the list")
+	}
+}
+
 func TestE2ESetAndGetSensorBatteryData(t *testing.T) {
 	// Step: 0 prepare test data
 	testClient := nexusClientGenerator()
