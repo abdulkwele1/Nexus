@@ -1,13 +1,24 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import navBar from './components/navBar.vue'; // This includes your Navbar
+import { initializeSessionManager, destroySessionManager } from './services/sessionManager';
 
 // Get the current route
 const route = useRoute();
 
 // Determine if the current route is /settings
 const isSettingsPage = computed(() => route.path === '/settings');
+
+// Initialize session manager when app mounts
+onMounted(() => {
+  initializeSessionManager();
+});
+
+// Clean up session manager when app unmounts
+onUnmounted(() => {
+  destroySessionManager();
+});
 </script>
 
 <template>

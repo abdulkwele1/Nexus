@@ -89,14 +89,13 @@ func CreateLoginHandler(apiService *APIService) http.HandlerFunc {
 
 		apiService.Trace().Msgf("password hash for user %s in our system is %s", request.Username, loginAuthentication.PasswordHash)
 
-		// Set the cookie with an expiration time
-		expiration := time.Now().Add(3 * 24 * time.Hour)
+		// Set the cookie with an expiration time (24 hours)
+		expiration := time.Now().Add(24 * time.Hour)
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_id",
 			Value:    response.Cookie,
 			Path:     "/",
 			Expires:  expiration,
-			MaxAge:   3600,  // 1 hour
 			HttpOnly: true,  // Optional: helps mitigate XSS
 			Secure:   false, // Set to true if serving over HTTPS
 		})
@@ -121,6 +120,63 @@ func CreateLoginHandler(apiService *APIService) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func CreateSessionRefreshHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rawUsername := r.Context().Value(UsernameContextKey)
+
+		userName, ok := rawUsername.(string)
+
+		if !ok {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: http.StatusText(http.StatusInternalServerError)})
+			return
+		}
+
+		// Get the current cookie from the request
+		cookie, err := r.Cookie("session_id")
+		if err != nil || cookie == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "No session cookie found"})
+			return
+		}
+
+		// Extend the cookie expiration by 8 hours (more reasonable)
+		newExpiration := time.Now().Add(8 * time.Hour)
+
+		// Update the cookie in the database
+		loginCookie := database.LoginCookie{
+			UserName:   userName,
+			Cookie:     cookie.Value,
+			Expiration: newExpiration,
+		}
+
+		err = loginCookie.Update(r.Context(), apiService.DatabaseClient.DB)
+		if err != nil {
+			apiService.Error().Msgf("error %s updating session cookie %+v", err, loginCookie)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to refresh session"})
+			return
+		}
+
+		// Set the new cookie with extended expiration
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_id",
+			Value:    cookie.Value,
+			Path:     "/",
+			Expires:  newExpiration,
+			HttpOnly: true,
+			Secure:   false,
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Session refreshed successfully",
+			"expires": newExpiration.Format(time.RFC3339),
+		})
 	}
 }
 

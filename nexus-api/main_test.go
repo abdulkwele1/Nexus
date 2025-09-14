@@ -615,6 +615,66 @@ func TestE2ESetAndGetSensorBatteryData(t *testing.T) {
 	}
 }
 
+func TestE2ESessionRefresh(t *testing.T) {
+	// Step: 0 prepare test data
+	testClient := nexusClientGenerator()
+	// generate user login info
+	testUserName := uuid.NewString()
+	testPassword := uuid.NewString()
+
+	testPasswordHash, err := password.HashPassword(testPassword)
+	assert.NoError(t, err)
+	// add user to database
+	testLoginAuthentication := database.LoginAuthentication{
+		UserName:     testUserName,
+		PasswordHash: testPasswordHash,
+	}
+
+	err = testLoginAuthentication.Save(testCtx, databaseClient.DB)
+	assert.NoError(t, err)
+
+	// update test client to have credentials for test user
+	testClient.Config.UserName = testUserName
+	testClient.Config.Password = testPassword
+
+	// Step 1: Login user
+	loginResponse, err := testClient.Login(testCtx, api.LoginRequest{
+		Username: testUserName,
+		Password: testPassword,
+	})
+	assert.NoError(t, err, "Login should succeed")
+	assert.True(t, loginResponse.Match, "Login should be successful")
+	assert.NotEmpty(t, loginResponse.Cookie, "Login should return a cookie")
+
+	// Step 2: Get initial cookie from database
+	initialCookie, err := database.GetLoginCookie(testCtx, databaseClient.DB, loginResponse.Cookie)
+	assert.NoError(t, err, "Should be able to retrieve initial cookie from database")
+	initialExpiration := initialCookie.Expiration
+
+	// Step 3: Wait a moment to ensure time difference
+	time.Sleep(1 * time.Second)
+
+	// Step 4: Refresh session
+	err = testClient.RefreshSession(testCtx)
+	assert.NoError(t, err, "Session refresh should succeed")
+
+	// Step 5: Verify cookie expiration was extended
+	refreshedCookie, err := database.GetLoginCookie(testCtx, databaseClient.DB, loginResponse.Cookie)
+	assert.NoError(t, err, "Should be able to retrieve refreshed cookie from database")
+
+	// The refreshed cookie should have a later expiration time
+	assert.True(t, refreshedCookie.Expiration.After(initialExpiration),
+		"Refreshed cookie should have a later expiration time than initial cookie")
+
+	// The cookie value should remain the same
+	assert.Equal(t, initialCookie.Cookie, refreshedCookie.Cookie,
+		"Cookie value should remain the same after refresh")
+
+	// The username should remain the same
+	assert.Equal(t, initialCookie.UserName, refreshedCookie.UserName,
+		"Username should remain the same after refresh")
+}
+
 func TestE2ESetAndGetDroneImages(t *testing.T) {
 	// Step 0: prepare test data
 	testClient := nexusClientGenerator()

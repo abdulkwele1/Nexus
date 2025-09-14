@@ -73,6 +73,7 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 	router.HandleFunc("/healthcheck", CorsMiddleware(CreateHealthCheckHandler(&databaseClient)))
 	router.HandleFunc("/login", CorsMiddleware(CreateLoginHandler(&nexusAPI)))
 	router.HandleFunc("/logout", CorsMiddleware(AuthMiddleware(CreateLogoutHandler(&nexusAPI), &nexusAPI)))
+	router.HandleFunc("/refresh-session", CorsMiddleware(AuthMiddleware(CreateSessionRefreshHandler(&nexusAPI), &nexusAPI)))
 	router.HandleFunc("/change-password", CorsMiddleware(AuthMiddleware(CreateChangePasswordHandler(&nexusAPI), &nexusAPI)))
 
 	router.HandleFunc("/settings", CorsMiddleware(AuthMiddleware(CreateSettingsHandler(&nexusAPI), &nexusAPI)))

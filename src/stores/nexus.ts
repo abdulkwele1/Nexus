@@ -49,6 +49,13 @@ class User {
         });
     }
 
+    async refreshSession() {
+        const refreshAPIUrl = `${VITE_NEXUS_API_URL}/refresh-session`;
+        return apiFetch(refreshAPIUrl, {
+            method: 'POST',
+        });
+    }
+
     async getPanelYieldData(panelId: number, startDate: string, endDate: string,): Promise<any> {
         const url = `${VITE_NEXUS_API_URL}/panels/${panelId}/yield_data`
         return apiFetch(url, {

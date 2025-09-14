@@ -22,6 +22,7 @@ const (
 	LoginPath          = "/login"
 	ChangePasswordPath = "/change-password"
 	LogoutPath         = "/logout"
+	RefreshSessionPath = "/refresh-session"
 )
 
 // SDKConfig wraps values for configuring
@@ -172,6 +173,37 @@ func (nc *NexusClient) Logout(ctx context.Context) error {
 	}
 
 	nc.Trace().Msgf("response %+v", response)
+
+	defer response.Body.Close()
+	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {
+		return fmt.Errorf("non 200 level status code %d", response.StatusCode)
+	}
+
+	return nil
+}
+
+// RefreshSession extends the current session cookie expiration
+func (nc *NexusClient) RefreshSession(ctx context.Context) error {
+	request, err := http.NewRequest("POST", nc.Config.NexusAPIEndpoint+RefreshSessionPath, nil)
+
+	if err != nil {
+		return err
+	}
+
+	err = SetAuthHeaders(request, nc.Cookie)
+
+	if err != nil {
+		return err
+	}
+
+	nc.Trace().Msgf("sending refresh session request %+v\n headers %+v", request, request.Header)
+	response, err := nc.http.Do(request)
+
+	if err != nil {
+		return err
+	}
+
+	nc.Trace().Msgf("refresh session response %+v", response)
 
 	defer response.Body.Close()
 	if !(response.StatusCode >= 200 && response.StatusCode <= 299) {

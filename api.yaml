@@ -91,6 +91,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /refresh-session:
+    post:
+      summary: Refresh user session
+      operationId: refreshSession
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Session refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionRefreshResponse'
+        '401':
+          description: Unauthorized - invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /sensors:
     get:
       summary: Get all sensors
@@ -611,6 +636,12 @@ paths:
           description: Internal server error
 
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+      description: Session cookie for authentication
   schemas:
     Panel:
       type: object
@@ -786,6 +817,17 @@ components:
         error:
           type: string
           example: "Invalid request"
+    SessionRefreshResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Session refreshed successfully"
+        expires:
+          type: string
+          format: date-time
+          example: "2025-09-15T13:29:22Z"
+          description: New expiration time for the session cookie
     ListSensorsResponse:
       type: object
       properties:
