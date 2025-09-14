@@ -48,6 +48,10 @@
     <div v-if="showAddSensorModal" class="modal">
       <div class="modal-content">
         <h2>Add New Sensor</h2>
+        <div class="info-message">
+          <span class="info-icon">ℹ️</span>
+          <span class="info-text">Only sensors through SenseCAP can be added with no optimization</span>
+        </div>
         <input type="text" v-model="sensorEUI" placeholder="Device EUI (required)" @input="clearSensorError" />
         <input type="text" v-model="sensorName" placeholder="Sensor Name (optional)" @input="clearSensorError" />
         <input type="text" v-model="sensorLocation" placeholder="Location (optional)" @input="clearSensorError" />
@@ -407,6 +411,29 @@ const logout = async () => {
   font-size: 14px;
   margin-top: 15px;
   text-align: center;
+}
+
+.info-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(144, 238, 144, 0.1);
+  border: 1px solid rgba(144, 238, 144, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 15px 0;
+  font-size: 14px;
+}
+
+.info-icon {
+  font-size: 16px;
+  color: #90EE90;
+  flex-shrink: 0;
+}
+
+.info-text {
+  color: #e0e0e0;
+  line-height: 1.4;
 }
 
 /* Navigation text color */
