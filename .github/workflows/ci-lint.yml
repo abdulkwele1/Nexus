@@ -9,9 +9,9 @@ jobs:
       - name: checkout repo from current commit
         uses: actions/checkout@v3
       - name: set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v4
         with:
             go-version-file: 'nexus-api/go.mod'
-            working-directory: 'nexus-api'
       - name: golangci-lint
         run: make lint
+        working-directory: nexus-api
