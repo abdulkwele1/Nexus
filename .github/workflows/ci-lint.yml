@@ -14,4 +14,3 @@ jobs:
             go-version-file: 'nexus-api/go.mod'
       - name: golangci-lint
         run: make lint
-        working-directory: nexus-api
