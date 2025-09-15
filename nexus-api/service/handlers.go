@@ -306,8 +306,24 @@ func CreateSettingsHandler(apiService *APIService) http.HandlerFunc {
 			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
 			return
 		}
+
+		// Get user role
+		userRole, err := database.GetUserRole(r.Context(), apiService.DatabaseClient.DB, username)
+		if err != nil {
+			apiService.Error().Msgf("Error getting user role: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Return user settings with role information
+		settingsResponse := api.UserSettingsResponse{
+			Username: username,
+			Role:     userRole,
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(api.SuccessResponse{Message: fmt.Sprintf("Settings page for user: %s", username)})
+		json.NewEncoder(w).Encode(settingsResponse)
 	}
 }
 
