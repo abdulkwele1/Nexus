@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"nexus-api/api"
 	"nexus-api/clients/database"
@@ -342,7 +341,7 @@ func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
 	assert.NoError(t, err)
 
 	// sensor ID to test
-	sensorID := "2CF7F1C06270008D" // Using a hex string ID
+	sensorID := uuid.New().String()[:8] + uuid.New().String()[:8] // Using a unique ID within 32 char limit
 
 	// add sensor to database
 	testSensor := database.Sensor{
@@ -357,7 +356,7 @@ func TestE2ESetAndGetSensorMoistureData(t *testing.T) {
 	// Test payload for setting Moisture data
 	expectedMoistureData := api.SetSensorMoistureDataResponse{SensorMoistureData: []api.SensorMoistureData{
 		{Date: time.Now().Add(1 * time.Second).UTC(), SoilMoisture: 100, SensorID: sensorID},
-		{Date: time.Now().Add(1 * time.Second).UTC(), SoilMoisture: 150, SensorID: sensorID},
+		{Date: time.Now().Add(2 * time.Second).UTC(), SoilMoisture: 150, SensorID: sensorID},
 	}}
 
 	// Step 1: POST (Set) moisture data
@@ -414,7 +413,7 @@ func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
 	assert.NoError(t, err)
 
 	// sensor ID to test
-	sensorID := "2CF7F1C0627000BC" // Using a hex string ID
+	sensorID := uuid.New().String()[:8] + uuid.New().String()[:8] // Using a unique ID within 32 char limit
 
 	// add sensor to database
 	testSensor := database.Sensor{
@@ -429,7 +428,7 @@ func TestE2ESetAndGetSensorTemperatureData(t *testing.T) {
 	// Test payload for setting Temperature data
 	expectedTemperatureData := api.SetSensorTemperatureDataResponse{SensorTemperatureData: []api.SensorTemperatureData{
 		{Date: time.Now().Add(1 * time.Second).UTC(), SoilTemperature: 100, SensorID: sensorID},
-		{Date: time.Now().Add(1 * time.Second).UTC(), SoilTemperature: 150, SensorID: sensorID},
+		{Date: time.Now().Add(2 * time.Second).UTC(), SoilTemperature: 150, SensorID: sensorID},
 	}}
 
 	// Step 1: POST (Set) temperature data
@@ -485,20 +484,20 @@ func TestE2EGetAllSensors(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	// Create some test sensors
+	// Create some test sensors with unique IDs (max 32 chars for database)
 	testSensors := []database.Sensor{
 		{
-			ID:       "2CF7F1C06270008D",
+			ID:       uuid.New().String()[:8] + uuid.New().String()[:8],
 			Name:     "Test Sensor 1",
 			Location: "Test Location 1",
 		},
 		{
-			ID:       "2CF7F1C0627000BC",
+			ID:       uuid.New().String()[:8] + uuid.New().String()[:8],
 			Name:     "Test Sensor 2",
 			Location: "Test Location 2",
 		},
 		{
-			ID:       "2CF7F1C0627000C4",
+			ID:       uuid.New().String()[:8] + uuid.New().String()[:8],
 			Name:     "Test Sensor 3",
 			Location: "Test Location 3",
 		},
@@ -635,8 +634,8 @@ func TestE2ESetAndGetSensorBatteryData(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	// Generate unique sensor ID for test (using shorter format)
-	sensorID := fmt.Sprintf("TS%s", uuid.NewString()[:8])
+	// Generate unique sensor ID for test (max 32 chars for database)
+	sensorID := uuid.New().String()[:8] + uuid.New().String()[:8]
 
 	// add sensor to database
 	testSensor := database.Sensor{

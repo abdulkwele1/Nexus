@@ -143,8 +143,8 @@ func CreateSessionRefreshHandler(apiService *APIService) http.HandlerFunc {
 			return
 		}
 
-		// Extend the cookie expiration by 8 hours (more reasonable)
-		newExpiration := time.Now().Add(8 * time.Hour)
+		// Extend the cookie expiration by 24 hours from now
+		newExpiration := time.Now().Add(24 * time.Hour)
 
 		// Update the cookie in the database
 		loginCookie := database.LoginCookie{
@@ -217,7 +217,7 @@ func CreateChangePasswordHandler(apiService *APIService) http.HandlerFunc {
 			return
 		}
 
-		username, ok := r.Context().Value("username").(string)
+		username, ok := r.Context().Value(UsernameContextKey).(string)
 		if !ok {
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
@@ -1165,6 +1165,8 @@ func CreateGetSensorBatteryDataHandler(apiService *APIService) http.HandlerFunc 
 				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid end_date format. Use YYYY-MM-DD"})
 				return
 			}
+			// Set end date to end of day (23:59:59) to include all data for that day
+			end = end.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
 		}
 
 		// Retrieve data for the sensorID
