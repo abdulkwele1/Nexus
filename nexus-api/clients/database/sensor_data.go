@@ -178,8 +178,40 @@ func GetSensorByID(ctx context.Context, db *bun.DB, id string) (Sensor, error) {
 }
 
 func DeleteSensor(ctx context.Context, db *bun.DB, id string) error {
-	_, err := db.NewDelete().Model((*Sensor)(nil)).Where("id = ?", id).Exec(ctx)
-	return err
+	// Start a transaction to ensure all deletions succeed or none do
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete all related sensor data first (due to foreign key constraints)
+	// 1. Delete battery data
+	_, err = tx.NewDelete().Model((*SensorBatteryData)(nil)).Where("sensor_id = ?", id).Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	// 2. Delete moisture data
+	_, err = tx.NewDelete().Model((*SensorMoistureData)(nil)).Where("sensor_id = ?", id).Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	// 3. Delete temperature data
+	_, err = tx.NewDelete().Model((*SensorTemperatureData)(nil)).Where("sensor_id = ?", id).Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	// 4. Finally delete the sensor itself
+	_, err = tx.NewDelete().Model((*Sensor)(nil)).Where("id = ?", id).Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Commit the transaction
+	return tx.Commit()
 }
 
 type SensorBatteryData struct {
