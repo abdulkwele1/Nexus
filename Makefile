@@ -1,14 +1,19 @@
 # execute these tasks when `make` with no target is invoked
 default: unit-test reset ready e2e-test logs
 
-# import environment file for setting or overriding
-# configuration used by this Makefile
-include .env
+# Set default values for required variables
+NEXUS_API_DIRECTORY ?= nexus-api
 
-# source all variables in environment file
+# import environment file for setting or overriding
+# configuration used by this Makefile (if it exists)
+-include .env
+
+# source all variables in environment file (if it exists)
 # This only runs in the make command shell
 # so won't affect your login shell
+ifneq (,$(wildcard .env))
 export $(shell sed 's/=.*//' .env)
+endif
 
 # Make functions that can be called inside of targets to check
 # that required environment variables are set, e.g.
