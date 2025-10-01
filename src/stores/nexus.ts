@@ -18,12 +18,14 @@ class User {
     userName: string;
     loggedIn: boolean;
     isAdmin: boolean;
+    userRole: string;
 
     constructor(baseURL: any) {
         this.baseURL = baseURL;
         this.userName = '';
         this.loggedIn = false;
         this.isAdmin = false;
+        this.userRole = 'user';
     }
 
     async login(userName: any, password: any): Promise<any> {
@@ -516,6 +518,28 @@ class User {
         } catch (error) {
             console.log('[NexusStore] User is not an admin:', error);
             return false;
+        }
+    }
+
+    async getUserSettings() {
+        try {
+            console.log('[NexusStore] Fetching user settings from:', `${this.baseURL}/settings`);
+            const response = await apiFetch(`${this.baseURL}/settings`, {
+                credentials: 'include',
+            });
+            const data = await response.json();
+            console.log('[NexusStore] Got user settings response:', data);
+            
+            // Update user role and admin status
+            if (data.role) {
+                this.userRole = data.role;
+                this.isAdmin = data.role === 'admin' || data.role === 'root_admin';
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('[NexusStore] Error fetching user settings:', error);
+            throw error;
         }
     }
 }

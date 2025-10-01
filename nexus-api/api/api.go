@@ -175,3 +175,8 @@ type ListUsersResponse struct {
 type UpdateUserRoleRequest struct {
 	Role string `json:"role"`
 }
+
+type UserSettingsResponse struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+}

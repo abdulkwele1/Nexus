@@ -24,6 +24,9 @@
       <div class="divider"></div>
       <div class="option" @click="addNewSensor">Add New Sensor</div>
       <div class="divider"></div>
+      <!-- Admin-only option -->
+      <div v-if="isAdminUser" class="option" @click="viewAllProfiles">All Profiles</div>
+      <div v-if="isAdminUser" class="divider"></div>
       <div class="option" @click="logout">Log Out</div>
     </div>
 
@@ -69,7 +72,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useNexusStore } from '@/stores/nexus'
@@ -94,6 +97,9 @@ const sensorName = ref('');
 const sensorLocation = ref('');
 const sensorErrorMessage = ref('');
 const sensorSuccessMessage = ref('');
+
+// Admin state
+const isAdminUser = ref(false);
 
 // Computed property to check if passwords match
 const passwordsMatch = computed(() => newPassword.value === confirmPassword.value);
@@ -225,6 +231,23 @@ const logout = async () => {
   store.user.userName = '';
   
   router.push('/');
+};
+
+// Check user role on component mount
+onMounted(async () => {
+  try {
+    await store.user.getUserSettings();
+    isAdminUser.value = store.user.isAdmin;
+  } catch (error) {
+    console.error('Error fetching user settings:', error);
+    isAdminUser.value = false;
+  }
+});
+
+// Handle viewing all profiles (admin only)
+const viewAllProfiles = () => {
+  // Navigate to the admin panel
+  router.push('/admin');
 };
 </script>
 

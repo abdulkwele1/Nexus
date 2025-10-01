@@ -15,9 +15,10 @@ Before starting development on this project, ensure you have installed the follo
 To run both the ui and api service
 
 ```bash
+#Starts the ui and api service
 make up
 ```
-
+## after running make up, run make seed-database seeds the database with user accounts and any database data. You need to run both of these commands after refreshing the api or resetting the database
 To view the logs of the ui and api service
 
 ```bash
