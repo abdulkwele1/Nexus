@@ -264,8 +264,8 @@ Your Nexus application should now be running and accessible via the public IP ad
 ### Deployment Steps
 
 1.) Download the private ssh key to the server (ask Abdul or Levi)
-2.) Set the required security permissions for the key `chmod 400 nexus-demo-server.pem`
-3.) SSH (remote login) to the server `ssh -i nexus-demo-server.pem ubuntu@35.94.111.25` (type yes when it asks you if you want to trust this server)
+2.) Set the required security permissions for the key `chmod 400 nexus-server-keypair.pem`
+3.) SSH (remote login) to the server `ssh -i nexus-server-keypair.pem ubuntu@34.217.174.48` (type yes when it asks you if you want to trust this server)
 4.) `cd Nexus` to go to the Nexus code repo
 5.) Get the latest merged code `git pull -p`
 6.) If you need to deploy updates to the api run `sudo make refresh`
