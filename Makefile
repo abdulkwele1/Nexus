@@ -100,6 +100,14 @@ reset: lint
 refresh: 
 	docker compose up -d nexus-api --build --force-recreate
 
+.PHONY: refresh-production
+# pull latest images from ECR and restart services (faster than building on server)
+refresh-production:
+	aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 654654589486.dkr.ecr.us-west-2.amazonaws.com
+	docker pull 654654589486.dkr.ecr.us-west-2.amazonaws.com/nexus-api:latest
+	docker pull 654654589486.dkr.ecr.us-west-2.amazonaws.com/nexus-ui:latest
+	docker compose -f docker-compose.production.yml up -d --force-recreate
+
 .PHONY: logs
 # follow the logs from all the dockerized services
 # make logs
