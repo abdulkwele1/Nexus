@@ -1,0 +1,41 @@
+{
+  "family": "nexus-ui",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::654654589486:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::654654589486:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "nexus-ui",
+      "image": "654654589486.dkr.ecr.us-west-2.amazonaws.com/nexus-ui:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/nexus-ui",
+          "awslogs-region": "us-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost/ || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      }
+    }
+  ]
+}
+

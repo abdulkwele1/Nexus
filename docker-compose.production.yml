@@ -1,0 +1,66 @@
+---
+# Production docker-compose using ECR images
+# This pulls pre-built images from ECR instead of building on the server
+services:
+  # run postgres for nexus user, location, sensor data
+  nexus-db:
+    image: postgres:${POSTGRES_VERSION}
+    env_file: .env
+    ports:
+      - "${POSTGRES_HOST_PORT}:${POSTGRES_CONTAINER_PORT}"
+    expose:
+      - "${POSTGRES_CONTAINER_PORT}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: "10m"
+  
+  # run api service from ECR
+  nexus-api:
+    image: 654654589486.dkr.ecr.us-west-2.amazonaws.com/nexus-api:latest
+    env_file: .env
+    ports:
+      - "${NEXUS_API_CONTAINER_PORT}:${NEXUS_API_HOST_PORT}"
+    depends_on:
+      - nexus-db
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: "10m"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+  
+  # run vuejs web app from ECR
+  nexus-ui:
+    image: 654654589486.dkr.ecr.us-west-2.amazonaws.com/nexus-ui:latest
+    ports:
+      - '${NEXUS_UI_HOST_PORT}:${NEXUS_UI_CONTAINER_PORT}'
+    depends_on:
+      - nexus-api
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: "10m"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres_data:
+    driver: local
+

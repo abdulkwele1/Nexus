@@ -1,0 +1,85 @@
+{
+  "family": "nexus-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::654654589486:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::654654589486:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "nexus-api",
+      "image": "654654589486.dkr.ecr.us-west-2.amazonaws.com/nexus-api:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "API_PORT",
+          "value": "8080"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "info"
+        },
+        {
+          "name": "DATABASE_SSL_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DATABASE_QUERY_LOGGING_ENABLED",
+          "value": "false"
+        },
+        {
+          "name": "RUN_DATABASE_MIGRATIONS",
+          "value": "true"
+        },
+        {
+          "name": "ENABLE_MQTT",
+          "value": "false"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_NAME",
+          "valueFrom": "arn:aws:secretsmanager:us-west-2:654654589486:secret:nexus/database/name"
+        },
+        {
+          "name": "DATABASE_ENDPOINT_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-west-2:654654589486:secret:nexus/database/endpoint"
+        },
+        {
+          "name": "DATABASE_USERNAME",
+          "valueFrom": "arn:aws:secretsmanager:us-west-2:654654589486:secret:nexus/database/username"
+        },
+        {
+          "name": "DATABASE_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-west-2:654654589486:secret:nexus/database/password"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/nexus-api",
+          "awslogs-region": "us-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8080/healthcheck || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
+
