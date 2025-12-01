@@ -322,7 +322,8 @@ const colors = [
 
 const nexusStore = useNexusStore();
 
-const REALTIME_SENSOR_ID = "2CF7F1C0649007B3"; // Updated to use sensor B3
+// Use first available sensor instead of hardcoded ID
+const REALTIME_SENSOR_ID = ref<string | null>(null);
 
 interface RealtimeSensorDisplay {
   name: string;
@@ -414,7 +415,6 @@ const sensorsError = ref<string | null>(null);
 const sensorVisibility = ref<{ [key: string]: boolean }>({});
 
 // Function to fetch sensors from the API
-// Function to fetch sensors from the API
 const fetchSensors = async () => {
   try {
     sensorsLoading.value = true;
@@ -439,14 +439,22 @@ const fetchSensors = async () => {
       SENSOR_CONFIGS.value.forEach((sensor, index) => {
         sensorVisibility.value[sensor.name] = index === 0;
       });
+
+      // Set real-time sensor ID to first available sensor if not already set
+      if (!REALTIME_SENSOR_ID.value && SENSOR_CONFIGS.value.length > 0) {
+        REALTIME_SENSOR_ID.value = SENSOR_CONFIGS.value[0].id;
+        console.log('[sensors.vue] Set real-time sensor ID to:', REALTIME_SENSOR_ID.value);
+      }
     } else {
       sensorsError.value = 'No sensors found';
       SENSOR_CONFIGS.value = [];
+      REALTIME_SENSOR_ID.value = null;
     }
   } catch (error) {
     console.error('Error fetching sensors:', error);
     sensorsError.value = 'Failed to load sensors';
     SENSOR_CONFIGS.value = [];
+    REALTIME_SENSOR_ID.value = null;
   } finally {
     sensorsLoading.value = false;
   }
@@ -495,12 +503,19 @@ onMounted(async () => {
   });
 
   const fetchAndUpdateRealtimeSensor = async () => {
+    // Skip if no sensor ID is available
+    if (!REALTIME_SENSOR_ID.value) {
+      console.log('[sensors.vue] No real-time sensor ID available, skipping update');
+      currentRealtimeSensorData.value.lastUpdated = new Date().toLocaleTimeString() + ' (No sensor)';
+      return;
+    }
+
     try {
       let data;
       if (currentSensorType.value === 'moisture') {
-        data = await nexusStore.user.getSensorMoistureData(REALTIME_SENSOR_ID);
+        data = await nexusStore.user.getSensorMoistureData(REALTIME_SENSOR_ID.value);
       } else {
-        data = await nexusStore.user.getSensorTemperatureData(REALTIME_SENSOR_ID);
+        data = await nexusStore.user.getSensorTemperatureData(REALTIME_SENSOR_ID.value);
       }
       
       if (data && data.length > 0) {
@@ -514,8 +529,12 @@ onMounted(async () => {
         previousRealtimeSensorValue.value = currentRealtimeSensorData.value.value; 
 
         // --- Update the current data --- 
+        // Get sensor name from config if available
+        const sensorConfig = SENSOR_CONFIGS.value.find(s => s.id === REALTIME_SENSOR_ID.value);
+        const sensorName = sensorConfig?.name || 'Sensor Alpha';
+        
         currentRealtimeSensorData.value = {
-          name: 'Sensor Alpha', 
+          name: sensorName, 
           value: newValue,
           lastUpdated: new Date(latestReading.date).toLocaleTimeString(),
         };
@@ -532,7 +551,7 @@ onMounted(async () => {
         currentRealtimeSensorData.value.lastUpdated = new Date().toLocaleTimeString() + ' (No data)';
       }
     } catch (error) {
-      console.error('Error fetching real-time sensor data for ID', REALTIME_SENSOR_ID, ':', error);
+      console.error('Error fetching real-time sensor data for ID', REALTIME_SENSOR_ID.value, ':', error);
        // --- Store null as previous on error --- 
       previousRealtimeSensorValue.value = currentRealtimeSensorData.value.value;
       currentRealtimeSensorData.value.value = null;
@@ -1044,9 +1063,13 @@ const formatLastUpdated = (date: Date | undefined) => {
 // Function to fetch battery data for a sensor
 const fetchBatteryData = async (sensorId: string) => {
   try {
-    // Use fixed dates that include September 2025
-    const startStr = "2025-09-01";  // Start of September 2025
-    const endStr = "2025-09-30";    // End of September 2025
+    // Use dynamic dates - last 30 days to today
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30); // Go back 30 days
+    
+    const startStr = toLocalDateString(startDate);
+    const endStr = toLocalDateString(endDate);
 
     console.log(`[sensors.vue] Fetching battery data for sensor ${sensorId} from ${startStr} to ${endStr}`);
 

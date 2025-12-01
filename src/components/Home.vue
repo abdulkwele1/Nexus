@@ -25,74 +25,22 @@
         </RouterLink>
       </div>
       <img src="../assets/farmMap.png" alt="Farm Map" class="farm-map" />
-      <!-- Sensor B3 point with tooltip -->
+      <!-- Dynamic sensor points loaded from API -->
       <div
-        class="map-point sensor sensor-b3"
-        :style="pointStyle(59, 32)"
+        v-for="(sensor, index) in sensors"
+        :key="sensor.id"
+        class="map-point sensor"
+        :class="`sensor-${index}`"
+        :style="{
+          ...pointStyle(sensor.xPercent || getDefaultX(index), sensor.yPercent || getDefaultY(index)),
+          '--sensor-color': sensor.color || getDefaultColor(index),
+          'border-color': sensor.color || getDefaultColor(index),
+          'background': getColorBackground(sensor.color || getDefaultColor(index))
+        }"
         @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, 'B3')"
+        @mouseenter="handleMouseEnter($event, sensor)"
         @mouseleave="handleMouseLeave"
-        title="Sensor B3"
-      >
-        <i class="fas fa-thermometer-half"></i>
-      </div>
-
-      <!-- Sensor 92 point with tooltip -->
-      <div
-        class="map-point sensor sensor-92"
-        :style="pointStyle(59, 40)"
-        @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, '92')"
-        @mouseleave="handleMouseLeave"
-        title="Sensor 92"
-      >
-        <i class="fas fa-thermometer-half"></i>
-      </div>
-
-      <!-- Sensor 87 point with tooltip -->
-      <div
-        class="map-point sensor sensor-87"
-        :style="pointStyle(45, 90)"
-        @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, '87')"
-        @mouseleave="handleMouseLeave"
-        title="Sensor 87"
-      >
-        <i class="fas fa-thermometer-half"></i>
-      </div>
-
-      <!-- Sensor 9D point with tooltip -->
-      <div
-        class="map-point sensor sensor-9d"
-        :style="pointStyle(30, 85)"
-        @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, '9D')"
-        @mouseleave="handleMouseLeave"
-        title="Sensor 9D"
-      >
-        <i class="fas fa-thermometer-half"></i>
-      </div>
-
-      <!-- Sensor B9 point with tooltip -->
-      <div
-        class="map-point sensor sensor-b9"
-        :style="pointStyle(35, 90)"
-        @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, 'B9')"
-        @mouseleave="handleMouseLeave"
-        title="Sensor B9"
-      >
-        <i class="fas fa-thermometer-half"></i>
-      </div>
-
-      <!-- Sensor C6 point with tooltip -->
-      <div
-        class="map-point sensor sensor-c6"
-        :style="pointStyle(18, 90)"
-        @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, 'C6')"
-        @mouseleave="handleMouseLeave"
-        title="Sensor C6"
+        :title="sensor.name"
       >
         <i class="fas fa-thermometer-half"></i>
       </div>
@@ -104,7 +52,7 @@
         :style="{
           left: `${tooltipPosition.x}px`,
           top: `${tooltipPosition.y - 120}px`,
-          '--sensor-color': SENSORS[activeSensor]?.color || '#4CAF50'
+          '--sensor-color': activeSensor?.color || '#4CAF50'
         }"
       >
         <div class="tooltip-header">{{ sensorData.name }}</div>
@@ -369,35 +317,7 @@
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.map-point.sensor-b3 {
-  border-color: #4CAF50;
-  background: #E8F5E9;
-}
-
-.map-point.sensor-92 {
-  border-color: #2196F3;
-  background: #E3F2FD;
-}
-
-.map-point.sensor-87 {
-  border-color: #FF5722;
-  background: #FBE9E7;
-}
-
-.map-point.sensor-9d {
-  border-color: #9C27B0;
-  background: #F3E5F5;
-}
-
-.map-point.sensor-b9 {
-  border-color: #FFC107;
-  background: #FFF8E1;
-}
-
-.map-point.sensor-c6 {
-  border-color: #00BCD4;
-  background: #E0F7FA;
-}
+/* Dynamic sensor colors are now applied via inline styles */
 
 /* Static Drone Icon Styles */
 .drone-tile {
@@ -459,40 +379,8 @@ import { useNexusStore } from '@/stores/nexus';
 const router = useRouter();
 const nexusStore = useNexusStore();
 
-const SENSORS = {
-  B3: {
-    id: '2CF7F1C0649007B3',
-    name: 'Sensor B3',
-    color: '#4CAF50'
-  },
-  '92': {
-    id: '2CF7F1C064900792',
-    name: 'Sensor 92',
-    color: '#2196F3'
-  },
-  '87': {
-    id: '2CF7F1C064900787',
-    name: 'Sensor 87',
-    color: '#FF5722'
-  },
-  '9D': {
-    id: '2CF7F1C06490079D',
-    name: 'Sensor 9D',
-    color: '#9C27B0'
-  },
-  'B9': {
-    id: '2CF7F1C064900792', // Changed to match the physical sensor's ID
-    name: 'Sensor B9',
-    color: '#FFC107'
-  },
-  'C6': {
-    id: '2CF7F1C0649007C6',
-    name: 'Sensor C6',
-    color: '#00BCD4'
-  }
-};
-
-// Sensor data state
+// Dynamic sensors loaded from API
+const sensors = ref([]);
 const sensorData = ref({
   id: '',
   name: '',
@@ -502,6 +390,51 @@ const sensorData = ref({
 });
 
 const activeSensor = ref(null);
+
+// Default colors for sensors (cycling through if more than 6)
+const defaultColors = [
+  '#4CAF50',  // Green
+  '#2196F3',  // Blue
+  '#FF5722',  // Deep Orange
+  '#9C27B0',  // Purple
+  '#FFC107',  // Amber
+  '#00BCD4',  // Cyan
+];
+
+// Default positions (distributed across map)
+const defaultPositions = [
+  { x: 59, y: 32 },
+  { x: 59, y: 40 },
+  { x: 45, y: 90 },
+  { x: 30, y: 85 },
+  { x: 35, y: 90 },
+  { x: 18, y: 90 },
+  { x: 50, y: 50 },
+  { x: 70, y: 60 },
+  { x: 25, y: 50 },
+  { x: 80, y: 30 },
+];
+
+function getDefaultColor(index) {
+  return defaultColors[index % defaultColors.length];
+}
+
+function getDefaultX(index) {
+  return defaultPositions[index % defaultPositions.length]?.x || 50;
+}
+
+function getDefaultY(index) {
+  return defaultPositions[index % defaultPositions.length]?.y || 50;
+}
+
+function getColorBackground(color) {
+  // Convert hex to rgba with low opacity for background
+  const hex = color.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  return `rgba(${r}, ${g}, ${b}, 0.15)`;
+}
 
 // Tooltip state
 const showTooltip = ref(false);
@@ -538,22 +471,21 @@ function formatTime(time) {
 }
 
 // Update tooltip handlers
-function handleMouseEnter(event, sensorKey) {
+function handleMouseEnter(event, sensor) {
   const rect = event.target.getBoundingClientRect();
   tooltipPosition.value = {
     x: rect.left + window.scrollX,
     y: rect.top + window.scrollY
   };
-  activeSensor.value = sensorKey;
+  activeSensor.value = sensor;
   showTooltip.value = true;
-  fetchSensorData(sensorKey);
+  fetchSensorData(sensor);
 }
 
 // Update fetch sensor data
-async function fetchSensorData(sensorKey) {
+async function fetchSensorData(sensor) {
   try {
-    const sensor = SENSORS[sensorKey];
-    if (!sensor) return;
+    if (!sensor || !sensor.id) return;
 
     const [moistureData, temperatureData] = await Promise.all([
       nexusStore.user.getSensorMoistureData(sensor.id),
@@ -580,15 +512,42 @@ async function fetchSensorData(sensorKey) {
   }
 }
 
+// Fetch sensors from API
+async function fetchSensors() {
+  try {
+    const result = await nexusStore.user.getAllSensors();
+    const list = Array.isArray(result)
+      ? result
+      : (Array.isArray(result?.sensors) ? result.sensors : []);
+
+    sensors.value = list.map((sensor, index) => ({
+      id: sensor.id,
+      name: sensor.name || `Sensor ${sensor.id}`,
+      color: getDefaultColor(index),
+      // Use coordinates from database if available, otherwise use defaults
+      xPercent: sensor.latitude ? null : getDefaultX(index), // TODO: Convert lat/lng to map coordinates
+      yPercent: sensor.longitude ? null : getDefaultY(index),
+      latitude: sensor.latitude,
+      longitude: sensor.longitude,
+    }));
+  } catch (error) {
+    console.error('Error fetching sensors:', error);
+    sensors.value = [];
+  }
+}
+
 // Update data periodically
 let updateInterval;
 
-onMounted(() => {
-  // No need for initial fetch or interval anymore
+onMounted(async () => {
+  await fetchSensors();
+  
+  // Listen for sensor updates
+  window.addEventListener('sensorsUpdated', fetchSensors);
 });
 
 onUnmounted(() => {
-  // No need to clear interval anymore
+  window.removeEventListener('sensorsUpdated', fetchSensors);
 });
 
 // Tooltip handlers
