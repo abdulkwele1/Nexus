@@ -495,7 +495,7 @@ class User {
     async removeAdminPermissions(username: string) {
         try {
             console.log('[NexusStore] Removing admin permissions for:', username);
-            const response = await apiFetch(`${this.baseURL}/admin/users/${username}`, {
+            const response = await apiFetch(`${this.baseURL}/admin/users/${username}/remove-admin`, {
                 credentials: 'include',
                 method: 'DELETE',
             });
@@ -505,6 +505,79 @@ class User {
         } catch (error) {
             console.error('[NexusStore] Error removing admin permissions:', error);
             throw error;
+        }
+    }
+
+    async createUser(username: string, password: string, role: string = 'user') {
+        try {
+            console.log('[NexusStore] Creating new user:', username, 'with role:', role);
+            const response = await apiFetch(`${this.baseURL}/admin/users`, {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                method: 'POST',
+                body: JSON.stringify({ username, password, role }),
+            });
+            const data = await response.json();
+            console.log('[NexusStore] Create user response:', data);
+            return data;
+        } catch (error) {
+            console.error('[NexusStore] Error creating user:', error);
+            throw error;
+        }
+    }
+
+    async deleteUser(username: string) {
+        try {
+            console.log('[NexusStore] Deleting user:', username);
+            const response = await apiFetch(`${this.baseURL}/admin/users/${username}`, {
+                credentials: 'include',
+                method: 'DELETE',
+            });
+            const data = await response.json();
+            console.log('[NexusStore] Delete user response:', data);
+            return data;
+        } catch (error) {
+            console.error('[NexusStore] Error deleting user:', error);
+            throw error;
+        }
+    }
+
+    async checkUsernameAvailable(username: string): Promise<{ available: boolean; error?: string }> {
+        try {
+            console.log('[NexusStore] Checking username availability:', username);
+            const response = await apiFetch(`${this.baseURL}/admin/users/check/${encodeURIComponent(username)}`, {
+                credentials: 'include',
+                method: 'GET',
+            });
+            const data = await response.json();
+            
+            // If status is OK and message is "Username is available", it's available
+            if (response.ok && data.message === 'Username is available') {
+                return { available: true };
+            }
+            
+            // If status is OK but has an error field, username is taken
+            if (response.ok && data.error) {
+                return { available: false, error: data.error };
+            }
+            
+            // Otherwise, username is taken or there's an error
+            return { available: false, error: data.error || 'Username is not available' };
+        } catch (error: any) {
+            console.error('[NexusStore] Error checking username:', error);
+            // Try to parse error response
+            try {
+                const errorData = await error.json?.() || {};
+                if (errorData.error) {
+                    return { available: false, error: errorData.error };
+                }
+            } catch (e) {
+                // Ignore JSON parse errors
+            }
+            // For network errors, assume available (don't block user)
+            return { available: true };
         }
     }
 

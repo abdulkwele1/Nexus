@@ -11,6 +11,7 @@ import (
 	"nexus-api/password"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -1532,5 +1533,263 @@ func CreateRemoveAdminHandler(apiService *APIService) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Admin permissions removed successfully"})
+	}
+}
+
+// CreateCreateUserHandler returns a handler that creates a new user (admin only)
+func CreateCreateUserHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Get the current user from the context
+		currentUser, ok := ctx.Value(UsernameContextKey).(string)
+		if !ok {
+			apiService.Error().Msg("No user found in context")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Check if current user is admin or root_admin
+		userRole, err := database.GetUserRole(ctx, apiService.DatabaseClient.DB, currentUser)
+		if err != nil {
+			apiService.Error().Msgf("Error getting user role: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		if userRole != "admin" && userRole != "root_admin" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Insufficient permissions"})
+			return
+		}
+
+		// Parse request body
+		var request api.CreateUserRequest
+		err = json.NewDecoder(r.Body).Decode(&request)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid request body"})
+			return
+		}
+
+		// Validate input
+		if request.Username == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Username is required"})
+			return
+		}
+
+		// Validate username doesn't contain spaces
+		if strings.Contains(request.Username, " ") {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Username cannot contain spaces"})
+			return
+		}
+
+		if request.Password == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Password is required"})
+			return
+		}
+
+		// Set default role if not provided
+		role := request.Role
+		if role == "" {
+			role = "user"
+		}
+
+		// Validate role
+		if role != "user" && role != "admin" && role != "root_admin" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Invalid role. Must be 'user', 'admin', or 'root_admin'"})
+			return
+		}
+
+		// Only root_admin can create root_admin users
+		if role == "root_admin" && userRole != "root_admin" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Only root admin can create root admin users"})
+			return
+		}
+
+		// Check if user already exists
+		_, err = database.GetLoginAuthenticationByUserName(ctx, apiService.DatabaseClient.DB, request.Username)
+		if err == nil {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "User already exists"})
+			return
+		}
+		if err != database.ErrorNoLoginAuthenticationForUsername {
+			apiService.Error().Msgf("Error checking if user exists: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Hash password
+		passwordHash, err := password.HashPassword(request.Password)
+		if err != nil {
+			apiService.Error().Msgf("Error hashing password: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to create user"})
+			return
+		}
+
+		// Create user
+		loginAuth := database.LoginAuthentication{
+			UserName:     request.Username,
+			PasswordHash: passwordHash,
+			Role:         role,
+		}
+
+		err = loginAuth.Save(ctx, apiService.DatabaseClient.DB)
+		if err != nil {
+			apiService.Error().Msgf("Error creating user: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to create user"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "User created successfully"})
+	}
+}
+
+// CreateDeleteUserHandler returns a handler that deletes a user (admin only)
+func CreateDeleteUserHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		vars := mux.Vars(r)
+		username := vars["username"]
+
+		// Get the current user from the context
+		currentUser, ok := ctx.Value(UsernameContextKey).(string)
+		if !ok {
+			apiService.Error().Msg("No user found in context")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Check if current user is admin or root_admin
+		userRole, err := database.GetUserRole(ctx, apiService.DatabaseClient.DB, currentUser)
+		if err != nil {
+			apiService.Error().Msgf("Error getting user role: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		if userRole != "admin" && userRole != "root_admin" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Insufficient permissions"})
+			return
+		}
+
+		// Prevent deleting yourself
+		if username == currentUser {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Cannot delete your own account"})
+			return
+		}
+
+		// Check if target user exists and get their role
+		targetUser, err := database.GetLoginAuthenticationByUserName(ctx, apiService.DatabaseClient.DB, username)
+		if err != nil {
+			if err == database.ErrorNoLoginAuthenticationForUsername {
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "User not found"})
+				return
+			}
+			apiService.Error().Msgf("Error checking if user exists: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Only root_admin can delete root_admin users
+		if targetUser.Role == "root_admin" && userRole != "root_admin" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Only root admin can delete root admin users"})
+			return
+		}
+
+		// Delete user
+		err = database.DeleteUser(ctx, apiService.DatabaseClient.DB, username)
+		if err != nil {
+			apiService.Error().Msgf("Error deleting user: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to delete user"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "User deleted successfully"})
+	}
+}
+
+// CreateCheckUsernameHandler returns a handler that checks if a username is available (admin only)
+func CreateCheckUsernameHandler(apiService *APIService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		vars := mux.Vars(r)
+		username := vars["username"]
+
+		// Get the current user from the context
+		currentUser, ok := ctx.Value(UsernameContextKey).(string)
+		if !ok {
+			apiService.Error().Msg("No user found in context")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+
+		// Check if current user is admin or root_admin
+		userRole, err := database.GetUserRole(ctx, apiService.DatabaseClient.DB, currentUser)
+		if err != nil {
+			apiService.Error().Msgf("Error getting user role: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		if userRole != "admin" && userRole != "root_admin" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Insufficient permissions"})
+			return
+		}
+
+		// Validate username doesn't contain spaces
+		if strings.Contains(username, " ") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Username cannot contain spaces"})
+			return
+		}
+
+		// Check if user already exists
+		_, err = database.GetLoginAuthenticationByUserName(ctx, apiService.DatabaseClient.DB, username)
+		if err == nil {
+			// User exists
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Username is already taken"})
+			return
+		}
+		if err != database.ErrorNoLoginAuthenticationForUsername {
+			apiService.Error().Msgf("Error checking if user exists: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Internal server error"})
+			return
+		}
+
+		// Username is available
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(api.SuccessResponse{Message: "Username is available"})
 	}
 }

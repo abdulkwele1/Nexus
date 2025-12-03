@@ -41,12 +41,6 @@ const navStyle = computed(() => ({
       </button>
       <div class="hidden w-full md:block md:w-auto" id="navbar-default">
         <ul class="font-medium flex flex-col p-4 md:p-0 mt-4 border md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0">
-          <li>
-            <a href="#" class="block py-1 px-2 rounded hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-blue-200 md:p-0" :class="{ 'text-white': isHomePage }">About</a>
-          </li>
-          <li>
-            <a href="#" class="block py-1 px-2 rounded hover:bg-gray-100 md:hover:bg-transparent md:border-0 md:hover:text-blue-200 md:p-0" :class="{ 'text-white': isHomePage }">Learn more</a>
-          </li>
           <li v-if="isHomePage">
             <RouterLink to="/settings" class="flex items-center">
               <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">

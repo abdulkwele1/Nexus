@@ -15,3 +15,14 @@ CREATE INDEX idx_login_authentications_role ON login_authentications(role);
 UPDATE login_authentications 
 SET role = 'root_admin' 
 WHERE user_name = 'abdul';
+
+-- Set specific users as admin (add more users as needed)
+-- Example: Set demo as admin
+-- UPDATE login_authentications 
+-- SET role = 'admin' 
+-- WHERE user_name = 'demo';
+
+-- Example: Set multiple users as admin at once
+-- UPDATE login_authentications 
+-- SET role = 'admin' 
+-- WHERE user_name IN ('user1', 'user2', 'user3');

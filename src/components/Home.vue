@@ -23,31 +23,66 @@
           </div>
           <span>Drone</span>
         </RouterLink>
+        <!-- Admin controls -->
+        <div v-if="isAdmin" class="admin-controls">
+          <button 
+            @click="toggleEditMode" 
+            class="admin-btn"
+            :class="{ active: editMode }"
+            title="Toggle Edit Mode"
+          >
+            <i class="fas" :class="editMode ? 'fa-check' : 'fa-edit'"></i>
+            <span>{{ editMode ? 'Done' : 'Edit' }}</span>
+          </button>
+          <button 
+            v-if="editMode"
+            @click="showAddSensorModal = true" 
+            class="admin-btn add-sensor-btn"
+            title="Add Sensor Icon"
+          >
+            <i class="fas fa-plus"></i>
+            <span>Add Icon</span>
+          </button>
+        </div>
       </div>
-      <img src="../assets/farmMap.png" alt="Farm Map" class="farm-map" />
+      <img :src="plotImageUrl" alt="Plot 1" class="plot-1" />
       <!-- Dynamic sensor points loaded from API -->
       <div
         v-for="(sensor, index) in sensors"
-        :key="sensor.id"
+        :key="`${sensor.id}-${sensor.mapIconId || 0}`"
         class="map-point sensor"
-        :class="`sensor-${index}`"
+        :class="{
+          [`sensor-${index}`]: true,
+          'draggable': editMode && isAdmin,
+          'dragging': draggingSensor === sensor.mapIconId
+        }"
         :style="{
           ...pointStyle(sensor.xPercent || getDefaultX(index), sensor.yPercent || getDefaultY(index)),
           '--sensor-color': sensor.color || getDefaultColor(index),
           'border-color': sensor.color || getDefaultColor(index),
-          'background': getColorBackground(sensor.color || getDefaultColor(index))
+          'background': getColorBackground(sensor.color || getDefaultColor(index)),
+          cursor: editMode && isAdmin ? 'move' : 'pointer'
         }"
-        @click="goTo('sensors')"
-        @mouseenter="handleMouseEnter($event, sensor)"
-        @mouseleave="handleMouseLeave"
-        :title="sensor.name"
+        @click="editMode && isAdmin ? null : goTo('sensors')"
+        @mousedown="editMode && isAdmin ? startDrag($event, sensor, index) : null"
+        @mouseenter="!editMode ? handleMouseEnter($event, sensor) : null"
+        @mouseleave="!editMode ? handleMouseLeave() : null"
+        :title="editMode && isAdmin ? `Drag to move - ${sensor.name}` : sensor.name"
       >
         <i class="fas fa-thermometer-half"></i>
+        <button 
+          v-if="editMode && isAdmin && sensor.mapIconId" 
+          @click.stop="deleteSensorIcon(sensor.mapIconId)"
+          class="delete-icon-btn"
+          title="Delete this icon"
+        >
+          <i class="fas fa-times"></i>
+        </button>
       </div>
 
       <!-- Tooltip -->
       <div
-        v-if="showTooltip"
+        v-if="showTooltip && !editMode"
         class="sensor-tooltip"
         :style="{
           left: `${tooltipPosition.x}px`,
@@ -81,6 +116,32 @@
         title="Solar Panels"
       >
         <i class="fas fa-solar-panel"></i>
+      </div>
+    </div>
+
+    <!-- Add Sensor Icon Modal (Admin Only) -->
+    <div v-if="showAddSensorModal && isAdmin" class="modal-overlay" @click.self="showAddSensorModal = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Add Sensor Icon</h3>
+          <button @click="showAddSensorModal = false" class="close-modal-btn">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>Select a sensor to add an icon for:</p>
+          <div class="sensor-list">
+            <div
+              v-for="sensor in availableSensors"
+              :key="sensor.id"
+              class="sensor-option"
+              @click="addSensorIcon(sensor)"
+            >
+              <i class="fas fa-thermometer-half"></i>
+              <span>{{ sensor.name }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -174,6 +235,20 @@
   transition: filter 0.3s;
 }
 .map-container:hover .farm-map {
+  filter: brightness(1) saturate(1.1);
+}
+.plot-1 {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  filter: brightness(0.98) saturate(1.05);
+  transition: filter 0.3s;
+}
+.map-container:hover .plot-1 {
   filter: brightness(1) saturate(1.1);
 }
 .map-point {
@@ -369,15 +444,205 @@
   bottom: -10px;
   right: -10px;
 }
+
+/* Admin Controls */
+.admin-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-left: 20px;
+  padding-left: 20px;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.admin-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: #222;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.admin-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.admin-btn.active {
+  background: #4CAF50;
+  color: white;
+  border-color: #4CAF50;
+}
+
+.add-sensor-btn {
+  background: #2196F3;
+  color: white;
+  border-color: #2196F3;
+}
+
+.add-sensor-btn:hover {
+  background: #1976d2;
+}
+
+/* Draggable sensor styles */
+.map-point.draggable {
+  cursor: move;
+}
+
+.map-point.dragging {
+  opacity: 0.7;
+  z-index: 1000;
+  transform: scale(1.1);
+}
+
+.delete-icon-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ff4444;
+  color: white;
+  border: 2px solid white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.delete-icon-btn:hover {
+  background: #ff0000;
+  transform: scale(1.1);
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.close-modal-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 5px 10px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-modal-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.modal-body p {
+  margin: 0 0 15px 0;
+  color: #666;
+}
+
+.sensor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sensor-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sensor-option:hover {
+  background: #f5f5f5;
+  border-color: #2196F3;
+  transform: translateX(5px);
+}
+
+.sensor-option i {
+  color: #4CAF50;
+  font-size: 18px;
+}
+
+.sensor-option span {
+  font-weight: 500;
+  color: #333;
+}
 </style>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useNexusStore } from '@/stores/nexus';
+import plotImageUrl from '@/assets/Plot1.JPG?url';
 
 const router = useRouter();
 const nexusStore = useNexusStore();
+
+// Admin and edit mode
+const isAdmin = ref(false);
+const editMode = ref(false);
+const showAddSensorModal = ref(false);
+
+// Drag and drop state
+const draggingSensor = ref(null);
+const dragOffset = ref({ x: 0, y: 0 });
+let nextMapIconId = 1;
 
 // Dynamic sensors loaded from API
 const sensors = ref([]);
@@ -512,6 +777,38 @@ async function fetchSensorData(sensor) {
   }
 }
 
+// Load sensor positions from localStorage
+function loadSensorPositions() {
+  try {
+    const saved = localStorage.getItem('sensorMapPositions');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (error) {
+    console.error('Error loading sensor positions:', error);
+  }
+  return {};
+}
+
+// Save sensor positions to localStorage
+function saveSensorPositions() {
+  try {
+    const positions = {};
+    sensors.value.forEach(sensor => {
+      if (sensor.mapIconId && sensor.xPercent !== null && sensor.yPercent !== null) {
+        positions[sensor.mapIconId] = {
+          xPercent: sensor.xPercent,
+          yPercent: sensor.yPercent,
+          sensorId: sensor.id
+        };
+      }
+    });
+    localStorage.setItem('sensorMapPositions', JSON.stringify(positions));
+  } catch (error) {
+    console.error('Error saving sensor positions:', error);
+  }
+}
+
 // Fetch sensors from API
 async function fetchSensors() {
   try {
@@ -520,26 +817,177 @@ async function fetchSensors() {
       ? result
       : (Array.isArray(result?.sensors) ? result.sensors : []);
 
-    sensors.value = list.map((sensor, index) => ({
-      id: sensor.id,
-      name: sensor.name || `Sensor ${sensor.id}`,
-      color: getDefaultColor(index),
-      // Use coordinates from database if available, otherwise use defaults
-      xPercent: sensor.latitude ? null : getDefaultX(index), // TODO: Convert lat/lng to map coordinates
-      yPercent: sensor.longitude ? null : getDefaultY(index),
-      latitude: sensor.latitude,
-      longitude: sensor.longitude,
-    }));
+    const savedPositions = loadSensorPositions();
+    
+    // Create initial sensor icons (one per sensor)
+    const sensorIcons = [];
+    list.forEach((sensor, index) => {
+      // Check if there are saved positions for this sensor
+      const savedIcons = Object.entries(savedPositions)
+        .filter(([_, pos]) => pos.sensorId === sensor.id)
+        .map(([iconId, pos]) => ({
+          id: sensor.id,
+          name: sensor.name || `Sensor ${sensor.id}`,
+          color: getDefaultColor(index),
+          xPercent: pos.xPercent,
+          yPercent: pos.yPercent,
+          latitude: sensor.latitude,
+          longitude: sensor.longitude,
+          mapIconId: iconId
+        }));
+
+      if (savedIcons.length > 0) {
+        sensorIcons.push(...savedIcons);
+      } else {
+        // Create default icon if no saved positions
+        sensorIcons.push({
+          id: sensor.id,
+          name: sensor.name || `Sensor ${sensor.id}`,
+          color: getDefaultColor(index),
+          xPercent: sensor.latitude ? null : getDefaultX(index),
+          yPercent: sensor.longitude ? null : getDefaultY(index),
+          latitude: sensor.latitude,
+          longitude: sensor.longitude,
+          mapIconId: `icon-${nextMapIconId++}`
+        });
+      }
+    });
+
+    // Update nextMapIconId based on existing icons
+    const maxIconId = Math.max(...sensorIcons.map(s => {
+      const match = s.mapIconId?.match(/icon-(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    }), 0);
+    nextMapIconId = maxIconId + 1;
+
+    sensors.value = sensorIcons;
+    saveSensorPositions();
   } catch (error) {
     console.error('Error fetching sensors:', error);
     sensors.value = [];
   }
 }
 
+// Get available sensors for adding icons
+const availableSensors = ref([]);
+
+async function loadAvailableSensors() {
+  try {
+    const result = await nexusStore.user.getAllSensors();
+    const list = Array.isArray(result)
+      ? result
+      : (Array.isArray(result?.sensors) ? result.sensors : []);
+    
+    availableSensors.value = list.map(sensor => ({
+      id: sensor.id,
+      name: sensor.name || `Sensor ${sensor.id}`
+    }));
+  } catch (error) {
+    console.error('Error loading available sensors:', error);
+    availableSensors.value = [];
+  }
+}
+
+// Toggle edit mode
+function toggleEditMode() {
+  editMode.value = !editMode.value;
+  if (editMode.value) {
+    // Hide tooltip when entering edit mode
+    showTooltip.value = false;
+    // Load available sensors when entering edit mode
+    loadAvailableSensors();
+  } else {
+    // Save positions when exiting edit mode
+    saveSensorPositions();
+  }
+}
+
+// Add sensor icon
+function addSensorIcon(sensor) {
+  const newIcon = {
+    id: sensor.id,
+    name: sensor.name,
+    color: getDefaultColor(sensors.value.length),
+    xPercent: 50, // Center of map
+    yPercent: 50,
+    mapIconId: `icon-${nextMapIconId++}`
+  };
+  sensors.value.push(newIcon);
+  saveSensorPositions();
+  showAddSensorModal.value = false;
+}
+
+// Delete sensor icon
+function deleteSensorIcon(mapIconId) {
+  if (confirm('Are you sure you want to delete this sensor icon?')) {
+    sensors.value = sensors.value.filter(s => s.mapIconId !== mapIconId);
+    saveSensorPositions();
+  }
+}
+
+// Drag and drop functions
+function startDrag(event, sensor, index) {
+  if (!editMode.value || !isAdmin.value) return;
+  
+  event.preventDefault();
+  draggingSensor.value = sensor.mapIconId;
+  
+  const rect = event.currentTarget.getBoundingClientRect();
+  const mapContainer = event.currentTarget.closest('.map-container');
+  const mapRect = mapContainer.getBoundingClientRect();
+  
+  // Calculate offset from mouse to center of sensor icon
+  dragOffset.value = {
+    x: event.clientX - rect.left - rect.width / 2,
+    y: event.clientY - rect.top - rect.height / 2
+  };
+  
+  document.addEventListener('mousemove', handleDrag);
+  document.addEventListener('mouseup', stopDrag);
+}
+
+function handleDrag(event) {
+  if (!draggingSensor.value) return;
+  
+  const mapContainer = document.querySelector('.map-container');
+  if (!mapContainer) return;
+  
+  const mapRect = mapContainer.getBoundingClientRect();
+  const x = event.clientX - mapRect.left - dragOffset.value.x;
+  const y = event.clientY - mapRect.top - dragOffset.value.y;
+  
+  // Convert to percentages
+  const xPercent = Math.max(0, Math.min(100, (x / mapRect.width) * 100));
+  const yPercent = Math.max(0, Math.min(100, (y / mapRect.height) * 100));
+  
+  // Update sensor position
+  const sensor = sensors.value.find(s => s.mapIconId === draggingSensor.value);
+  if (sensor) {
+    sensor.xPercent = xPercent;
+    sensor.yPercent = yPercent;
+  }
+}
+
+function stopDrag() {
+  draggingSensor.value = null;
+  document.removeEventListener('mousemove', handleDrag);
+  document.removeEventListener('mouseup', stopDrag);
+  saveSensorPositions();
+}
+
 // Update data periodically
 let updateInterval;
 
 onMounted(async () => {
+  // Check if user is admin
+  try {
+    await nexusStore.user.getUserSettings();
+    isAdmin.value = nexusStore.user.isAdmin || nexusStore.user.userRole === 'admin' || nexusStore.user.userRole === 'root_admin';
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    isAdmin.value = false;
+  }
+  
   await fetchSensors();
   
   // Listen for sensor updates
@@ -548,6 +996,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('sensorsUpdated', fetchSensors);
+  document.removeEventListener('mousemove', handleDrag);
+  document.removeEventListener('mouseup', stopDrag);
 });
 
 // Tooltip handlers
