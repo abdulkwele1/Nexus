@@ -1,5 +1,12 @@
 <template>
   <div class="soil-moisture-graph">
+    <div class="graph-header">
+      <button @click="toggleFullscreen" class="fullscreen-btn" title="Enlarge graph">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+      </button>
+    </div>
     <div ref="chartContainer"></div>
     <div 
       v-if="activeTooltip" 
@@ -11,11 +18,24 @@
         <div class="tooltip-value">{{ tooltipData.value }}</div>
       </div>
     </div>
+    
+    <!-- Fullscreen modal -->
+    <div v-if="isFullscreen" class="fullscreen-modal" @click.self="toggleFullscreen">
+      <div class="fullscreen-content">
+        <button @click="toggleFullscreen" class="close-fullscreen-btn" title="Close">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        <div ref="fullscreenChartContainer" class="fullscreen-chart"></div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineExpose, computed } from 'vue';
+import { ref, onMounted, watch, defineExpose, computed, nextTick } from 'vue';
 import * as d3 from 'd3';
 import type { Selection } from 'd3';
 import { useNexusStore } from '@/stores/nexus';
@@ -56,8 +76,11 @@ interface Props {
 const props = defineProps<Props>();
 
 const chartContainer = ref<HTMLElement | null>(null);
+const fullscreenChartContainer = ref<HTMLElement | null>(null);
 const svg = ref<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
+const fullscreenSvg = ref<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
 const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
+const isFullscreen = ref(false);
 
 // Update colors to be more distinguishable
 const colors = [
@@ -588,10 +611,17 @@ const createChart = () => {
     }
 };
 
-// Add watch for queryParams
-watch(() => props.queryParams, (newParams) => {
+// Add watch for queryParams - re-fetch data when date range changes
+watch(() => props.queryParams, (newParams, oldParams) => {
   console.log(`[soilMoistureGraph] Query params changed. New resolution: ${newParams.resolution}`);
-  processAndDrawChart();
+  // Re-fetch data if startDate or endDate changed (not just resolution)
+  if (oldParams && (newParams.startDate !== oldParams.startDate || newParams.endDate !== oldParams.endDate)) {
+    console.log(`[soilMoistureGraph] Date range changed, re-fetching all sensor data...`);
+    fetchAllSensorData();
+  } else {
+    // Just re-process existing data if only resolution or other params changed
+    processAndDrawChart();
+  }
 }, { deep: true });
 
 // Add watch for sensorVisibility prop (NEW)
@@ -603,8 +633,8 @@ watch(() => props.sensorVisibility, () => {
 
 // --- Watch for dynamicTimeWindow prop --- 
 watch(() => props.dynamicTimeWindow, () => {
-  console.log(`[soilMoistureGraph] dynamicTimeWindow prop changed to: ${props.dynamicTimeWindow}. Triggering chart processing...`);
-  processAndDrawChart(); 
+  console.log(`[soilMoistureGraph] dynamicTimeWindow prop changed to: ${props.dynamicTimeWindow}. Re-fetching all sensor data...`);
+  fetchAllSensorData(); 
 });
 // --- End watch for dynamicTimeWindow prop --- 
 
@@ -663,11 +693,26 @@ const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'dai
         moisture: group.sum / group.count
       }))
       .sort((a, b) => a.time.getTime() - b.time.getTime());
+    
+    // Log missing days for daily aggregation to help debug
+    if (resolution === 'daily' && sortedGroups.length > 0) {
+      const firstDay = d3.timeDay.floor(sortedGroups[0].time);
+      const lastDay = d3.timeDay.floor(sortedGroups[sortedGroups.length - 1].time);
+      const expectedDays = Math.ceil((lastDay.getTime() - firstDay.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+      if (sortedGroups.length < expectedDays) {
+        console.log(`[soilMoistureGraph] Sensor ${sensor.name}: Expected ${expectedDays} days but only have ${sortedGroups.length} days with data (missing ${expectedDays - sortedGroups.length} days)`);
+      }
+    }
 
     console.log(`[soilMoistureGraph] Aggregated ${sensor.data.length} points into ${sortedGroups.length} points for sensor ${sensor.name}`);
     if (sortedGroups.length > 0) {
-      console.log(`[soilMoistureGraph] First aggregated point:`, sortedGroups[0]);
-      console.log(`[soilMoistureGraph] Last aggregated point:`, sortedGroups[sortedGroups.length - 1]);
+      console.log(`[soilMoistureGraph] First aggregated point: ${sortedGroups[0].time.toISOString()} = ${sortedGroups[0].moisture}`);
+      console.log(`[soilMoistureGraph] Last aggregated point: ${sortedGroups[sortedGroups.length - 1].time.toISOString()} = ${sortedGroups[sortedGroups.length - 1].moisture}`);
+      // Log date range coverage for daily aggregation
+      if (resolution === 'daily' && sortedGroups.length > 1) {
+        const dateRange = Math.ceil((sortedGroups[sortedGroups.length - 1].time.getTime() - sortedGroups[0].time.getTime()) / (24 * 60 * 60 * 1000));
+        console.log(`[soilMoistureGraph] Daily aggregation covers ${dateRange + 1} days with ${sortedGroups.length} data points (some days may have no data)`);
+      }
     }
 
     return { ...sensor, data: sortedGroups };
@@ -682,6 +727,7 @@ const filterData = (params: Props['queryParams']) => {
   let useInclusiveEnd = false;
 
   console.log(`[soilMoistureGraph] filterData called. Dynamic Window: ${props.dynamicTimeWindow}, Resolution: ${params.resolution}`);
+  console.log(`[soilMoistureGraph] Current browser time: ${now.toISOString()} (UTC), ${now.toLocaleString()} (local)`);
 
   if (props.dynamicTimeWindow && props.dynamicTimeWindow !== 'none') {
     filterRangeEnd = now;
@@ -690,7 +736,10 @@ const filterData = (params: Props['queryParams']) => {
 
     switch (props.dynamicTimeWindow) {
       case 'lastHour':
+        // Go back 1 hour (60 minutes) from now - use UTC time for consistency
         filterRangeStart = new Date(now.getTime() - 60 * 60 * 1000);
+        console.log(`[soilMoistureGraph] Last hour range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+        console.log(`[soilMoistureGraph] Last hour range (local): ${filterRangeStart.toLocaleString()} to ${filterRangeEnd.toLocaleString()}`);
         break;
       case 'last24Hours':
         // If using weekly/monthly resolution, extend the range
@@ -709,7 +758,8 @@ const filterData = (params: Props['queryParams']) => {
           start7Days.setMonth(now.getMonth() - 2);
           start7Days.setDate(1); // Start from the beginning of the month
         } else {
-          start7Days.setDate(now.getDate() - 6);
+          // Go back 7 days (not 6) to include today + 6 previous days = 7 days total
+          start7Days.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
         start7Days.setHours(0, 0, 0, 0);
         filterRangeStart = start7Days;
@@ -721,7 +771,8 @@ const filterData = (params: Props['queryParams']) => {
           start30Days.setMonth(now.getMonth() - 2);
           start30Days.setDate(1); // Start from the beginning of the month
         } else {
-          start30Days.setDate(now.getDate() - 29);
+          // Go back 30 days (not 29) to include today + 29 previous days = 30 days total
+          start30Days.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         }
         start30Days.setHours(0, 0, 0, 0);
         filterRangeStart = start30Days;
@@ -756,29 +807,43 @@ const filterData = (params: Props['queryParams']) => {
     }
 
     const sensorFilteredData = sensor.data.filter(point => {
-      const date = point.time;
+      const date = point.time; // This is already a Date object from UTC timestamp
       const value = point.moisture;
+      
+      // Compare using getTime() for precise UTC timestamp comparison
+      const pointTime = date.getTime();
+      const startTime = filterRangeStart.getTime();
+      const endTime = filterRangeEnd.getTime();
       
       let inTimeRange;
       if (useInclusiveEnd) {
-        inTimeRange = date >= filterRangeStart && date <= filterRangeEnd;
+        inTimeRange = pointTime >= startTime && pointTime <= endTime;
       } else {
-        inTimeRange = date >= filterRangeStart && date < filterRangeEnd;
+        inTimeRange = pointTime >= startTime && pointTime < endTime;
       }
       
       const isAboveMin = value >= minValue;
       const isBelowMax = value <= maxValue;
       
       if (props.dynamicTimeWindow === 'lastHour') {
-        console.log(`[soilMoistureGraph] Point time: ${date.toISOString()}, inRange: ${inTimeRange}, value: ${value}, aboveMin: ${isAboveMin}, belowMax: ${isBelowMax}`);
+        console.log(`[soilMoistureGraph] Point time: ${date.toISOString()} (${date.toLocaleString()} local), Filter: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}, inRange: ${inTimeRange}, value: ${value}`);
       }
       
       return inTimeRange && isAboveMin && isBelowMax;
     });
 
     console.log(`[soilMoistureGraph] Sensor ${sensor.name}: ${initialPoints} points -> ${sensorFilteredData.length} points after filtering`);
+    console.log(`[soilMoistureGraph] Filter range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
     if (sensorFilteredData.length > 0) {
       console.log(`[soilMoistureGraph] First filtered point: ${sensorFilteredData[0].time.toISOString()}, Last filtered point: ${sensorFilteredData[sensorFilteredData.length - 1].time.toISOString()}`);
+    } else if (initialPoints > 0) {
+      console.warn(`[soilMoistureGraph] Sensor ${sensor.name}: Had ${initialPoints} points but none matched the filter range!`);
+      if (initialPoints > 0) {
+        const firstPoint = sensor.data[0].time;
+        const lastPoint = sensor.data[initialPoints - 1].time;
+        console.warn(`[soilMoistureGraph] Data range: ${firstPoint.toISOString()} to ${lastPoint.toISOString()}`);
+        console.warn(`[soilMoistureGraph] Filter range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+      }
     }
 
     return {
@@ -827,6 +892,337 @@ const getFilteredData = () => {
 watch(() => props.dataType, () => {
   console.log(`[soilMoistureGraph] Data type changed to: ${props.dataType}. Fetching new data...`);
   fetchAllSensorData();
+});
+
+// Fullscreen functionality
+const toggleFullscreen = () => {
+  isFullscreen.value = !isFullscreen.value;
+  if (isFullscreen.value) {
+    // Wait for DOM to update, then create fullscreen chart
+    nextTick(() => {
+      createFullscreenChart();
+    });
+  }
+};
+
+// Create chart in fullscreen mode
+const createFullscreenChart = () => {
+  if (!fullscreenChartContainer.value) {
+    console.error("[soilMoistureGraph] fullscreenChartContainer ref is not available.");
+    return;
+  }
+
+  // Clear previous chart
+  if (fullscreenSvg.value) {
+    fullscreenSvg.value.remove();
+  }
+
+  // Use larger dimensions for fullscreen
+  const width = Math.min(window.innerWidth - 100, 1400);
+  const height = Math.min(window.innerHeight - 150, 800);
+  const marginTop = 20;
+  const marginRight = 30;
+  const marginBottom = 30;
+  const marginLeft = 40;
+
+  // Create SVG container
+  fullscreenSvg.value = d3.create("svg")
+    .attr("viewBox", [0, 0, width + 120, height])
+    .attr("width", width + 120)
+    .attr("height", height)
+    .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;")
+    .style("-webkit-tap-highlight-color", "transparent")
+    .style("overflow", "visible") as Selection<SVGSVGElement, unknown, null, undefined>;
+
+  if (!fullscreenSvg.value) return;
+
+  // Combine visible sensor data for domain calculation
+  const allData = sensors.value
+    .filter(sensor => props.sensorVisibility[sensor.name])
+    .flatMap(sensor => sensor.data);
+    
+  if (allData.length === 0) {
+    console.warn("[soilMoistureGraph] No data points available for fullscreen chart");
+    return;
+  }
+
+  let yMinActual = d3.min(allData, (d: DataPoint) => d.moisture) as number;
+  let yMaxActual = d3.max(allData, (d: DataPoint) => d.moisture) as number;
+
+  if (allData.length === 0 || yMinActual === undefined || yMaxActual === undefined) {
+    yMinActual = 0;
+    yMaxActual = 100;
+  }
+
+  const dataRange = yMaxActual - yMinActual;
+  let yDomainMinWithPadding = Math.max(0, yMinActual - (dataRange * 0.1));
+  let yDomainMaxWithPadding = Math.min(100, yMaxActual + (dataRange * 0.1));
+
+  // Create scales
+  const x = d3.scaleUtc()
+    .range([marginLeft, width - marginRight]);
+
+  let currentXDomain = d3.extent(allData, (d: DataPoint) => d.time) as [Date, Date];
+  if (!currentXDomain[0] || !currentXDomain[1]) {
+    const today = new Date();
+    currentXDomain = [today, d3.timeDay.offset(today, 1)];
+  } else if (currentXDomain[0].getTime() === currentXDomain[1].getTime()) {
+    const singleDate = currentXDomain[0];
+    currentXDomain = [d3.timeHour.offset(singleDate, -1), d3.timeHour.offset(singleDate, 1)];
+  }
+  x.domain(currentXDomain);
+
+  const y = d3.scaleLinear()
+    .domain([yDomainMinWithPadding, yDomainMaxWithPadding])
+    .range([height - marginBottom, marginTop]);
+
+  // Create line generator
+  const line = d3.line<DataPoint>()
+    .x(d => x(d.time))
+    .y(d => y(d.moisture));
+
+  // Add x-axis
+  const xAxisGroup = fullscreenSvg.value.append("g")
+    .attr("transform", `translate(0,${height - marginBottom})`);
+
+  let xAxis = d3.axisBottom(x);
+  let tickFormat: (date: Date) => string;
+
+  // Use same axis formatting logic as createChart
+  const timeRange = x.domain()[1].getTime() - x.domain()[0].getTime();
+  const isWithin24Hours = timeRange <= 24 * 60 * 60 * 1000;
+
+  if (props.dynamicTimeWindow === 'last24Hours') {
+    if (props.queryParams.resolution === 'weekly') {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a");
+    } else if (props.queryParams.resolution === 'monthly') {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%b %d");
+    } else {
+      xAxis.ticks(d3.timeHour.every(3));
+      tickFormat = d3.timeFormat("%I %p");
+    }
+  } else {
+    switch (props.queryParams.resolution) {
+      case 'monthly':
+        xAxis.ticks(d3.timeMonth.every(1));
+        tickFormat = d3.timeFormat("%b %Y");
+        break;
+      case 'weekly':
+        xAxis.ticks(d3.timeWeek.every(1));
+        tickFormat = d3.timeFormat("%b %d");
+        break;
+      case 'daily':
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%b %d");
+        break;
+      case 'hourly':
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%a %I %p");
+        break;
+      default:
+        xAxis.ticks(width / 80);
+        tickFormat = isWithin24Hours ? 
+          d3.timeFormat("%I:%M %p") : 
+          d3.timeFormat("%b %d");
+    }
+  }
+  xAxis.tickFormat(tickFormat as any);
+  xAxisGroup.call(xAxis);
+
+  // Add y-axis
+  fullscreenSvg.value.append("g")
+    .attr("transform", `translate(${marginLeft},0)`)
+    .call(d3.axisLeft(y).ticks(height / 40))
+    .call((g: Selection<SVGGElement, unknown, null, undefined>) => g.select(".domain").remove())
+    .call((g: Selection<SVGGElement, unknown, null, undefined>) => g.selectAll(".tick line").clone()
+      .attr("x2", width - marginLeft - marginRight)
+      .attr("stroke-opacity", 0.1))
+    .call((g: Selection<SVGGElement, unknown, null, undefined>) => g.append("text")
+      .attr("x", -marginLeft)
+      .attr("y", 10)
+      .attr("fill", "currentColor")
+      .attr("text-anchor", "start")
+      .text("↑ Soil Moisture (%)"));
+
+  // Create tooltip container for fullscreen
+  const fullscreenTooltip = fullscreenSvg.value.append("g")
+    .attr("class", "tooltip")
+    .style("display", "none");
+
+  // Add lines for each visible sensor
+  sensors.value.forEach((sensor) => {
+    if (!props.sensorVisibility[sensor.name] || sensor.data.length === 0) {
+      return;
+    }
+
+    const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
+    const color = colors[sensorColorIndex % colors.length];
+
+    const path = fullscreenSvg.value!.append("path")
+      .datum(sensor.data)
+      .attr("fill", "none")
+      .attr("stroke", color)
+      .attr("stroke-width", 2)
+      .attr("d", line);
+
+    // Add points
+    const points = fullscreenSvg.value!.append("g")
+      .attr("class", "points")
+      .selectAll("circle")
+      .data(sensor.data)
+      .join("circle")
+      .attr("cx", (d: DataPoint) => x(d.time))
+      .attr("cy", (d: DataPoint) => y(d.moisture))
+      .attr("r", 4)
+      .attr("fill", color)
+      .attr("stroke", "white")
+      .attr("stroke-width", 1.5)
+      .style("cursor", "pointer");
+
+    // Add hover effects
+    points.on("mouseenter", function() {
+      d3.select(this).attr("r", 6).attr("stroke-width", 2);
+    })
+    .on("mouseleave", function() {
+      d3.select(this).attr("r", 4).attr("stroke-width", 1.5);
+    });
+  });
+
+  // Add legend
+  const legend = fullscreenSvg.value.append("g")
+    .attr("font-family", "sans-serif")
+    .attr("font-size", 12)
+    .attr("text-anchor", "start")
+    .selectAll("g")
+    .data(sensors.value.filter(s => props.sensorVisibility[s.name]))
+    .join("g")
+    .attr("transform", (d: Sensor, i: number) => `translate(${width + 10},${marginTop + (i * 30)})`);
+
+  legend.append("rect")
+    .attr("width", 18)
+    .attr("height", 18)
+    .attr("fill", (d: Sensor) => {
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
+      return colors[sensorColorIndex % colors.length];
+    })
+    .attr("rx", 2);
+
+  legend.append("text")
+    .attr("x", 28)
+    .attr("y", 14)
+    .style("font-size", "14px")
+    .style("fill", "black")
+    .text((d: Sensor) => d.name.replace(/^Sensor\s+/i, ""));
+
+  // Add mouse interaction for tooltip
+  const bisect = d3.bisector<DataPoint, Date>(d => d.time).center;
+  
+  fullscreenSvg.value.on("pointermove", (event) => {
+    const visibleSensorsWithData = sensors.value.filter(s => props.sensorVisibility[s.name] && s.data.length > 0);
+    if (!fullscreenTooltip || visibleSensorsWithData.length === 0) {
+      return;
+    }
+
+    const pointer = d3.pointer(event);
+    const xPos = x.invert(pointer[0]);
+    const yPos = pointer[1];
+    
+    interface ClosestSensorData {
+      name: string;
+      value: number;
+      time: Date;
+      color: string;
+      distance: number;
+    }
+    
+    let closestSensorData: ClosestSensorData | null = null;
+    let minDistance = Infinity;
+    
+    for (const sensor of visibleSensorsWithData) {
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
+      const color = colors[sensorColorIndex % colors.length];
+
+      const index = bisect(sensor.data, xPos);
+      const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
+      if (!dataPoint) continue;
+
+      const pointX = x(dataPoint.time);
+      const pointY = y(dataPoint.moisture);
+      const distance = Math.sqrt(Math.pow(pointer[0] - pointX, 2) + Math.pow(yPos - pointY, 2));
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestSensorData = {
+          name: sensor.name,
+          value: dataPoint.moisture,
+          time: dataPoint.time,
+          color: color,
+          distance: distance
+        };
+      }
+    }
+
+    if (!closestSensorData) {
+      return;
+    }
+
+    fullscreenTooltip.style("display", null);
+    fullscreenTooltip.attr("transform", `translate(${pointer[0]},${pointer[1]})`);
+    fullscreenTooltip.selectAll("*").remove();
+
+    const tooltipGroup = fullscreenTooltip.append("g");
+    const data = closestSensorData;
+
+    tooltipGroup.append("rect")
+      .attr("x", -70)
+      .attr("y", -25)
+      .attr("width", 140)
+      .attr("height", 45)
+      .attr("fill", "white")
+      .attr("stroke", data.color)
+      .attr("stroke-width", 2)
+      .attr("rx", 4);
+
+    tooltipGroup.append("circle")
+      .attr("cx", -60)
+      .attr("cy", -5)
+      .attr("r", 6)
+      .attr("fill", data.color);
+
+    tooltipGroup.append("text")
+      .attr("x", -50)
+      .attr("y", -2)
+      .attr("fill", "black")
+      .attr("font-size", "12px")
+      .attr("font-weight", "bold")
+      .text(`${data.name}: ${formatValue(data.value, props.dataType)}`);
+
+    tooltipGroup.append("text")
+      .attr("x", -60)
+      .attr("y", 12)
+      .attr("fill", "#666")
+      .attr("font-size", "10px")
+      .text(formatDate(data.time));
+  })
+  .on("pointerleave", () => {
+    if (fullscreenTooltip) {
+      fullscreenTooltip.style("display", "none");
+    }
+  });
+
+  // Add the chart to the fullscreen container
+  fullscreenChartContainer.value.appendChild(fullscreenSvg.value!.node()!);
+};
+
+// Watch for fullscreen changes to recreate chart
+watch(isFullscreen, (newValue) => {
+  if (newValue && fullscreenChartContainer.value) {
+    nextTick(() => {
+      createFullscreenChart();
+    });
+  }
 });
 
 defineExpose({
@@ -889,5 +1285,87 @@ const emit = defineEmits(['showDroneImages']);
 
 .points circle {
   transition: r 0.2s, stroke-width 0.2s;
+}
+
+.graph-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.fullscreen-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #333;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.fullscreen-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.fullscreen-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 8px;
+  padding: 60px 40px 40px;
+}
+
+.close-fullscreen-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  color: #333;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2001;
+}
+
+.close-fullscreen-btn:hover {
+  background: rgba(0, 0, 0, 0.2);
+  color: #000;
+}
+
+.fullscreen-chart {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
 }
 </style>

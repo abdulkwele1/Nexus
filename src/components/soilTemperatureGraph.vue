@@ -1,6 +1,14 @@
 <template>
   <div class="soil-temperature-graph">
+    <div class="graph-header">
+      <button @click="toggleFullscreen" class="fullscreen-btn" title="Enlarge graph">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+      </button>
+    </div>
     <div ref="chartContainer"></div>
+    <!-- Vue tooltip only for drone indicators -->
     <div 
       v-if="activeTooltip" 
       class="tooltip-container"
@@ -11,11 +19,24 @@
         <div class="tooltip-value">{{ tooltipData.value }}</div>
       </div>
     </div>
+    
+    <!-- Fullscreen modal -->
+    <div v-if="isFullscreen" class="fullscreen-modal" @click.self="toggleFullscreen">
+      <div class="fullscreen-content">
+        <button @click="toggleFullscreen" class="close-fullscreen-btn" title="Close">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        <div ref="fullscreenChartContainer" class="fullscreen-chart"></div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineExpose, computed } from 'vue';
+import { ref, onMounted, watch, defineExpose, computed, nextTick } from 'vue';
 import * as d3 from 'd3';
 import { useNexusStore } from '@/stores/nexus';
 
@@ -37,6 +58,14 @@ interface Sensor {
   name: string;
 }
 
+interface ClosestSensorData {
+  name: string;
+  value: number;
+  time: Date;
+  color: string;
+  distance: number;
+}
+
 interface Props {
   queryParams: {
     startDate: string;
@@ -55,8 +84,11 @@ interface Props {
 const props = defineProps<Props>();
 
 const chartContainer = ref<HTMLElement | null>(null);
+const fullscreenChartContainer = ref<HTMLElement | null>(null);
 const svg = ref<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
+const fullscreenSvg = ref<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
 const tooltip = ref<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
+const isFullscreen = ref(false);
 
 // Add new refs for tooltip
 const activeTooltip = ref(false);
@@ -472,30 +504,15 @@ const createChart = () => {
       .style("cursor", "pointer")
       .style("pointer-events", "all");
 
-    // Add hover effects for points
+    // Add hover effects for points - just visual feedback, no Vue tooltip
     points.on("mouseenter", function(event: MouseEvent, d: DataPoint) {
       const point = d3.select(this);
       point.attr("r", 5).attr("stroke-width", 2);
-
-      // Update tooltip data
-      tooltipData.value = {
-        date: formatDate(d.time),
-        value: formatValue(d.temperature)
-      };
-
-      // Position tooltip
-      const rect = chartContainer.value!.getBoundingClientRect();
-      tooltipStyle.value = {
-        left: `${event.clientX - rect.left + 10}px`,
-        top: `${event.clientY - rect.top - 10}px`
-      };
-
-      activeTooltip.value = true;
+      // Don't show Vue tooltip - let SVG tooltip handle it
     })
     .on("mouseleave", function() {
       const point = d3.select(this);
       point.attr("r", 3).attr("stroke-width", 1);
-      activeTooltip.value = false;
     });
 
     // Add hover effect for the line
@@ -620,11 +637,19 @@ const createChart = () => {
 
         // Add hover effect
         indicator
-          .on("mouseenter", function(event) {
+          .on("mouseenter", function(event: MouseEvent) {
+            // Stop event propagation to prevent SVG tooltip from showing
+            event.stopPropagation();
+            
             d3.select(this)
               .transition()
               .duration(200)
               .attr("transform", `translate(${xPos}, ${marginTop}) scale(1.2)`);
+
+            // Hide D3 SVG tooltip when Vue tooltip is active
+            if (tooltip.value) {
+              tooltip.value.style("display", "none");
+            }
 
             // Update tooltip
             tooltipData.value = {
@@ -648,6 +673,10 @@ const createChart = () => {
 
             activeTooltip.value = false;
           })
+          .on("pointermove", function(event: PointerEvent) {
+            // Stop event propagation to prevent SVG tooltip from showing when moving over drone indicators
+            event.stopPropagation();
+          })
           .on("click", () => {
             // Emit event to parent to show drone images for this date
             emit('showDroneImages', imageData.date);
@@ -663,78 +692,124 @@ const createChart = () => {
   const bisect = d3.bisector<DataPoint, Date>(d => d.time).center;
   
   svg.value!.on("pointermove", (event) => {
+    // Hide Vue tooltip when D3 SVG tooltip is active
+    if (activeTooltip.value) {
+      activeTooltip.value = false;
+    }
+
     const visibleSensorsWithData = sensors.value.filter(s => props.sensorVisibility[s.name] && s.data.length > 0);
     if (!tooltip.value || visibleSensorsWithData.length === 0) {
-      if (tooltip.value) tooltip.value.style("display", "none");
+      // Keep tooltip visible if it was already shown
       return;
     }
 
     const pointer = d3.pointer(event);
     const xPos = x.invert(pointer[0]);
+    const yPos = pointer[1];
     
-    const tooltipData = visibleSensorsWithData
-      .map((sensor) => {
-        const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
-        const color = colors[sensorColorIndex % colors.length];
+    // Find the closest sensor line to the mouse pointer
+    let closestSensorData: ClosestSensorData | null = null;
+    let minDistance = Infinity;
+    
+    for (const sensor of visibleSensorsWithData) {
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
+      const color = colors[sensorColorIndex % colors.length];
 
-        const index = bisect(sensor.data, xPos);
-        const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
-        if (!dataPoint) return null;
+      const index = bisect(sensor.data, xPos);
+      const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
+      if (!dataPoint) continue;
 
-        return {
+      // Calculate distance from mouse to this sensor's data point
+      const pointX = x(dataPoint.time);
+      const pointY = y(celsiusToFahrenheit(dataPoint.temperature));
+      const distance = Math.sqrt(Math.pow(pointer[0] - pointX, 2) + Math.pow(yPos - pointY, 2));
+      
+      // Track the closest sensor
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestSensorData = {
           name: sensor.name,
           value: dataPoint.temperature,
           time: dataPoint.time,
-          color: color
+          color: color,
+          distance: distance
         };
-      }).filter(item => item !== null);
+      }
+    }
 
-    // Show tooltip
+    // Always show tooltip when mouse is over the graph, even if no closest sensor found
+    // (this keeps the last tooltip visible until cursor moves away)
+    if (!closestSensorData) {
+      // Keep tooltip visible but don't update it
+      return;
+    }
+
+    // Show tooltip with only the closest sensor
     tooltip.value.style("display", null);
     tooltip.value.attr("transform", `translate(${pointer[0]},${pointer[1]})`);
 
-    // Update tooltip content
-    const tooltipContent = tooltip.value.selectAll("g")
-      .data(tooltipData)
-      .join("g")
-      .attr("transform", (d, i) => `translate(0,${i * 20})`);
+    // Clear previous content
+    tooltip.value.selectAll("*").remove();
 
-    tooltipContent.selectAll("rect")
-      .data(d => [d])
-      .join("rect")
-      .attr("x", -60)
-      .attr("y", -15)
-      .attr("width", 120)
-      .attr("height", 20)
+    // Create tooltip content group
+    const tooltipGroup = tooltip.value.append("g");
+
+    // Use closestSensorData directly (already null-checked above)
+    const data = closestSensorData;
+
+    tooltipGroup.append("rect")
+      .attr("x", -70)
+      .attr("y", -25)
+      .attr("width", 140)
+      .attr("height", 45)
       .attr("fill", "white")
-      .attr("stroke", "black")
-      .attr("stroke-width", 0.5);
+      .attr("stroke", data.color)
+      .attr("stroke-width", 2)
+      .attr("rx", 4);
 
-    tooltipContent.selectAll("text")
-      .data(d => [d])
-      .join("text")
-      .attr("fill", d => d.color)
-      .selectAll("tspan")
-      .data(d_text => [
-        `${d_text.name}: ${formatValue(d_text.value)}`,
-        formatDate(d_text.time)
-      ])
-      .join("tspan")
-      .attr("x", -55)
-      .attr("dy", (d_tspan, i_tspan) => i_tspan === 0 ? "-0.1em" : "1.2em")
-      .text(d_tspan => d_tspan);
+    // Add colored circle icon
+    tooltipGroup.append("circle")
+      .attr("cx", -60)
+      .attr("cy", -5)
+      .attr("r", 6)
+      .attr("fill", data.color);
+
+    // Add sensor name and value
+    tooltipGroup.append("text")
+      .attr("x", -50)
+      .attr("y", -2)
+      .attr("fill", "black")
+      .attr("font-size", "12px")
+      .attr("font-weight", "bold")
+      .text(`${data.name}: ${formatValue(data.value)}`);
+
+    // Add date
+    tooltipGroup.append("text")
+      .attr("x", -60)
+      .attr("y", 12)
+      .attr("fill", "#666")
+      .attr("font-size", "10px")
+      .text(formatDate(data.time));
   })
   .on("pointerleave", () => {
+    // Only hide tooltip when cursor actually leaves the graph area
     if (tooltip.value) {
       tooltip.value.style("display", "none");
     }
   });
 };
 
-// Add watch for queryParams
-watch(() => props.queryParams, (newParams) => {
+// Add watch for queryParams - re-fetch data when date range changes
+watch(() => props.queryParams, (newParams, oldParams) => {
   console.log(`[TEMP_GRAPH] Query params changed. New resolution: ${newParams.resolution}`);
-  processAndDrawChart();
+  // Re-fetch data if startDate or endDate changed (not just resolution)
+  if (oldParams && (newParams.startDate !== oldParams.startDate || newParams.endDate !== oldParams.endDate)) {
+    console.log(`[TEMP_GRAPH] Date range changed, re-fetching all sensor data...`);
+    fetchAllSensorData();
+  } else {
+    // Just re-process existing data if only resolution or other params changed
+    processAndDrawChart();
+  }
 }, { deep: true });
 
 // Add watch for sensorVisibility prop
@@ -745,8 +820,8 @@ watch(() => props.sensorVisibility, () => {
 
 // Watch for dynamicTimeWindow prop
 watch(() => props.dynamicTimeWindow, () => {
-  console.log(`[TEMP_GRAPH] dynamicTimeWindow prop changed to: ${props.dynamicTimeWindow}. Triggering chart processing...`);
-  processAndDrawChart();
+  console.log(`[TEMP_GRAPH] dynamicTimeWindow prop changed to: ${props.dynamicTimeWindow}. Re-fetching all sensor data...`);
+  fetchAllSensorData();
 });
 
 // Add data aggregation function
@@ -807,8 +882,17 @@ const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'dai
 
     console.log(`[TEMP_GRAPH] Aggregated ${sensor.data.length} points into ${sortedGroups.length} points for sensor ${sensor.name}`);
     if (sortedGroups.length > 0) {
-      console.log(`[TEMP_GRAPH] First aggregated point:`, sortedGroups[0]);
-      console.log(`[TEMP_GRAPH] Last aggregated point:`, sortedGroups[sortedGroups.length - 1]);
+      console.log(`[TEMP_GRAPH] First aggregated point: ${sortedGroups[0].time.toISOString()} = ${sortedGroups[0].temperature}`);
+      console.log(`[TEMP_GRAPH] Last aggregated point: ${sortedGroups[sortedGroups.length - 1].time.toISOString()} = ${sortedGroups[sortedGroups.length - 1].temperature}`);
+      // Log missing days for daily aggregation to help debug
+      if (resolution === 'daily' && sortedGroups.length > 0) {
+        const firstDay = d3.timeDay.floor(sortedGroups[0].time);
+        const lastDay = d3.timeDay.floor(sortedGroups[sortedGroups.length - 1].time);
+        const expectedDays = Math.ceil((lastDay.getTime() - firstDay.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+        if (sortedGroups.length < expectedDays) {
+          console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: Expected ${expectedDays} days but only have ${sortedGroups.length} days with data (missing ${expectedDays - sortedGroups.length} days)`);
+        }
+      }
     }
 
     return { ...sensor, data: sortedGroups };
@@ -850,7 +934,8 @@ const filterData = (params: Props['queryParams']) => {
           start7Days.setMonth(now.getMonth() - 2);
           start7Days.setDate(1); // Start from the beginning of the month
         } else {
-          start7Days.setDate(now.getDate() - 6);
+          // Go back 7 days (not 6) to include today + 6 previous days = 7 days total
+          start7Days.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
         start7Days.setHours(0, 0, 0, 0);
         filterRangeStart = start7Days;
@@ -862,7 +947,8 @@ const filterData = (params: Props['queryParams']) => {
           start30Days.setMonth(now.getMonth() - 2);
           start30Days.setDate(1); // Start from the beginning of the month
         } else {
-          start30Days.setDate(now.getDate() - 29);
+          // Go back 30 days (not 29) to include today + 29 previous days = 30 days total
+          start30Days.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         }
         start30Days.setHours(0, 0, 0, 0);
         filterRangeStart = start30Days;
@@ -892,23 +978,44 @@ const filterData = (params: Props['queryParams']) => {
     console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: Filtering ${initialPoints} points...`);
 
     const sensorFilteredData = sensor.data.filter(point => {
-      const date = point.time;
+      const date = point.time; // This is already a Date object from UTC timestamp
       const temperature = point.temperature;
+      
+      // Compare using getTime() for precise UTC timestamp comparison
+      const pointTime = date.getTime();
+      const startTime = filterRangeStart.getTime();
+      const endTime = filterRangeEnd.getTime();
       
       let inTimeRange;
       if (useInclusiveEnd) {
-        inTimeRange = date >= filterRangeStart && date <= filterRangeEnd;
+        inTimeRange = pointTime >= startTime && pointTime <= endTime;
       } else {
-        inTimeRange = date >= filterRangeStart && date < filterRangeEnd;
+        inTimeRange = pointTime >= startTime && pointTime < endTime;
       }
       
       const isAboveMinTemp = temperature >= minTemperature;
       const isBelowMaxTemp = temperature <= maxTemperature;
       
+      if (props.dynamicTimeWindow === 'lastHour') {
+        console.log(`[TEMP_GRAPH] Point time: ${date.toISOString()} (${date.toLocaleString()} local), Filter: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}, inRange: ${inTimeRange}, value: ${temperature}`);
+      }
+      
       return inTimeRange && isAboveMinTemp && isBelowMaxTemp;
     });
 
     console.log(`[TEMP_GRAPH] Sensor ${sensor.name}: ${initialPoints} points -> ${sensorFilteredData.length} points after filtering`);
+    console.log(`[TEMP_GRAPH] Filter range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+    if (sensorFilteredData.length > 0) {
+      console.log(`[TEMP_GRAPH] First filtered point: ${sensorFilteredData[0].time.toISOString()}, Last filtered point: ${sensorFilteredData[sensorFilteredData.length - 1].time.toISOString()}`);
+    } else if (initialPoints > 0) {
+      console.warn(`[TEMP_GRAPH] Sensor ${sensor.name}: Had ${initialPoints} points but none matched the filter range!`);
+      if (initialPoints > 0) {
+        const firstPoint = sensor.data[0].time;
+        const lastPoint = sensor.data[initialPoints - 1].time;
+        console.warn(`[TEMP_GRAPH] Data range: ${firstPoint.toISOString()} to ${lastPoint.toISOString()}`);
+        console.warn(`[TEMP_GRAPH] Filter range: ${filterRangeStart.toISOString()} to ${filterRangeEnd.toISOString()}`);
+      }
+    }
     return {
       ...sensor,
       data: sensorFilteredData
@@ -953,6 +1060,336 @@ watch(() => props.dynamicTimeWindow, (newWindow) => {
   if (props.dataType === 'temperature') {
     console.log('[TEMP_GRAPH] Refetching data for new time window');
     fetchAllSensorData();
+  }
+});
+
+// Fullscreen functionality
+const toggleFullscreen = () => {
+  isFullscreen.value = !isFullscreen.value;
+  if (isFullscreen.value) {
+    // Wait for DOM to update, then create fullscreen chart
+    nextTick(() => {
+      createFullscreenChart();
+    });
+  }
+};
+
+// Create chart in fullscreen mode
+const createFullscreenChart = () => {
+  if (!fullscreenChartContainer.value) {
+    console.error("[TEMP_GRAPH] fullscreenChartContainer ref is not available.");
+    return;
+  }
+
+  // Clear previous chart
+  if (fullscreenSvg.value) {
+    fullscreenSvg.value.remove();
+  }
+
+  // Use larger dimensions for fullscreen
+  const width = Math.min(window.innerWidth - 100, 1400);
+  const height = Math.min(window.innerHeight - 150, 800);
+  const marginTop = 20;
+  const marginRight = 30;
+  const marginBottom = 30;
+  const marginLeft = 40;
+
+  // Create SVG container
+  fullscreenSvg.value = d3.create("svg")
+    .attr("viewBox", [0, 0, width + 120, height])
+    .attr("width", width + 120)
+    .attr("height", height)
+    .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;")
+    .style("-webkit-tap-highlight-color", "transparent")
+    .style("overflow", "visible") as d3.Selection<SVGSVGElement, unknown, null, undefined>;
+
+  if (!fullscreenSvg.value) return;
+
+  // Use the same chart creation logic but with fullscreen container
+  // We'll reuse the createChart logic but adapt it for fullscreen
+  const allData = sensors.value
+    .filter(sensor => props.sensorVisibility[sensor.name])
+    .flatMap(sensor => sensor.data);
+    
+  if (allData.length === 0) {
+    console.warn("[TEMP_GRAPH] No data points available for fullscreen chart");
+    return;
+  }
+
+  // Convert Celsius to Fahrenheit for display
+  const fahrenheitData = allData.map(d => ({
+    ...d,
+    temperature: celsiusToFahrenheit(d.temperature)
+  }));
+
+  let yMinActual = d3.min(fahrenheitData, d => d.temperature) as number;
+  let yMaxActual = d3.max(fahrenheitData, d => d.temperature) as number;
+
+  if (fahrenheitData.length === 0 || yMinActual === undefined || yMaxActual === undefined) {
+    yMinActual = 32;
+    yMaxActual = 122;
+  }
+
+  const dataRange = yMaxActual - yMinActual;
+  let yDomainMinWithPadding = Math.max(14, yMinActual - (dataRange * 0.1));
+  let yDomainMaxWithPadding = Math.min(122, yMaxActual + (dataRange * 0.1));
+
+  // Create scales
+  const x = d3.scaleUtc()
+    .range([marginLeft, width - marginRight]);
+
+  let currentXDomain = d3.extent(allData, d => d.time) as [Date, Date];
+  if (!currentXDomain[0] || !currentXDomain[1]) {
+    const today = new Date();
+    currentXDomain = [today, d3.timeDay.offset(today, 1)];
+  } else if (currentXDomain[0].getTime() === currentXDomain[1].getTime()) {
+    const singleDate = currentXDomain[0];
+    currentXDomain = [d3.timeHour.offset(singleDate, -1), d3.timeHour.offset(singleDate, 1)];
+  }
+  x.domain(currentXDomain);
+
+  const y = d3.scaleLinear()
+    .domain([yDomainMinWithPadding, yDomainMaxWithPadding])
+    .range([height - marginBottom, marginTop]);
+
+  // Create line generator
+  const line = d3.line<DataPoint>()
+    .x(d => x(d.time))
+    .y(d => y(celsiusToFahrenheit(d.temperature)));
+
+  // Add x-axis
+  const xAxisGroup = fullscreenSvg.value.append("g")
+    .attr("transform", `translate(0,${height - marginBottom})`);
+
+  let xAxis = d3.axisBottom(x);
+  let tickFormat: (date: Date) => string;
+
+  // Use same axis formatting logic as createChart
+  const timeRange = x.domain()[1].getTime() - x.domain()[0].getTime();
+  const isWithin24Hours = timeRange <= 24 * 60 * 60 * 1000;
+
+  if (props.dynamicTimeWindow === 'last24Hours') {
+    if (props.queryParams.resolution === 'weekly') {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%a");
+    } else if (props.queryParams.resolution === 'monthly') {
+      xAxis.ticks(d3.timeDay.every(1));
+      tickFormat = d3.timeFormat("%b %d");
+    } else {
+      xAxis.ticks(d3.timeHour.every(3));
+      tickFormat = d3.timeFormat("%I %p");
+    }
+  } else {
+    switch (props.queryParams.resolution) {
+      case 'monthly':
+        xAxis.ticks(d3.timeMonth.every(1));
+        tickFormat = d3.timeFormat("%b %Y");
+        break;
+      case 'weekly':
+        xAxis.ticks(d3.timeWeek.every(1));
+        tickFormat = d3.timeFormat("%b %d");
+        break;
+      case 'daily':
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%b %d");
+        break;
+      case 'hourly':
+        xAxis.ticks(d3.timeDay.every(1));
+        tickFormat = d3.timeFormat("%a %I %p");
+        break;
+      default:
+        xAxis.ticks(width / 80);
+        tickFormat = isWithin24Hours ? 
+          d3.timeFormat("%I:%M %p") : 
+          d3.timeFormat("%b %d");
+    }
+  }
+  xAxis.tickFormat(tickFormat as any);
+  xAxisGroup.call(xAxis);
+
+  // Add y-axis
+  fullscreenSvg.value.append("g")
+    .attr("transform", `translate(${marginLeft},0)`)
+    .call(d3.axisLeft(y).ticks(height / 40))
+    .call(g => g.select(".domain").remove())
+    .call(g => g.selectAll(".tick line").clone()
+      .attr("x2", width - marginLeft - marginRight)
+      .attr("stroke-opacity", 0.1))
+    .call(g => g.append("text")
+      .attr("x", -marginLeft)
+      .attr("y", 10)
+      .attr("fill", "currentColor")
+      .attr("text-anchor", "start")
+      .text("↑ Soil Temperature (°F)"));
+
+  // Create tooltip container for fullscreen
+  const fullscreenTooltip = fullscreenSvg.value.append("g")
+    .attr("class", "tooltip")
+    .style("display", "none");
+
+  // Add lines for each visible sensor
+  sensors.value.forEach((sensor, i) => {
+    if (!props.sensorVisibility[sensor.name] || sensor.data.length === 0) {
+      return;
+    }
+
+    const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
+    const color = colors[sensorColorIndex % colors.length];
+
+    const path = fullscreenSvg.value!.append("path")
+      .datum(sensor.data)
+      .attr("fill", "none")
+      .attr("stroke", color)
+      .attr("stroke-width", 2)
+      .attr("d", line);
+
+    // Add points
+    const points = fullscreenSvg.value!.append("g")
+      .attr("class", "points")
+      .selectAll("circle")
+      .data(sensor.data)
+      .join("circle")
+      .attr("cx", d => x(d.time))
+      .attr("cy", d => y(celsiusToFahrenheit(d.temperature)))
+      .attr("r", 4)
+      .attr("fill", color)
+      .attr("stroke", "white")
+      .attr("stroke-width", 1.5)
+      .style("cursor", "pointer");
+
+    // Add hover effects
+    points.on("mouseenter", function() {
+      d3.select(this).attr("r", 6).attr("stroke-width", 2);
+    })
+    .on("mouseleave", function() {
+      d3.select(this).attr("r", 4).attr("stroke-width", 1.5);
+    });
+  });
+
+  // Add legend
+  const legend = fullscreenSvg.value.append("g")
+    .attr("font-family", "sans-serif")
+    .attr("font-size", 12)
+    .attr("text-anchor", "start")
+    .selectAll("g")
+    .data(sensors.value.filter(s => props.sensorVisibility[s.name]))
+    .join("g")
+    .attr("transform", (d: Sensor, i: number) => `translate(${width + 10},${marginTop + (i * 30)})`);
+
+  legend.append("rect")
+    .attr("width", 18)
+    .attr("height", 18)
+    .attr("fill", (d: Sensor) => {
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === d.name);
+      return colors[sensorColorIndex % colors.length];
+    })
+    .attr("rx", 2);
+
+  legend.append("text")
+    .attr("x", 28)
+    .attr("y", 14)
+    .style("font-size", "14px")
+    .style("fill", "black")
+    .text((d: Sensor) => d.name.replace(/^Sensor\s+/i, ""));
+
+  // Add mouse interaction for tooltip (similar to main chart)
+  const bisect = d3.bisector<DataPoint, Date>(d => d.time).center;
+  
+  fullscreenSvg.value.on("pointermove", (event) => {
+    const visibleSensorsWithData = sensors.value.filter(s => props.sensorVisibility[s.name] && s.data.length > 0);
+    if (!fullscreenTooltip || visibleSensorsWithData.length === 0) {
+      return;
+    }
+
+    const pointer = d3.pointer(event);
+    const xPos = x.invert(pointer[0]);
+    const yPos = pointer[1];
+    
+    let closestSensorData: ClosestSensorData | null = null;
+    let minDistance = Infinity;
+    
+    for (const sensor of visibleSensorsWithData) {
+      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
+      const color = colors[sensorColorIndex % colors.length];
+
+      const index = bisect(sensor.data, xPos);
+      const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
+      if (!dataPoint) continue;
+
+      const pointX = x(dataPoint.time);
+      const pointY = y(celsiusToFahrenheit(dataPoint.temperature));
+      const distance = Math.sqrt(Math.pow(pointer[0] - pointX, 2) + Math.pow(yPos - pointY, 2));
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestSensorData = {
+          name: sensor.name,
+          value: dataPoint.temperature,
+          time: dataPoint.time,
+          color: color,
+          distance: distance
+        };
+      }
+    }
+
+    if (!closestSensorData) {
+      return;
+    }
+
+    fullscreenTooltip.style("display", null);
+    fullscreenTooltip.attr("transform", `translate(${pointer[0]},${pointer[1]})`);
+    fullscreenTooltip.selectAll("*").remove();
+
+    const tooltipGroup = fullscreenTooltip.append("g");
+    const data = closestSensorData;
+
+    tooltipGroup.append("rect")
+      .attr("x", -70)
+      .attr("y", -25)
+      .attr("width", 140)
+      .attr("height", 45)
+      .attr("fill", "white")
+      .attr("stroke", data.color)
+      .attr("stroke-width", 2)
+      .attr("rx", 4);
+
+    tooltipGroup.append("circle")
+      .attr("cx", -60)
+      .attr("cy", -5)
+      .attr("r", 6)
+      .attr("fill", data.color);
+
+    tooltipGroup.append("text")
+      .attr("x", -50)
+      .attr("y", -2)
+      .attr("fill", "black")
+      .attr("font-size", "12px")
+      .attr("font-weight", "bold")
+      .text(`${data.name}: ${formatValue(data.value)}`);
+
+    tooltipGroup.append("text")
+      .attr("x", -60)
+      .attr("y", 12)
+      .attr("fill", "#666")
+      .attr("font-size", "10px")
+      .text(formatDate(data.time));
+  })
+  .on("pointerleave", () => {
+    if (fullscreenTooltip) {
+      fullscreenTooltip.style("display", "none");
+    }
+  });
+
+  // Add the chart to the fullscreen container
+  fullscreenChartContainer.value.appendChild(fullscreenSvg.value!.node()!);
+};
+
+// Watch for fullscreen changes to recreate chart
+watch(isFullscreen, (newValue) => {
+  if (newValue && fullscreenChartContainer.value) {
+    nextTick(() => {
+      createFullscreenChart();
+    });
   }
 });
 
@@ -1019,5 +1456,87 @@ const emit = defineEmits(['showDroneImages']);
 
 .points circle {
   transition: r 0.2s, stroke-width 0.2s;
+}
+
+.graph-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.fullscreen-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #333;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.fullscreen-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.fullscreen-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 8px;
+  padding: 60px 40px 40px;
+}
+
+.close-fullscreen-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  color: #333;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2001;
+}
+
+.close-fullscreen-btn:hover {
+  background: rgba(0, 0, 0, 0.2);
+  color: #000;
+}
+
+.fullscreen-chart {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
 }
 </style> 

@@ -55,7 +55,6 @@
           <button @click="setTimeRange('24h')">Last 24 Hours</button>
           <button @click="setTimeRange('7d')">Last 7 Days</button>
           <button @click="setTimeRange('30d')">Last 30 Days</button>
-          <button @click="resetToDefault" class="reset-btn">Reset to Default</button>
         </div>
       </div>
 
@@ -300,11 +299,15 @@ const getDayWithSuffix = (day: number): string => {
 };
 
 // --- New logic for default date check ---
-const initialDefaultDateString = toLocalDateString(new Date()); // Store today's date string at component setup
+// Store initial default dates for "last 24 hours" at component setup
+const nowForDefault = new Date();
+const last24HoursStartForDefault = new Date(nowForDefault.getTime() - 24 * 60 * 60 * 1000);
+const initialDefaultStartDateString = toLocalDateString(last24HoursStartForDefault);
+const initialDefaultEndDateString = toLocalDateString(nowForDefault);
 // --- End new logic ---
 
 // --- Add dynamicTimeWindow ---
-const dynamicTimeWindow = ref<'none' | 'lastHour' | 'last24Hours' | 'last7Days' | 'last30Days'>('none');
+const dynamicTimeWindow = ref<'none' | 'lastHour' | 'last24Hours' | 'last7Days' | 'last30Days'>('last24Hours');
 // --- End Add dynamicTimeWindow ---
 
 // Real-time data setup
@@ -491,15 +494,24 @@ onMounted(async () => {
   }, 1000);
 
   // Initial battery data fetch and setup periodic updates
-  await updateAllBatteryLevels();
-  batteryUpdateInterval.value = setInterval(updateAllBatteryLevels, 60000); // Update every minute
+  // Check for today's data first, then fall back to last 30 days
+  await updateAllBatteryLevels(true);
+  lastBatteryCheckDate.value = toLocalDateString(new Date());
+  
+  // Update every minute (for real-time updates)
+  batteryUpdateInterval.value = setInterval(() => {
+    updateAllBatteryLevels(false); // Regular check, don't prioritize today
+  }, 60000);
+  
+  // Setup daily check at midnight to refresh battery data for new day
+  setupDailyBatteryCheck();
 
   // Listen for sensor updates from other components
   window.addEventListener('sensorsUpdated', async () => {
     console.log('[sensors.vue] Sensors updated event received, refreshing sensor list...');
     await fetchSensors();
-    // Also refresh battery data for the new sensors
-    await updateAllBatteryLevels();
+    // Also refresh battery data for the new sensors, prioritizing today's data
+    await updateAllBatteryLevels(true);
   });
 
   const fetchAndUpdateRealtimeSensor = async () => {
@@ -589,6 +601,9 @@ onUnmounted(() => {
   if (batteryUpdateInterval.value) {
     clearInterval(batteryUpdateInterval.value);
   }
+  if (dailyBatteryCheckInterval.value) {
+    clearInterval(dailyBatteryCheckInterval.value);
+  }
 
   // Remove scroll listener
   window.removeEventListener('scroll', handleScroll);
@@ -597,7 +612,7 @@ onUnmounted(() => {
   window.removeEventListener('sensorsUpdated', async () => {
     console.log('[sensors.vue] Sensors updated event received, refreshing sensor list...');
     await fetchSensors();
-    await updateAllBatteryLevels();
+    await updateAllBatteryLevels(true); // Prioritize today's data when sensors are updated
   });
 });
 
@@ -634,17 +649,23 @@ const sensorTypeIndex = ref(initialSensorTypeIndex >= 0 ? initialSensorTypeIndex
 // --- End Sensor Types for Slider ---
 
 // Initialize query params for both types
+// Initialize with "last 24 hours" default
+const now = new Date();
+const last24HoursStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+const initialStartDate = toLocalDateString(last24HoursStart);
+const initialEndDate = toLocalDateString(now);
+
 const moistureQueryParams = ref<QueryParams>({
-  startDate: initialDefaultDateString,
-  endDate: initialDefaultDateString,
+  startDate: initialStartDate,
+  endDate: initialEndDate,
   minValue: 0,
   maxValue: 100,
   resolution: defaultResolutionValue as QueryParams['resolution']
 });
 
 const temperatureQueryParams = ref<QueryParams>({
-  startDate: initialDefaultDateString,
-  endDate: initialDefaultDateString,
+  startDate: initialStartDate,
+  endDate: initialEndDate,
   minValue: -10,
   maxValue: 50,
   resolution: defaultResolutionValue as QueryParams['resolution']
@@ -754,13 +775,13 @@ watch(sensorTypeIndex, (newIndex) => {
 });
 
 // --- New logic for default date check ---
-// Computed properties to check if the current value matches the INITIAL default
+// Computed properties to check if the current value matches the INITIAL default (last 24 hours)
 const isStartDateInitialDefault = computed(() => {
-  return queryParams.value.startDate === initialDefaultDateString;
+  return queryParams.value.startDate === initialDefaultStartDateString;
 });
 
 const isEndDateInitialDefault = computed(() => {
-  return queryParams.value.endDate === initialDefaultDateString;
+  return queryParams.value.endDate === initialDefaultEndDateString;
 });
 // --- End new logic ---
 
@@ -785,13 +806,13 @@ const setTimeRange = (range: string) => {
       break;
     case '7d':
       dynamicTimeWindow.value = 'last7Days';
-      start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000); 
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); 
       end = now;
       newResolution = 'daily';
       break;
     case '30d':
       dynamicTimeWindow.value = 'last30Days';
-      start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000); 
+      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); 
       end = now;
       newResolution = 'daily';
       break;
@@ -972,47 +993,6 @@ const currentSensorType = computed(() => {
   return sensorTypeOptions[sensorTypeIndex.value].value as 'moisture' | 'temperature';
 });
 
-// Add the resetToDefault function in the script section
-const resetToDefault = () => {
-  const now = new Date();
-  const todayStr = toLocalDateString(now);
-  
-  // Reset to default state
-  dynamicTimeWindow.value = 'none';
-  
-  // Reset query params to default values
-  const defaultQueryParams: QueryParams = {
-    startDate: todayStr,
-    endDate: todayStr,
-    minValue: currentSensorType.value === 'moisture' ? 0 : -10,
-    maxValue: currentSensorType.value === 'moisture' ? 100 : 50,
-    resolution: 'hourly' as const // Default to hourly resolution
-  };
-
-  // Update the appropriate query params based on sensor type
-  if (currentSensorType.value === 'moisture') {
-    moistureQueryParams.value = defaultQueryParams;
-  } else {
-    temperatureQueryParams.value = defaultQueryParams;
-  }
-
-  // Reset resolution index to hourly
-  const hourlyIndex = resolutionOptions.findIndex(opt => opt.value === 'hourly');
-  if (hourlyIndex !== -1) {
-    resolutionIndex.value = hourlyIndex;
-  }
-
-  // Trigger graph update
-  nextTick(() => {
-    const currentGraph = currentSensorType.value === 'moisture' 
-      ? moistureGraphComponent.value 
-      : temperatureGraphComponent.value;
-    
-    if (currentGraph) {
-      currentGraph.fetchAllSensorData();
-    }
-  });
-};
 
 // Add battery level tracking
 interface BatteryStatus {
@@ -1022,6 +1002,8 @@ interface BatteryStatus {
 
 const batteryLevels = ref<{ [key: string]: BatteryStatus }>({});
 const batteryUpdateInterval = ref<number>();
+const lastBatteryCheckDate = ref<string | null>(null);
+const dailyBatteryCheckInterval = ref<number>();
 
 // Battery level helper functions
 const getBatteryLevelClass = (level: number | undefined) => {
@@ -1061,11 +1043,48 @@ const formatLastUpdated = (date: Date | undefined) => {
 };
 
 // Function to fetch battery data for a sensor
-const fetchBatteryData = async (sensorId: string) => {
+const fetchBatteryData = async (sensorId: string, prioritizeToday: boolean = false) => {
   try {
-    // Use dynamic dates - last 30 days to today
     const endDate = new Date();
-    const startDate = new Date();
+    let startDate = new Date();
+    
+    // If prioritizing today, first check for today's data specifically
+    if (prioritizeToday) {
+      const todayStr = toLocalDateString(endDate);
+      const todayStart = new Date(todayStr + 'T00:00:00');
+      const todayEnd = new Date(todayStr + 'T23:59:59');
+      
+      console.log(`[sensors.vue] Checking for today's battery data for sensor ${sensorId} (${todayStr})`);
+      
+      const todayResponse = await nexusStore.user.getSensorBatteryData(
+        sensorId, 
+        toLocalDateString(todayStart), 
+        toLocalDateString(todayEnd)
+      );
+      
+      // If we have data for today, use it
+      if (todayResponse?.battery_level_data && Array.isArray(todayResponse.battery_level_data) && todayResponse.battery_level_data.length > 0) {
+        const sortedTodayData = [...todayResponse.battery_level_data].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        
+        const latestTodayReading = sortedTodayData[0];
+        console.log(`[sensors.vue] Found today's battery reading for sensor ${sensorId}:`, latestTodayReading);
+        
+        batteryLevels.value[sensorId] = {
+          level: latestTodayReading.battery_level,
+          lastUpdated: new Date(latestTodayReading.date)
+        };
+        
+        console.log(`[sensors.vue] Updated battery level for sensor ${sensorId} with today's data:`, batteryLevels.value[sensorId]);
+        return; // Exit early since we found today's data
+      }
+      
+      // If no data for today, fall through to check last 30 days
+      console.log(`[sensors.vue] No battery data found for today for sensor ${sensorId}, checking last 30 days...`);
+    }
+    
+    // Use dynamic dates - last 30 days to today
     startDate.setDate(startDate.getDate() - 30); // Go back 30 days
     
     const startStr = toLocalDateString(startDate);
@@ -1111,10 +1130,44 @@ const fetchBatteryData = async (sensorId: string) => {
 };
 
 // Function to update all battery levels
-const updateAllBatteryLevels = async () => {
+const updateAllBatteryLevels = async (prioritizeToday: boolean = false) => {
   for (const sensor of SENSOR_CONFIGS.value) {
-    await fetchBatteryData(sensor.id);
+    await fetchBatteryData(sensor.id, prioritizeToday);
   }
+};
+
+// Function to check if it's a new day and refresh battery data
+const checkForNewDayBatteryUpdate = () => {
+  const today = toLocalDateString(new Date());
+  
+  // If we haven't checked today yet, or if it's a new day
+  if (!lastBatteryCheckDate.value || lastBatteryCheckDate.value !== today) {
+    console.log(`[sensors.vue] New day detected (${today}), refreshing battery data...`);
+    lastBatteryCheckDate.value = today;
+    updateAllBatteryLevels(true); // Prioritize today's data
+  }
+};
+
+// Function to setup daily battery check at midnight
+const setupDailyBatteryCheck = () => {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0); // Set to midnight
+  
+  const msUntilMidnight = tomorrow.getTime() - now.getTime();
+  
+  console.log(`[sensors.vue] Setting up daily battery check. Next check in ${Math.round(msUntilMidnight / 1000 / 60)} minutes`);
+  
+  // Set initial timeout for midnight
+  setTimeout(() => {
+    checkForNewDayBatteryUpdate();
+    
+    // Then set up interval to check every 24 hours (at midnight)
+    dailyBatteryCheckInterval.value = setInterval(() => {
+      checkForNewDayBatteryUpdate();
+    }, 24 * 60 * 60 * 1000); // 24 hours
+  }, msUntilMidnight);
 };
 
 // Add new refs for drone images
