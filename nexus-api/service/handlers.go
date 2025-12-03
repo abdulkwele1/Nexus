@@ -569,6 +569,7 @@ func CreateGetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 
 		// Convert database data to GetSensorMoistureDataResponse
 		var response api.GetSensorMoistureDataResponse
+		var mostRecentTimestamp time.Time
 		for _, d := range data {
 			response.SensorMoistureData = append(response.SensorMoistureData, api.SensorMoistureData{
 				ID:           d.ID,
@@ -576,7 +577,27 @@ func CreateGetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 				Date:         d.Date,
 				SoilMoisture: d.SoilMoisture,
 			})
+			// Track the most recent timestamp
+			if d.Date.After(mostRecentTimestamp) {
+				mostRecentTimestamp = d.Date
+			}
 		}
+
+		// Check if sensor is online based on most recent data timestamp
+		if len(data) > 0 {
+			now := time.Now()
+			threshold := 24 * time.Hour // 24 hours threshold
+			timeDiff := now.Sub(mostRecentTimestamp)
+			isOnline := timeDiff <= threshold
+
+			response.IsOnline = &isOnline
+			response.LastDataTimestamp = &mostRecentTimestamp
+
+			if !isOnline {
+				apiService.Warn().Msgf("Sensor %s appears offline: last data timestamp (%v) is older than 24 hours", sensorID, mostRecentTimestamp)
+			}
+		}
+
 		apiService.Debug().Msgf("Sending back %d moisture data records for sensor_id: %s", len(response.SensorMoistureData), sensorID)
 
 		// Send the response
@@ -691,6 +712,7 @@ func CreateGetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 
 		// Convert database data to GetSensorTemperatureDataResponse
 		var response api.GetSensorTemperatureDataResponse
+		var mostRecentTimestamp time.Time
 		for _, d := range data {
 			response.SensorTemperatureData = append(response.SensorTemperatureData, api.SensorTemperatureData{
 				ID:              d.ID,
@@ -698,6 +720,25 @@ func CreateGetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 				Date:            d.Date,
 				SoilTemperature: d.SoilTemperature,
 			})
+			// Track the most recent timestamp
+			if d.Date.After(mostRecentTimestamp) {
+				mostRecentTimestamp = d.Date
+			}
+		}
+
+		// Check if sensor is online based on most recent data timestamp
+		if len(data) > 0 {
+			now := time.Now()
+			threshold := 24 * time.Hour // 24 hours threshold
+			timeDiff := now.Sub(mostRecentTimestamp)
+			isOnline := timeDiff <= threshold
+
+			response.IsOnline = &isOnline
+			response.LastDataTimestamp = &mostRecentTimestamp
+
+			if !isOnline {
+				apiService.Warn().Msgf("Sensor %s appears offline: last data timestamp (%v) is older than 24 hours", sensorID, mostRecentTimestamp)
+			}
 		}
 
 		// Send the response
@@ -1270,11 +1311,31 @@ func CreateGetSensorBatteryDataHandler(apiService *APIService) http.HandlerFunc 
 		response := api.GetBatteryLevelDataResponse{
 			BatteryLevelData: make([]api.BatteryLevelData, 0),
 		}
+		var mostRecentTimestamp time.Time
 		for _, d := range data {
 			response.BatteryLevelData = append(response.BatteryLevelData, api.BatteryLevelData{
 				Date:         d.Date,
 				BatteryLevel: d.BatteryLevel,
 			})
+			// Track the most recent timestamp
+			if d.Date.After(mostRecentTimestamp) {
+				mostRecentTimestamp = d.Date
+			}
+		}
+
+		// Check if sensor is online based on most recent data timestamp
+		if len(data) > 0 {
+			now := time.Now()
+			threshold := 24 * time.Hour // 24 hours threshold
+			timeDiff := now.Sub(mostRecentTimestamp)
+			isOnline := timeDiff <= threshold
+
+			response.IsOnline = &isOnline
+			response.LastDataTimestamp = &mostRecentTimestamp
+
+			if !isOnline {
+				apiService.Warn().Msgf("Sensor %s appears offline: last battery data timestamp (%v) is older than 24 hours", sensorID, mostRecentTimestamp)
+			}
 		}
 
 		// Send the response

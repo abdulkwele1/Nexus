@@ -64,10 +64,14 @@ type SetPanelYieldDataResponse struct {
 
 type GetSensorMoistureDataResponse struct {
 	SensorMoistureData []SensorMoistureData `json:"sensor_moisture_data"`
+	IsOnline           *bool                `json:"is_online,omitempty"`           // nil if no data, true/false if data exists
+	LastDataTimestamp  *time.Time           `json:"last_data_timestamp,omitempty"` // Most recent data timestamp
 }
 
 type GetSensorTemperatureDataResponse struct {
 	SensorTemperatureData []SensorTemperatureData `json:"sensor_temperature_data"`
+	IsOnline              *bool                   `json:"is_online,omitempty"`           // nil if no data, true/false if data exists
+	LastDataTimestamp     *time.Time              `json:"last_data_timestamp,omitempty"` // Most recent data timestamp
 }
 type ConsumptionData struct {
 	Date        time.Time `json:"date"`
@@ -152,7 +156,9 @@ type BatteryLevelData struct {
 }
 
 type GetBatteryLevelDataResponse struct {
-	BatteryLevelData []BatteryLevelData `json:"battery_level_data"`
+	IsOnline          *bool              `json:"is_online,omitempty"`           // nil if no data, true/false if data exists
+	LastDataTimestamp *time.Time         `json:"last_data_timestamp,omitempty"` // Most recent data timestamp
+	BatteryLevelData  []BatteryLevelData `json:"battery_level_data"`
 }
 
 type SetBatteryLevelDataResponse struct {
