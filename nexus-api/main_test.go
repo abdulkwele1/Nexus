@@ -862,6 +862,23 @@ func TestE2EAutoCreateSensorOnlyWhenOnline(t *testing.T) {
 	gotBatteryData, err := testClient.GetSensorBatteryData(testCtx, recentBatterySensorID, startDate, endDate)
 	assert.NoError(t, err, "Battery sensor should exist after auto-creation")
 	assert.NotNil(t, gotBatteryData, "Battery sensor data should be retrievable")
+
+	// Cleanup: Delete all test sensors created during this test
+	cleanupSensors := []string{
+		recentSensorID,
+		oldSensorID,
+		veryRecentSensorID,
+		recentTempSensorID,
+		recentBatterySensorID,
+	}
+
+	for _, sensorID := range cleanupSensors {
+		err = testClient.DeleteSensor(testCtx, sensorID)
+		if err != nil {
+			// Log but don't fail test if cleanup fails
+			t.Logf("Warning: Failed to cleanup test sensor %s: %v", sensorID, err)
+		}
+	}
 }
 
 func TestE2ESessionRefresh(t *testing.T) {
