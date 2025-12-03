@@ -119,8 +119,11 @@ func NewAPIService(ctx context.Context, config APIConfig) (APIService, error) {
 
 	// Admin routes
 	router.HandleFunc("/admin/users", CorsMiddleware(AdminMiddleware(CreateGetAllUsersHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/admin/users", CorsMiddleware(AdminMiddleware(CreateCreateUserHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc("/admin/users/check/{username}", CorsMiddleware(AdminMiddleware(CreateCheckUsernameHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc("/admin/users/{username}", CorsMiddleware(AdminMiddleware(CreateUpdateUserRoleHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodPatch, http.MethodOptions)
-	router.HandleFunc("/admin/users/{username}", CorsMiddleware(AdminMiddleware(CreateRemoveAdminHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodDelete, http.MethodOptions)
+	router.HandleFunc("/admin/users/{username}/remove-admin", CorsMiddleware(AdminMiddleware(CreateRemoveAdminHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodDelete, http.MethodOptions)
+	router.HandleFunc("/admin/users/{username}", CorsMiddleware(AdminMiddleware(CreateDeleteUserHandler(&nexusAPI), &nexusAPI))).Methods(http.MethodDelete, http.MethodOptions)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", config.APIPort),

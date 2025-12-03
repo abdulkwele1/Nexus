@@ -43,7 +43,60 @@
       <div v-else class="users-section">
         <div class="section-header">
           <h2>All Users</h2>
-          <button @click="loadUsers" class="refresh-button">Refresh</button>
+          <div class="header-actions">
+            <button @click="showCreateForm = !showCreateForm" class="create-button">Create User</button>
+            <button @click="loadUsers" class="refresh-button">Refresh</button>
+          </div>
+        </div>
+
+        <!-- Create User Form -->
+        <div v-if="showCreateForm" class="create-user-form">
+          <h3>Create New User</h3>
+          <form @submit.prevent="handleCreateUser">
+            <div class="form-group">
+              <label>Username:</label>
+              <input 
+                v-model="newUser.username" 
+                @input="validateUsername"
+                type="text" 
+                required 
+                placeholder="Enter username (no spaces)"
+                :class="['form-input', usernameValidationClass]"
+              />
+              <div v-if="usernameValidationMessage" :class="['validation-message', usernameValidationClass]">
+                {{ usernameValidationMessage }}
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Password:</label>
+              <input 
+                v-model="newUser.password" 
+                type="password" 
+                required 
+                placeholder="Enter password"
+                class="form-input"
+              />
+            </div>
+            <div class="form-group">
+              <label>Role:</label>
+              <select v-model="newUser.role" class="form-select">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+                <option v-if="currentUserRole === 'root_admin'" value="root_admin">Root Admin</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button 
+                type="submit" 
+                class="submit-button" 
+                :disabled="creatingUser || !isUsernameValid || checkingUsername"
+              >
+                {{ creatingUser ? 'Creating...' : 'Create User' }}
+              </button>
+              <button type="button" @click="cancelCreateUser" class="cancel-button">Cancel</button>
+            </div>
+            <div v-if="createError" class="error-text">{{ createError }}</div>
+          </form>
         </div>
 
         <div v-if="users.length === 0" class="no-users">
@@ -81,6 +134,15 @@
               >
                 Remove Admin
               </button>
+
+              <!-- Delete User Button -->
+              <button 
+                v-if="user.username !== currentUsername && (user.role !== 'root_admin' || currentUserRole === 'root_admin')"
+                @click="deleteUser(user.username)"
+                class="delete-button"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
@@ -103,6 +165,20 @@ const loading = ref(false);
 const error = ref('');
 const currentUsername = ref('');
 const currentUserRole = ref('');
+const showCreateForm = ref(false);
+const creatingUser = ref(false);
+const createError = ref('');
+const checkingUsername = ref(false);
+const usernameValidationMessage = ref('');
+const usernameValidationClass = ref('');
+const isUsernameValid = ref(false);
+let usernameCheckTimeout = null;
+
+const newUser = ref({
+  username: '',
+  password: '',
+  role: 'user'
+});
 
 // Load users on component mount
 onMounted(async () => {
@@ -165,6 +241,123 @@ const removeAdminPermissions = async (username) => {
     } catch (err) {
       console.error('Error removing admin permissions:', err);
       alert('Failed to remove admin permissions');
+    }
+  }
+};
+
+// Validate username in real-time
+const validateUsername = async () => {
+  const username = newUser.value.username.trim();
+  
+  // Clear previous timeout
+  if (usernameCheckTimeout) {
+    clearTimeout(usernameCheckTimeout);
+  }
+  
+  // Reset validation state
+  usernameValidationMessage.value = '';
+  usernameValidationClass.value = '';
+  isUsernameValid.value = false;
+  
+  // Check for spaces
+  if (username.includes(' ')) {
+    usernameValidationMessage.value = 'Username cannot contain spaces';
+    usernameValidationClass.value = 'error';
+    isUsernameValid.value = false;
+    return;
+  }
+  
+  // If username is empty, don't check
+  if (!username) {
+    return;
+  }
+  
+  // Debounce the API call
+  usernameCheckTimeout = setTimeout(async () => {
+    checkingUsername.value = true;
+    try {
+      const result = await store.user.checkUsernameAvailable(username);
+      if (result.available) {
+        usernameValidationMessage.value = 'Username is available';
+        usernameValidationClass.value = 'success';
+        isUsernameValid.value = true;
+      } else {
+        usernameValidationMessage.value = result.error || 'Username is already taken';
+        usernameValidationClass.value = 'error';
+        isUsernameValid.value = false;
+      }
+    } catch (err) {
+      console.error('Error checking username:', err);
+      // Don't block user if check fails
+      usernameValidationMessage.value = '';
+      usernameValidationClass.value = '';
+      isUsernameValid.value = true;
+    } finally {
+      checkingUsername.value = false;
+    }
+  }, 500); // 500ms debounce
+};
+
+// Create new user
+const handleCreateUser = async () => {
+  // Final validation before submitting
+  if (!isUsernameValid.value || newUser.value.username.includes(' ')) {
+    createError.value = 'Please fix the username errors before creating the user.';
+    return;
+  }
+  
+  creatingUser.value = true;
+  createError.value = '';
+  
+  try {
+    await store.user.createUser(newUser.value.username.trim(), newUser.value.password, newUser.value.role);
+    // Reset form
+    newUser.value = { username: '', password: '', role: 'user' };
+    usernameValidationMessage.value = '';
+    usernameValidationClass.value = '';
+    isUsernameValid.value = false;
+    showCreateForm.value = false;
+    // Reload users list
+    await loadUsers();
+  } catch (err) {
+    console.error('Error creating user:', err);
+    const errorMessage = err.message || err.error || 'Failed to create user. User may already exist.';
+    createError.value = errorMessage;
+    // Update validation if username is taken
+    if (errorMessage.includes('already exists') || errorMessage.includes('taken')) {
+      usernameValidationMessage.value = 'Username is already taken';
+      usernameValidationClass.value = 'error';
+      isUsernameValid.value = false;
+    }
+  } finally {
+    creatingUser.value = false;
+  }
+};
+
+// Cancel create user form
+const cancelCreateUser = () => {
+  showCreateForm.value = false;
+  newUser.value = { username: '', password: '', role: 'user' };
+  createError.value = '';
+  usernameValidationMessage.value = '';
+  usernameValidationClass.value = '';
+  isUsernameValid.value = false;
+  if (usernameCheckTimeout) {
+    clearTimeout(usernameCheckTimeout);
+    usernameCheckTimeout = null;
+  }
+};
+
+// Delete user
+const deleteUser = async (username) => {
+  if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+    try {
+      await store.user.deleteUser(username);
+      // Remove from local state
+      users.value = users.value.filter(u => u.username !== username);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert('Failed to delete user');
     }
   }
 };
@@ -298,6 +491,11 @@ const goToSettings = () => {
   margin: 0;
 }
 
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .refresh-button {
   background-color: #90EE90;
   color: black;
@@ -309,6 +507,20 @@ const goToSettings = () => {
 
 .refresh-button:hover {
   background-color: #7CCD7C;
+}
+
+.create-button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.create-button:hover {
+  background-color: #45a049;
 }
 
 /* Users list */
@@ -411,6 +623,131 @@ const goToSettings = () => {
 
 .remove-admin-button:hover {
   background-color: #ff5252;
+}
+
+.delete-button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.delete-button:hover {
+  background-color: #c82333;
+}
+
+/* Create User Form */
+.create-user-form {
+  background: #2a2a2a;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #333;
+}
+
+.create-user-form h3 {
+  color: white;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  color: #e0e0e0;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: #3a3a3a;
+  color: white;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: #90EE90;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.submit-button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel-button {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.cancel-button:hover {
+  background-color: #5a6268;
+}
+
+.error-text {
+  color: #ff6b6b;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.validation-message {
+  margin-top: 5px;
+  font-size: 0.85rem;
+  padding: 4px 0;
+}
+
+.validation-message.success {
+  color: #4CAF50;
+}
+
+.validation-message.error {
+  color: #ff6b6b;
+}
+
+.form-input.error {
+  border-color: #ff6b6b;
+}
+
+.form-input.success {
+  border-color: #4CAF50;
 }
 
 /* Navigation text color */

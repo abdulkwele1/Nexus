@@ -133,3 +133,13 @@ func UpdateUserRole(ctx context.Context, db *bun.DB, username, role string) erro
 
 	return err
 }
+
+// DeleteUser deletes a user from the database
+func DeleteUser(ctx context.Context, db *bun.DB, username string) error {
+	_, err := db.NewDelete().
+		Model((*LoginAuthentication)(nil)).
+		Where("user_name = ?", username).
+		Exec(ctx)
+
+	return err
+}

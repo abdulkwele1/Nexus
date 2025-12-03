@@ -176,6 +176,12 @@ type UpdateUserRoleRequest struct {
 	Role string `json:"role"`
 }
 
+type CreateUserRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Role     string `json:"role"` // Optional, defaults to "user"
+}
+
 type UserSettingsResponse struct {
 	Username string `json:"username"`
 	Role     string `json:"role"`
