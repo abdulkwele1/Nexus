@@ -70,7 +70,7 @@ header {
 }
 
 nav {
-  width: 1000%;
+  width: 100%;
   font-size: 18px;
   text-align: center;
   margin-top: 2rem;

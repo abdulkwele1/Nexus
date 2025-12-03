@@ -106,64 +106,82 @@ const tooltipStyle = ref({
   top: '0px'
 });
 
+// Add a flag to prevent concurrent fetches
+let isFetching = false;
+let fetchTimeout: ReturnType<typeof setTimeout> | null = null;
+
 async function fetchAllSensorData() {
-  let fetchError = false;
-  try {
-    console.log(`[soilMoistureGraph] Fetching data with resolution: ${props.queryParams.resolution}`);
-    
-    // Get visible sensors from props
-    const visibleSensors = Object.entries(props.sensorVisibility)
-      .filter(([_, isVisible]) => isVisible)
-      .map(([name]) => name);
-    
-    // Clear existing data
-    sensors.value = visibleSensors.map(name => ({
-      data: [],
-      name: name
-    }));
-
-    const allSensorsDataPromises = sensors.value.map(async (sensor) => {
-      let rawDataPoints;
-      // Get sensor ID from parent component's sensorConfigs prop
-      const sensorConfig = props.sensorConfigs.find(config => config.name === sensor.name);
-      
-      if (!sensorConfig) {
-        console.warn(`[soilMoistureGraph] No configuration found for sensor ${sensor.name}`);
-        return;
-      }
-      console.log(`[soilMoistureGraph] Requesting moisture data for sensor ID: ${sensorConfig.id}`);
-
-      if (props.dataType === 'moisture') {
-        rawDataPoints = await nexusStore.user.getSensorMoistureData(sensorConfig.id);
-      } else {
-        rawDataPoints = await nexusStore.user.getSensorTemperatureData(sensorConfig.id);
-      }
-      
-      if (rawDataPoints && Array.isArray(rawDataPoints)) {
-        const formattedData: DataPoint[] = rawDataPoints.map((point: any) => ({
-          time: new Date(point.date),
-          moisture: props.dataType === 'moisture' ? Number(point.soil_moisture) : Number(point.soil_temperature),
-        })).sort((a, b) => a.time.getTime() - b.time.getTime());
-        
-        sensor.data = formattedData;
-        console.log(`[soilMoistureGraph] Fetched ${formattedData.length} points for sensor ${sensor.name}`);
-      } else {
-        console.warn(`No data for sensor ${sensor.name}`);
-        sensor.data = [];
-      }
-    });
-    await Promise.all(allSensorsDataPromises);
-  } catch (error) {
-    console.error("Error fetching sensor data:", error);
-    fetchError = true;
-    sensors.value.forEach(sensor => sensor.data = []);
-  } finally {
-    if (!fetchError) {
-      processAndDrawChart();
-    } else {
-      createChart();
-    }
+  // Debounce rapid calls
+  if (fetchTimeout) {
+    clearTimeout(fetchTimeout);
   }
+  
+  fetchTimeout = setTimeout(async () => {
+    // Prevent concurrent fetches
+    if (isFetching) {
+      console.log('[soilMoistureGraph] Fetch already in progress, skipping...');
+      return;
+    }
+    
+    isFetching = true;
+    let fetchError = false;
+    try {
+      console.log(`[soilMoistureGraph] Fetching data with resolution: ${props.queryParams.resolution}`);
+      
+      // Fetch data for ALL sensors, not just visible ones
+      // This ensures data is available when sensors become visible
+      const allSensorNames = props.sensorConfigs.map(config => config.name);
+      
+      // Clear existing data
+      sensors.value = allSensorNames.map(name => ({
+        data: [],
+        name: name
+      }));
+
+      const allSensorsDataPromises = sensors.value.map(async (sensor) => {
+        let rawDataPoints;
+        // Get sensor ID from parent component's sensorConfigs prop
+        const sensorConfig = props.sensorConfigs.find(config => config.name === sensor.name);
+        
+        if (!sensorConfig) {
+          console.warn(`[soilMoistureGraph] No configuration found for sensor ${sensor.name}`);
+          return;
+        }
+        console.log(`[soilMoistureGraph] Requesting moisture data for sensor ID: ${sensorConfig.id}`);
+
+        if (props.dataType === 'moisture') {
+          rawDataPoints = await nexusStore.user.getSensorMoistureData(sensorConfig.id);
+        } else {
+          rawDataPoints = await nexusStore.user.getSensorTemperatureData(sensorConfig.id);
+        }
+        
+        if (rawDataPoints && Array.isArray(rawDataPoints)) {
+          const formattedData: DataPoint[] = rawDataPoints.map((point: any) => ({
+            time: new Date(point.date),
+            moisture: props.dataType === 'moisture' ? Number(point.soil_moisture) : Number(point.soil_temperature),
+          })).sort((a, b) => a.time.getTime() - b.time.getTime());
+          
+          sensor.data = formattedData;
+          console.log(`[soilMoistureGraph] Fetched ${formattedData.length} points for sensor ${sensor.name}`);
+        } else {
+          console.warn(`No data for sensor ${sensor.name}`);
+          sensor.data = [];
+        }
+      });
+      await Promise.all(allSensorsDataPromises);
+    } catch (error) {
+      console.error("Error fetching sensor data:", error);
+      fetchError = true;
+      sensors.value.forEach(sensor => sensor.data = []);
+    } finally {
+      isFetching = false;
+      if (!fetchError) {
+        processAndDrawChart();
+      } else {
+        createChart();
+      }
+    }
+  }, 100); // 100ms debounce
 }
 
 // Function to process data based on current state and draw
@@ -611,32 +629,35 @@ const createChart = () => {
     }
 };
 
-// Add watch for queryParams - re-fetch data when date range changes
-watch(() => props.queryParams, (newParams, oldParams) => {
-  console.log(`[soilMoistureGraph] Query params changed. New resolution: ${newParams.resolution}`);
-  // Re-fetch data if startDate or endDate changed (not just resolution)
-  if (oldParams && (newParams.startDate !== oldParams.startDate || newParams.endDate !== oldParams.endDate)) {
-    console.log(`[soilMoistureGraph] Date range changed, re-fetching all sensor data...`);
+// Consolidated watcher for queryParams and dynamicTimeWindow to avoid race conditions
+watch([() => props.queryParams, () => props.dynamicTimeWindow], ([newParams, newWindow], [oldParams, oldWindow]) => {
+  console.log(`[soilMoistureGraph] Query params or time window changed. Resolution: ${newParams.resolution}, Window: ${newWindow}`);
+  
+  // Determine if we need to re-fetch data
+  const dateRangeChanged = oldParams && (newParams.startDate !== oldParams.startDate || newParams.endDate !== oldParams.endDate);
+  const timeWindowChanged = newWindow !== oldWindow;
+  const resolutionChanged = oldParams && newParams.resolution !== oldParams.resolution;
+  
+  // Re-fetch if date range or time window changed, or if resolution changed significantly
+  if (dateRangeChanged || timeWindowChanged || (resolutionChanged && (newParams.resolution === 'raw' || oldParams.resolution === 'raw'))) {
+    console.log(`[soilMoistureGraph] Significant change detected, re-fetching all sensor data...`);
     fetchAllSensorData();
+  } else if (resolutionChanged) {
+    // Just re-process existing data if only resolution changed (and it's not raw)
+    console.log(`[soilMoistureGraph] Resolution changed, re-processing existing data...`);
+    processAndDrawChart();
   } else {
-    // Just re-process existing data if only resolution or other params changed
+    // Other param changes, just re-process
     processAndDrawChart();
   }
 }, { deep: true });
 
-// Add watch for sensorVisibility prop (NEW)
+// Add watch for sensorVisibility prop
 watch(() => props.sensorVisibility, () => {
   console.log('[soilMoistureGraph] sensorVisibility prop changed. Triggering createChart...');
   // Just need to redraw, filtering happens within createChart based on the new prop
   createChart(); 
-}, { deep: true });
-
-// --- Watch for dynamicTimeWindow prop --- 
-watch(() => props.dynamicTimeWindow, () => {
-  console.log(`[soilMoistureGraph] dynamicTimeWindow prop changed to: ${props.dynamicTimeWindow}. Re-fetching all sensor data...`);
-  fetchAllSensorData(); 
-});
-// --- End watch for dynamicTimeWindow prop --- 
+}, { deep: true }); 
 
 // Add data aggregation function
 const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'daily' | 'weekly' | 'monthly'): Sensor[] => {

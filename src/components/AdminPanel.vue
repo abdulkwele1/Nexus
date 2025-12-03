@@ -45,7 +45,7 @@
           <h2>All Users</h2>
           <div class="header-actions">
             <button @click="showCreateForm = !showCreateForm" class="create-button">Create User</button>
-            <button @click="loadUsers" class="refresh-button">Refresh</button>
+          <button @click="loadUsers" class="refresh-button">Refresh</button>
           </div>
         </div>
 

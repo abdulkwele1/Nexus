@@ -7,8 +7,18 @@
   </div>
   
   <div class="main-content">
+    <!-- Sidebar Toggle Button -->
+    <button 
+      class="sidebar-toggle" 
+      @click="toggleSidebar"
+      :class="{ 'sidebar-closed': !sidebarOpen }"
+      :title="sidebarOpen ? 'Close sidebar' : 'Open sidebar'"
+    >
+      <i class="fas" :class="sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
+    </button>
+    
     <!-- Query Side Panel -->
-    <div class="query-panel">
+    <div class="query-panel" :class="{ 'sidebar-closed': !sidebarOpen }">
       <div class="panel-section">
         <h3>Selected Sensors</h3>
         <div class="sensor-selection">
@@ -132,7 +142,7 @@
     </div>
 
     <!-- Main Content Area -->
-    <div class="sensors-content">
+    <div class="sensors-content" :class="{ 'sidebar-closed': !sidebarOpen }">
       <!-- Battery Status Display -->
       <div class="battery-status-container">
         <h2 class="battery-status-title">Sensor Battery Status</h2>
@@ -379,6 +389,13 @@ const formattedTime = computed(() => {
 
   return `${month} ${dayWithSuffix} ${dayOfWeek}, ${time}`; // Combine them
 });
+
+// --- Sidebar Toggle ---
+const sidebarOpen = ref(true);
+
+const toggleSidebar = () => {
+  sidebarOpen.value = !sidebarOpen.value;
+};
 
 // --- Navbar Scroll Behavior --- 
 const lastScrollY = ref(0);
@@ -1297,6 +1314,50 @@ const getSensorColor = (sensorName: string): string => {
   position: fixed;
   overflow-y: auto;
   box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+  left: 0;
+  top: 60px;
+  transition: transform 0.3s ease-in-out;
+  z-index: 100;
+}
+
+.query-panel.sidebar-closed {
+  transform: translateX(-100%);
+}
+
+.sidebar-toggle {
+  position: fixed;
+  left: 300px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 60px;
+  background: #1a1a1a;
+  border: 2px solid rgba(144, 238, 144, 0.1);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  color: #90EE90;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 101;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-toggle:hover {
+  background: #242424;
+  border-color: #90EE90;
+  color: #90EE90;
+}
+
+.sidebar-toggle.sidebar-closed {
+  left: 0;
+}
+
+.sidebar-toggle i {
+  font-size: 16px;
+  transition: transform 0.3s ease-in-out;
 }
 
 /* Custom scrollbar for the panel */
@@ -1461,6 +1522,11 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  transition: margin-left 0.3s ease-in-out;
+}
+
+.sensors-content.sidebar-closed {
+  margin-left: 0;
 }
 
 .realtime-container {
@@ -1519,6 +1585,14 @@ select:focus {
 @media (max-width: 768px) {
   .main-content {
     flex-direction: column;
+  }
+
+  .sidebar-toggle {
+    left: 300px;
+  }
+
+  .sidebar-toggle.sidebar-closed {
+    left: 0;
   }
 
   .query-panel {
