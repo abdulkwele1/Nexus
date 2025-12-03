@@ -97,8 +97,9 @@ func CreateLoginHandler(apiService *APIService) http.HandlerFunc {
 			Value:    response.Cookie,
 			Path:     "/",
 			Expires:  expiration,
-			HttpOnly: true,  // Optional: helps mitigate XSS
-			Secure:   false, // Set to true if serving over HTTPS
+			HttpOnly: true,                 // Optional: helps mitigate XSS
+			Secure:   false,                // Set to true if serving over HTTPS
+			SameSite: http.SameSiteLaxMode, // Required for Safari compatibility
 		})
 
 		// upsert cookie to database
@@ -170,6 +171,7 @@ func CreateSessionRefreshHandler(apiService *APIService) http.HandlerFunc {
 			Expires:  newExpiration,
 			HttpOnly: true,
 			Secure:   false,
+			SameSite: http.SameSiteLaxMode, // Required for Safari compatibility
 		})
 
 		w.Header().Set("Content-Type", "application/json")
@@ -598,14 +600,44 @@ func CreateSetSensorMoistureDataHandler(apiService *APIService) http.HandlerFunc
 			return
 		}
 
-		// Ensure sensor exists before saving data
-		err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID)
+		// Check if we have any data points to determine sensor online status
+		var mostRecentTimestamp time.Time
+		if len(request.SensorMoistureData) > 0 {
+			// Find the most recent timestamp in the batch
+			mostRecentTimestamp = request.SensorMoistureData[0].Date
+			for _, data := range request.SensorMoistureData {
+				if data.Date.After(mostRecentTimestamp) {
+					mostRecentTimestamp = data.Date
+				}
+			}
+		} else {
+			// No data in request, use current time (sensor is sending data, so it's online)
+			mostRecentTimestamp = time.Now()
+		}
+
+		// Ensure sensor exists before saving data, but only if it's online (data is recent)
+		// Use 24 hours as the threshold - if data is older than 24 hours, sensor is considered offline
+		err = database.EnsureSensorExistsIfOnline(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID, mostRecentTimestamp, 24)
 		if err != nil {
-			apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %s, error: %s", sensorID, err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
-			return
+			// If sensor is offline, log warning but don't fail - we might want to process the data anyway
+			// or we could return an error to prevent processing offline sensor data
+			apiService.Warn().Msgf("Sensor %s appears offline or error ensuring exists: %s", sensorID, err)
+			// Option 1: Skip processing offline sensor data (uncomment to enable)
+			// w.Header().Set("Content-Type", "application/json")
+			// w.WriteHeader(http.StatusBadRequest)
+			// json.NewEncoder(w).Encode(api.ErrorResponse{Error: fmt.Sprintf("Sensor appears offline: %v", err)})
+			// return
+
+			// Option 2: Continue processing but log warning (current behavior)
+			// Try to ensure sensor exists without online check as fallback
+			err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID)
+			if err != nil {
+				apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %s, error: %s", sensorID, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
+				return
+			}
 		}
 
 		// Iterate over each SensorMoistureData item and save to the database
@@ -689,14 +721,44 @@ func CreateSetSensorTemperatureDataHandler(apiService *APIService) http.HandlerF
 			return
 		}
 
-		// Ensure sensor exists before saving data
-		err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID)
+		// Check if we have any data points to determine sensor online status
+		var mostRecentTimestamp time.Time
+		if len(request.SensorTemperatureData) > 0 {
+			// Find the most recent timestamp in the batch
+			mostRecentTimestamp = request.SensorTemperatureData[0].Date
+			for _, data := range request.SensorTemperatureData {
+				if data.Date.After(mostRecentTimestamp) {
+					mostRecentTimestamp = data.Date
+				}
+			}
+		} else {
+			// No data in request, use current time (sensor is sending data, so it's online)
+			mostRecentTimestamp = time.Now()
+		}
+
+		// Ensure sensor exists before saving data, but only if it's online (data is recent)
+		// Use 24 hours as the threshold - if data is older than 24 hours, sensor is considered offline
+		err = database.EnsureSensorExistsIfOnline(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID, mostRecentTimestamp, 24)
 		if err != nil {
-			apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %s, error: %s", sensorID, err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
-			return
+			// If sensor is offline, log warning but don't fail - we might want to process the data anyway
+			// or we could return an error to prevent processing offline sensor data
+			apiService.Warn().Msgf("Sensor %s appears offline or error ensuring exists: %s", sensorID, err)
+			// Option 1: Skip processing offline sensor data (uncomment to enable)
+			// w.Header().Set("Content-Type", "application/json")
+			// w.WriteHeader(http.StatusBadRequest)
+			// json.NewEncoder(w).Encode(api.ErrorResponse{Error: fmt.Sprintf("Sensor appears offline: %v", err)})
+			// return
+
+			// Option 2: Continue processing but log warning (current behavior)
+			// Try to ensure sensor exists without online check as fallback
+			err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID)
+			if err != nil {
+				apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %s, error: %s", sensorID, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
+				return
+			}
 		}
 
 		// Iterate over each SensorTemperatureData item and save to the database
@@ -1236,14 +1298,44 @@ func CreateSetSensorBatteryDataHandler(apiService *APIService) http.HandlerFunc 
 			return
 		}
 
-		// Ensure sensor exists before saving data
-		err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID)
+		// Check if we have any data points to determine sensor online status
+		var mostRecentTimestamp time.Time
+		if len(request.BatteryLevelData) > 0 {
+			// Find the most recent timestamp in the batch
+			mostRecentTimestamp = request.BatteryLevelData[0].Date
+			for _, data := range request.BatteryLevelData {
+				if data.Date.After(mostRecentTimestamp) {
+					mostRecentTimestamp = data.Date
+				}
+			}
+		} else {
+			// No data in request, use current time (sensor is sending data, so it's online)
+			mostRecentTimestamp = time.Now()
+		}
+
+		// Ensure sensor exists before saving data, but only if it's online (data is recent)
+		// Use 24 hours as the threshold - if data is older than 24 hours, sensor is considered offline
+		err = database.EnsureSensorExistsIfOnline(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID, mostRecentTimestamp, 24)
 		if err != nil {
-			apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %s, error: %s", sensorID, err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
-			return
+			// If sensor is offline, log warning but don't fail - we might want to process the data anyway
+			// or we could return an error to prevent processing offline sensor data
+			apiService.Warn().Msgf("Sensor %s appears offline or error ensuring exists: %s", sensorID, err)
+			// Option 1: Skip processing offline sensor data (uncomment to enable)
+			// w.Header().Set("Content-Type", "application/json")
+			// w.WriteHeader(http.StatusBadRequest)
+			// json.NewEncoder(w).Encode(api.ErrorResponse{Error: fmt.Sprintf("Sensor appears offline: %v", err)})
+			// return
+
+			// Option 2: Continue processing but log warning (current behavior)
+			// Try to ensure sensor exists without online check as fallback
+			err = database.EnsureSensorExists(r.Context(), apiService.DatabaseClient.DB, sensorID, sensorID)
+			if err != nil {
+				apiService.Error().Msgf("Failed to ensure sensor exists for sensor_id: %s, error: %s", sensorID, err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(api.ErrorResponse{Error: "Failed to ensure sensor exists"})
+				return
+			}
 		}
 
 		// Iterate over each BatteryLevelData item and save to the database

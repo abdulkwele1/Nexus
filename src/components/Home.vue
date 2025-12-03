@@ -841,13 +841,13 @@ async function fetchSensors() {
       } else {
         // Create default icon if no saved positions
         sensorIcons.push({
-          id: sensor.id,
-          name: sensor.name || `Sensor ${sensor.id}`,
-          color: getDefaultColor(index),
+      id: sensor.id,
+      name: sensor.name || `Sensor ${sensor.id}`,
+      color: getDefaultColor(index),
           xPercent: sensor.latitude ? null : getDefaultX(index),
-          yPercent: sensor.longitude ? null : getDefaultY(index),
-          latitude: sensor.latitude,
-          longitude: sensor.longitude,
+      yPercent: sensor.longitude ? null : getDefaultY(index),
+      latitude: sensor.latitude,
+      longitude: sensor.longitude,
           mapIconId: `icon-${nextMapIconId++}`
         });
       }

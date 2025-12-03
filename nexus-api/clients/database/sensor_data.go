@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -94,6 +95,7 @@ func (d *SensorTemperatureData) Save(ctx context.Context, db *bun.DB) error {
 }
 
 // EnsureSensorExists ensures a sensor exists in the database, creating it if it doesn't exist
+// This function will auto-create sensors without checking if they're online
 func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID string, deviceID string) error {
 	// Check if sensor already exists
 	var existingSensor Sensor
@@ -113,6 +115,53 @@ func EnsureSensorExists(ctx context.Context, db *bun.DB, sensorID string, device
 	}
 
 	// Create new sensor entry
+	newSensor := Sensor{
+		ID:               sensorID,
+		Name:             "Sensor " + sensorID + " (Auto-created)",
+		Location:         "Device " + deviceID,
+		InstallationDate: time.Now(),
+	}
+
+	_, err = db.NewInsert().
+		Model(&newSensor).
+		Exec(ctx)
+
+	return err
+}
+
+// EnsureSensorExistsIfOnline ensures a sensor exists in the database, but only creates it
+// if the provided data timestamp indicates the sensor is online (data is recent).
+// dataTimestamp: The timestamp of the incoming sensor data
+// onlineThresholdHours: How many hours back we consider data to be "recent" (default: 24 hours)
+func EnsureSensorExistsIfOnline(ctx context.Context, db *bun.DB, sensorID string, deviceID string, dataTimestamp time.Time, onlineThresholdHours int) error {
+	// Check if sensor already exists
+	var existingSensor Sensor
+	err := db.NewSelect().
+		Model(&existingSensor).
+		Where("id = ?", sensorID).
+		Scan(ctx)
+
+	// If sensor exists, we're done
+	if err == nil {
+		return nil
+	}
+
+	// If error is not "no rows found", return the error
+	if err.Error() != "sql: no rows in result set" {
+		return err
+	}
+
+	// Check if the data timestamp is recent (sensor is online)
+	now := time.Now()
+	threshold := time.Duration(onlineThresholdHours) * time.Hour
+	timeDiff := now.Sub(dataTimestamp)
+
+	// If data is too old, don't create the sensor (it's offline)
+	if timeDiff > threshold {
+		return fmt.Errorf("sensor %s appears offline: data timestamp (%v) is older than %d hours", sensorID, dataTimestamp, onlineThresholdHours)
+	}
+
+	// Data is recent, sensor is online - create new sensor entry
 	newSensor := Sensor{
 		ID:               sensorID,
 		Name:             "Sensor " + sensorID + " (Auto-created)",

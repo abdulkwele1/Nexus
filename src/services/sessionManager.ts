@@ -3,7 +3,7 @@ import { useNexusStore } from '@/stores/nexus';
 class SessionManager {
   private refreshInterval: number = 60 * 60 * 1000; // 1 hour
   private lastActivity: number = Date.now();
-  private refreshTimer: NodeJS.Timeout | null = null;
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private store: any;
 
   constructor() {

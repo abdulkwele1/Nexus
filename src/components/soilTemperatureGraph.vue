@@ -113,103 +113,116 @@ const sensors = ref<Sensor[]>([]);
 
 const nexusStore = useNexusStore();
 
+// Add a flag to prevent concurrent fetches
+let isFetching = false;
+let fetchTimeout: ReturnType<typeof setTimeout> | null = null;
+
 async function fetchAllSensorData() {
-  let fetchError = false;
-  console.log(`[TEMP_GRAPH] fetchAllSensorData called. DataType: ${props.dataType}, Resolution: ${props.queryParams.resolution}`);
-  
-  try {
-    // Get visible sensors from props
-    const visibleSensors = Object.entries(props.sensorVisibility)
-      .filter(([_, isVisible]) => isVisible)
-      .map(([name]) => name);
-    
-    // Clear existing data
-    sensors.value = visibleSensors.map(name => ({
-      data: [],
-      name: name
-    }));
-
-    const allSensorsDataPromises = sensors.value.map(async (sensor) => {
-      let rawDataPoints;
-      // Get sensor ID from parent component's sensorConfigs prop
-      const sensorConfig = props.sensorConfigs.find(config => config.name === sensor.name);
-      
-      if (!sensorConfig) {
-        console.warn(`[TEMP_GRAPH] No configuration found for sensor ${sensor.name}`);
-        return;
-      }
-
-      // Ensure we only fetch temperature data here
-      if (props.dataType === 'temperature') { 
-        console.log(`[TEMP_GRAPH] Fetching temperature for sensor ${sensor.name} (ID: ${sensorConfig.id})`);
-        try {
-          rawDataPoints = await nexusStore.user.getSensorTemperatureData(sensorConfig.id);
-          console.log(`[TEMP_GRAPH] Raw temperature data received for ${sensor.name}:`, rawDataPoints);
-        } catch (error) {
-          console.error(`[TEMP_GRAPH] Error fetching temperature data for sensor ${sensor.name}:`, error);
-          return;
-        }
-      
-        if (!rawDataPoints || !Array.isArray(rawDataPoints)) {
-          console.error(`[TEMP_GRAPH] Invalid data received for sensor ${sensor.name}:`, rawDataPoints);
-          return;
-        }
-        
-        if (rawDataPoints.length === 0) {
-          console.warn(`[TEMP_GRAPH] No temperature data points received for sensor ${sensor.name}`);
-          return;
-        }
-      
-        // Format temperature data
-        const formattedTemperatureData: DataPoint[] = rawDataPoints
-          .filter((point: any) => {
-            const isValid = point && 
-                          typeof point.date === 'string' && 
-                          typeof point.soil_temperature === 'number' && 
-                          !isNaN(point.soil_temperature);
-            if (!isValid) {
-              console.warn(`[TEMP_GRAPH] Invalid data point for ${sensor.name}:`, point);
-            }
-            return isValid;
-          })
-          .map((point: any) => ({
-            time: new Date(point.date),
-            temperature: Number(point.soil_temperature), 
-          }))
-          .sort((a, b) => a.time.getTime() - b.time.getTime());
-        
-        console.log(`[TEMP_GRAPH] Formatted ${formattedTemperatureData.length} valid points for sensor ${sensor.name}`);
-        if (formattedTemperatureData.length > 0) {
-          console.log(`[TEMP_GRAPH] First point:`, formattedTemperatureData[0]);
-          console.log(`[TEMP_GRAPH] Last point:`, formattedTemperatureData[formattedTemperatureData.length - 1]);
-        }
-
-        sensor.data = formattedTemperatureData;
-      } else {
-        console.warn(`[TEMP_GRAPH] Incorrect dataType prop received: ${props.dataType}. Expected 'temperature'.`);
-      }
-    });
-    
-    await Promise.all(allSensorsDataPromises);
-    
-    // Log final state of sensors data
-    sensors.value.forEach((sensor) => {
-      console.log(`[TEMP_GRAPH] Final data state for sensor ${sensor.name}: ${sensor.data.length} points`);
-    });
-    
-  } catch (error) {
-    console.error("[TEMP_GRAPH] Error fetching sensor data:", error);
-    fetchError = true;
-    sensors.value.forEach(sensor => sensor.data = []);
-  } finally {
-    console.log(`[TEMP_GRAPH] Fetch complete. fetchError: ${fetchError}`);
-    if (!fetchError) {
-      processAndDrawChart();
-    } else {
-      console.log("[TEMP_GRAPH] Calling createChart after fetch error to draw empty state.");
-      createChart(); 
-    }
+  // Debounce rapid calls
+  if (fetchTimeout) {
+    clearTimeout(fetchTimeout);
   }
+  
+  fetchTimeout = setTimeout(async () => {
+    // Prevent concurrent fetches
+    if (isFetching) {
+      console.log('[TEMP_GRAPH] Fetch already in progress, skipping...');
+      return;
+    }
+    
+    isFetching = true;
+    let fetchError = false;
+    console.log(`[TEMP_GRAPH] fetchAllSensorData called. DataType: ${props.dataType}, Resolution: ${props.queryParams.resolution}`);
+    
+    try {
+      // Fetch data for ALL sensors, not just visible ones
+      // This ensures data is available when sensors become visible
+      const allSensorNames = props.sensorConfigs.map(config => config.name);
+      
+      // Clear existing data
+      sensors.value = allSensorNames.map(name => ({
+        data: [],
+        name: name
+      }));
+
+      const allSensorsDataPromises = sensors.value.map(async (sensor) => {
+        let rawDataPoints;
+        // Get sensor ID from parent component's sensorConfigs prop
+        const sensorConfig = props.sensorConfigs.find(config => config.name === sensor.name);
+        
+        if (!sensorConfig) {
+          console.warn(`[TEMP_GRAPH] No configuration found for sensor ${sensor.name}`);
+          return;
+        }
+
+        // Ensure we only fetch temperature data here
+        if (props.dataType === 'temperature') { 
+          console.log(`[TEMP_GRAPH] Fetching temperature for sensor ${sensor.name} (ID: ${sensorConfig.id})`);
+          try {
+            rawDataPoints = await nexusStore.user.getSensorTemperatureData(sensorConfig.id);
+            console.log(`[TEMP_GRAPH] Raw temperature data received for ${sensor.name}:`, rawDataPoints);
+          } catch (error) {
+            console.error(`[TEMP_GRAPH] Error fetching temperature data for sensor ${sensor.name}:`, error);
+            return;
+          }
+        
+          if (!rawDataPoints || !Array.isArray(rawDataPoints)) {
+            console.error(`[TEMP_GRAPH] Invalid data received for sensor ${sensor.name}:`, rawDataPoints);
+            return;
+          }
+        
+          // Format temperature data
+          const formattedTemperatureData: DataPoint[] = rawDataPoints
+            .filter((point: any) => {
+              const isValid = point && 
+                            typeof point.date === 'string' && 
+                            typeof point.soil_temperature === 'number' && 
+                            !isNaN(point.soil_temperature);
+              if (!isValid) {
+                console.warn(`[TEMP_GRAPH] Invalid data point for ${sensor.name}:`, point);
+              }
+              return isValid;
+            })
+            .map((point: any) => ({
+              time: new Date(point.date),
+              temperature: Number(point.soil_temperature), 
+            }))
+            .sort((a, b) => a.time.getTime() - b.time.getTime());
+          
+          console.log(`[TEMP_GRAPH] Formatted ${formattedTemperatureData.length} valid points for sensor ${sensor.name}`);
+          if (formattedTemperatureData.length > 0) {
+            console.log(`[TEMP_GRAPH] First point:`, formattedTemperatureData[0]);
+            console.log(`[TEMP_GRAPH] Last point:`, formattedTemperatureData[formattedTemperatureData.length - 1]);
+          }
+
+          sensor.data = formattedTemperatureData;
+        } else {
+          console.warn(`[TEMP_GRAPH] Incorrect dataType prop received: ${props.dataType}. Expected 'temperature'.`);
+        }
+      });
+      
+      await Promise.all(allSensorsDataPromises);
+      
+      // Log final state of sensors data
+      sensors.value.forEach((sensor) => {
+        console.log(`[TEMP_GRAPH] Final data state for sensor ${sensor.name}: ${sensor.data.length} points`);
+      });
+      
+    } catch (error) {
+      console.error("[TEMP_GRAPH] Error fetching sensor data:", error);
+      fetchError = true;
+      sensors.value.forEach(sensor => sensor.data = []);
+    } finally {
+      isFetching = false;
+      console.log(`[TEMP_GRAPH] Fetch complete. fetchError: ${fetchError}`);
+      if (!fetchError) {
+        processAndDrawChart();
+      } else {
+        console.log("[TEMP_GRAPH] Calling createChart after fetch error to draw empty state.");
+        createChart(); 
+      }
+    }
+  }, 100); // 100ms debounce
 }
 
 const processAndDrawChart = () => {
@@ -712,11 +725,11 @@ const createChart = () => {
     let minDistance = Infinity;
     
     for (const sensor of visibleSensorsWithData) {
-      const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
-      const color = colors[sensorColorIndex % colors.length];
+        const sensorColorIndex = props.sensorConfigs.findIndex(sc => sc.name === sensor.name);
+        const color = colors[sensorColorIndex % colors.length];
 
-      const index = bisect(sensor.data, xPos);
-      const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
+        const index = bisect(sensor.data, xPos);
+        const dataPoint = sensor.data[Math.max(0, Math.min(index, sensor.data.length - 1))];
       if (!dataPoint) continue;
 
       // Calculate distance from mouse to this sensor's data point
@@ -799,15 +812,25 @@ const createChart = () => {
   });
 };
 
-// Add watch for queryParams - re-fetch data when date range changes
-watch(() => props.queryParams, (newParams, oldParams) => {
-  console.log(`[TEMP_GRAPH] Query params changed. New resolution: ${newParams.resolution}`);
-  // Re-fetch data if startDate or endDate changed (not just resolution)
-  if (oldParams && (newParams.startDate !== oldParams.startDate || newParams.endDate !== oldParams.endDate)) {
-    console.log(`[TEMP_GRAPH] Date range changed, re-fetching all sensor data...`);
+// Consolidated watcher for queryParams and dynamicTimeWindow to avoid race conditions
+watch([() => props.queryParams, () => props.dynamicTimeWindow], ([newParams, newWindow], [oldParams, oldWindow]) => {
+  console.log(`[TEMP_GRAPH] Query params or time window changed. Resolution: ${newParams.resolution}, Window: ${newWindow}`);
+  
+  // Determine if we need to re-fetch data
+  const dateRangeChanged = oldParams && (newParams.startDate !== oldParams.startDate || newParams.endDate !== oldParams.endDate);
+  const timeWindowChanged = newWindow !== oldWindow;
+  const resolutionChanged = oldParams && newParams.resolution !== oldParams.resolution;
+  
+  // Re-fetch if date range or time window changed, or if resolution changed significantly
+  if (dateRangeChanged || timeWindowChanged || (resolutionChanged && (newParams.resolution === 'raw' || oldParams.resolution === 'raw'))) {
+    console.log(`[TEMP_GRAPH] Significant change detected, re-fetching all sensor data...`);
     fetchAllSensorData();
+  } else if (resolutionChanged) {
+    // Just re-process existing data if only resolution changed (and it's not raw)
+    console.log(`[TEMP_GRAPH] Resolution changed, re-processing existing data...`);
+    processAndDrawChart();
   } else {
-    // Just re-process existing data if only resolution or other params changed
+    // Other param changes, just re-process
     processAndDrawChart();
   }
 }, { deep: true });
@@ -817,12 +840,6 @@ watch(() => props.sensorVisibility, () => {
   console.log('[TEMP_GRAPH] sensorVisibility prop changed. Triggering createChart...');
   createChart();
 }, { deep: true });
-
-// Watch for dynamicTimeWindow prop
-watch(() => props.dynamicTimeWindow, () => {
-  console.log(`[TEMP_GRAPH] dynamicTimeWindow prop changed to: ${props.dynamicTimeWindow}. Re-fetching all sensor data...`);
-  fetchAllSensorData();
-});
 
 // Add data aggregation function
 const aggregateData = (sensorsToAggregate: Sensor[], resolution: 'hourly' | 'daily' | 'weekly' | 'monthly'): Sensor[] => {
@@ -1053,15 +1070,6 @@ watch(() => props.dataType, (newDataType) => {
     fetchAllSensorData();
   }
 }, { immediate: true });
-
-// Add watch for dynamicTimeWindow prop
-watch(() => props.dynamicTimeWindow, (newWindow) => {
-  console.log(`[TEMP_GRAPH] dynamicTimeWindow changed to: ${newWindow}`);
-  if (props.dataType === 'temperature') {
-    console.log('[TEMP_GRAPH] Refetching data for new time window');
-    fetchAllSensorData();
-  }
-});
 
 // Fullscreen functionality
 const toggleFullscreen = () => {
